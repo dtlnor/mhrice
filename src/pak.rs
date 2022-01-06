@@ -13,6 +13,54 @@ const LANGUAGE_LIST: &[&str] = &[
     "Fc", "Hi",
 ];
 
+/*const FAIL_ADDR: &[u64] = &[
+    5275325371,
+    5275008347,
+    5280377319,
+    5280299095,
+    5274522203,
+    5274881211,
+    5274811179,
+    5275184267,
+    5280253135,
+    5280102303,
+    5275039331,
+    5275129083,
+    5275152515,
+    5274667651,
+    5274727059,
+    5274851763,
+    5275373003,
+    5280215215,
+    5280023319,
+    5274599027,
+    5274547171,
+    5280324063,
+    5274580075,
+    5274697483,
+    5274969171,
+    5280429431,
+    5275070571,
+    5275099379,
+    5275302963,
+    5274909123,
+    5274753563,
+    5274628603,
+    5275255075,
+    5275279275,
+    5280236607,
+    5275230619,
+    5280405871,
+    5280224951,
+    5275207315,
+    5280238663,
+    5274937419,
+    5329316189,
+    5280179495,
+    5275348931,
+    5274781475,
+];*/
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct PakFileIndex {
     version: usize,
@@ -83,30 +131,34 @@ impl<F: Read + Seek> PakReader<F> {
         let suffix = *SUFFIX_MAP
             .get(&path[dot + 1..])
             .context("Unknown extension")?;
-        let full_path = format!("natives/NSW/{}.{}", path, suffix);
-        let full_path_nsw = format!("{}.NSW", &full_path);
+        for suffix in suffix {
+            let full_path = format!("natives/stm/{}.{}", path, suffix);
+            let full_path_nsw = format!("{}.stm", &full_path);
 
-        let mut result = vec![];
+            let mut result = vec![];
 
-        for &language in LANGUAGE_LIST {
-            let (path_l, path_nsw_l) = if language.is_empty() {
-                (full_path.clone(), full_path_nsw.clone())
-            } else {
-                let path_l = format!("{}.{}", &full_path, language);
-                let path_nsw_l = format!("{}.{}", &full_path_nsw, language);
-                (path_l, path_nsw_l)
-            };
-            if let Some(index) = self.find_file_internal(path_l) {
-                result.push(I18nPakFileIndex { language, index });
-                continue;
+            for &language in LANGUAGE_LIST {
+                let (path_l, path_nsw_l) = if language.is_empty() {
+                    (full_path.clone(), full_path_nsw.clone())
+                } else {
+                    let path_l = format!("{}.{}", &full_path, language);
+                    let path_nsw_l = format!("{}.{}", &full_path_nsw, language);
+                    (path_l, path_nsw_l)
+                };
+                if let Some(index) = self.find_file_internal(path_l) {
+                    result.push(I18nPakFileIndex { language, index });
+                    continue;
+                }
+
+                if let Some(index) = self.find_file_internal(path_nsw_l) {
+                    result.push(I18nPakFileIndex { language, index });
+                }
             }
-
-            if let Some(index) = self.find_file_internal(path_nsw_l) {
-                result.push(I18nPakFileIndex { language, index });
+            if !result.is_empty() {
+                return Ok(result);
             }
         }
-
-        Ok(result)
+        return Ok(vec![]);
     }
 
     pub fn find_file(&mut self, path: &str) -> Result<PakFileIndex> {
@@ -126,34 +178,49 @@ impl<F: Read + Seek> PakReader<F> {
         let len = file.read_u64()?;
         let format = file.read_u8()?;
         let _ /*? */ = file.read_u8()?;
+        let sub_format = file.read_u8()?;
 
-        file.seek(SeekFrom::Start(offset))?;
-        match format {
-            0 => {
-                if len != len_compressed {
-                    bail!("Uncompressed file should have len == len_compressed")
+        if sub_format == 1 {
+        //if FAIL_ADDR.contains(&offset) {
+            file.seek(SeekFrom::Start(offset))?;
+            match format {
+                0 |1 |2 => {
+                    let mut data = vec![0; len_compressed.try_into()?];
+                    file.read_exact(&mut data)?;
+                    Ok(data)
                 }
-                let mut data = vec![0; len.try_into()?];
-                file.read_exact(&mut data)?;
-                Ok(data)
+                _ => bail!("Unsupported format: {}", format),
             }
-            1 => {
-                let stream = file.by_ref().take(len_compressed);
-                let mut decompressed = Vec::new();
-                flate::Decoder::new(stream).read_to_end(&mut decompressed)?;
-                if u64::try_from(decompressed.len()).unwrap() != len {
-                    bail!("Expected size {}, actual size {}", len, decompressed.len());
+        }else{
+            file.seek(SeekFrom::Start(offset))?;
+            match format {
+                0 => {
+                    if len != len_compressed {
+                        bail!("Uncompressed file should have len == len_compressed")
+                    }
+                    let mut data = vec![0; len.try_into()?];
+                    file.read_exact(&mut data)?;
+                    Ok(data)
                 }
-                Ok(decompressed)
-            }
-            2 => {
-                let decoded = zstd::decode_all(file.by_ref().take(len_compressed))?;
-                if u64::try_from(decoded.len()).unwrap() != len {
-                    bail!("Expected size {}, actual size {}", len, decoded.len());
+                1 => {
+                    let stream = file.by_ref().take(len_compressed);
+                    let mut decompressed = Vec::new();
+                    flate::Decoder::new(stream).read_to_end(&mut decompressed)?;
+                    if u64::try_from(decompressed.len()).unwrap() != len {
+                        bail!("Expected size {}, actual size {}", len, decompressed.len());
+                    }
+                    Ok(decompressed)
                 }
-                Ok(decoded)
+                2 => {
+                    let decoded = zstd::decode_all(file.by_ref().take(len_compressed))?;
+                    if u64::try_from(decoded.len()).unwrap() != len {
+                        bail!("Expected size {}, actual size {}", len, decoded.len());
+                    }
+                    Ok(decoded)
+                }
+                _ => bail!("Unsupported format: {}", format),
             }
-            _ => bail!("Unsupported format: {}", format),
+
         }
     }
 
