@@ -155,8 +155,8 @@ pub static SUFFIX_MAP: Lazy<HashMap<&'static str, &'static [u32]>> = Lazy::new(|
     m.insert("ainvmmgr", &[2]);
     m.insert("aivspcmgr", &[2]);
     m.insert("nar", &[1]);
-    m.insert("nmr", &[0xf, 0x10]);  //demo nsw&PC
-    m.insert("ncf", &[5]);
+    m.insert("nmr", &[0xf, 0x10, 0x11]);  //demo nsw PC
+    m.insert("ncf", &[5, 9]);
     m.insert("rfl", &[1]);
     m.insert("pup", &[0]);
     m.insert("mov", &[1]);
@@ -172,6 +172,7 @@ pub static SUFFIX_MAP: Lazy<HashMap<&'static str, &'static [u32]>> = Lazy::new(|
     m.insert("fol", &[0]);
     m.insert("gp", &[0]);
     m.insert("layergrid", &[7]);
+    m.insert("fgrl", &[1]);
     m.insert("def", &[5, 6]); //other re game
     m.insert("rmesh", &[10008, 17008]); //other re game
     m.insert("rbs", &[28]); //other re game

@@ -67,7 +67,7 @@ enum Mhrice {
         #[structopt(short, long)]
         version: usize,
         #[structopt(short, long)]
-        index: u32,
+        index: usize,
         #[structopt(short, long)]
         output: String,
     },
@@ -252,7 +252,7 @@ fn dump(pak: Vec<String>, name: String, output: String) -> Result<()> {
     Ok(())
 }
 
-fn dump_index(pak: Vec<String>, version: usize, index: u32, output: String) -> Result<()> {
+fn dump_index(pak: Vec<String>, version: usize, index: usize, output: String) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
     let content = pak.read_file_at(version, index)?;
     std::fs::write(output, content)?;
