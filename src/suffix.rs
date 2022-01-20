@@ -172,6 +172,13 @@ pub static SUFFIX_MAP: Lazy<HashMap<&'static str, &'static [u32]>> = Lazy::new(|
     m.insert("fol", &[0]);
     m.insert("gp", &[0]);
     m.insert("layergrid", &[7]);
+    m.insert("def", &[5, 6]); //other re game
+    m.insert("rmesh", &[10008, 17008]); //other re game
+    m.insert("rbs", &[28]); //other re game
+    m.insert("rdd", &[27019,28019]); //other re game
+    m.insert("gclo", &[8]); //other re game
+    m.insert("gpuc", &[5]); //other re game
+    m.insert("rdc", &[28019003]); //other re game
 
     m
 });
