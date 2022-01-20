@@ -67,7 +67,7 @@ enum Mhrice {
         #[structopt(short, long)]
         version: usize,
         #[structopt(short, long)]
-        index: u32,
+        index: usize,
         #[structopt(short, long)]
         output: String,
     },
@@ -252,7 +252,7 @@ fn dump(pak: Vec<String>, name: String, output: String) -> Result<()> {
     Ok(())
 }
 
-fn dump_index(pak: Vec<String>, version: usize, index: u32, output: String) -> Result<()> {
+fn dump_index(pak: Vec<String>, version: usize, index: usize, output: String) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
     let content = pak.read_file_at(version, index)?;
     std::fs::write(output, content)?;
@@ -829,31 +829,32 @@ fn main() -> Result<()> {
             index,
             output,
         } => dump_index(pak, version, index, output),
-        Mhrice::Scan { pak } => scan(pak),
-        Mhrice::GenJson { pak } => gen_json(pak),
-        Mhrice::GenWebsite { pak, output, s3 } => gen_website(pak, output, s3),
-        Mhrice::ReadTdb { tdb } => read_tdb(tdb),
-        Mhrice::ReadMsg { msg } => read_msg(msg),
-        Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
-        Mhrice::GrepMsg { pak, pattern } => grep_msg(pak, pattern),
-        Mhrice::Grep { pak, pattern } => grep(pak, pattern),
-        Mhrice::SearchPath { pak } => search_path(pak),
-        Mhrice::DumpTree { pak, list, output } => dump_tree(pak, list, output),
-        Mhrice::ScanMesh { pak } => scan_mesh(pak),
-        Mhrice::ScanRcol { pak } => scan_rcol(pak),
-        Mhrice::ScanTex { pak } => scan_tex(pak),
-        Mhrice::ScanGui { pak } => scan_gui(pak),
-        Mhrice::ScanUvs { pak } => scan_uvs(pak),
-        Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
-        Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
-        Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
-        Mhrice::DumpTex { tex, output } => dump_tex(tex, output),
-        Mhrice::DumpGui { gui } => dump_gui(gui),
-        Mhrice::GenMeat { pak, index, output } => gen_meat(pak, index, output),
-        Mhrice::GenResources { pak, output } => gen_resources(pak, output),
-        Mhrice::Hash { input, utf16 } => {
-            hash(input, utf16);
-            Ok(())
-        }
+        //Mhrice::Scan { pak } => scan(pak),
+        //Mhrice::GenJson { pak } => gen_json(pak),
+        //Mhrice::GenWebsite { pak, output, s3 } => gen_website(pak, output, s3),
+        //Mhrice::ReadTdb { tdb } => read_tdb(tdb),
+        //Mhrice::ReadMsg { msg } => read_msg(msg),
+        //Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
+        //Mhrice::GrepMsg { pak, pattern } => grep_msg(pak, pattern),
+        //Mhrice::Grep { pak, pattern } => grep(pak, pattern),
+        //Mhrice::SearchPath { pak } => search_path(pak),
+        //Mhrice::DumpTree { pak, list, output } => dump_tree(pak, list, output),
+        //Mhrice::ScanMesh { pak } => scan_mesh(pak),
+        //Mhrice::ScanRcol { pak } => scan_rcol(pak),
+        //Mhrice::ScanTex { pak } => scan_tex(pak),
+        //Mhrice::ScanGui { pak } => scan_gui(pak),
+        //Mhrice::ScanUvs { pak } => scan_uvs(pak),
+        //Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
+        //Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
+        //Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
+        //Mhrice::DumpTex { tex, output } => dump_tex(tex, output),
+        //Mhrice::DumpGui { gui } => dump_gui(gui),
+        //Mhrice::GenMeat { pak, index, output } => gen_meat(pak, index, output),
+        //Mhrice::GenResources { pak, output } => gen_resources(pak, output),
+        //Mhrice::Hash { input, utf16 } => {
+        //    hash(input, utf16);
+        //    Ok(())
+        //}
+        _ => unimplemented!(),
     }
 }
