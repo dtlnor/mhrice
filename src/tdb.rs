@@ -27,80 +27,8 @@ bitflags! {
         const POINTER                  = 0x0800;
         const MARSHAL                  = 0x1000;
         const PINVOKE                  = 0x2000;
-        const EXPOSE_MEMBER            = 0x4000;
+        const UNK                      = 0x4000;
         const DEFAULT                  = 0x8000;
-        const RESERVED_MASK            = 0x9500;
-        const NO_RESERVE               = 0x0000;
-    }
-}
-
-bitflags! {
-    struct PropertyFlag: u16 {
-        const SPECIAL_NAME             = 0x0200;
-        const RT_SPECIAL_NAME          = 0x0400;
-        const HAS_DEFAULT              = 0x1000;
-        const EXPOSE_MEMBER            = 0x4000;
-    }
-}
-
-bitflags! {
-    struct TypeFlag: u32 {
-
-        const VISIBILITY_MASK           = 0x00000007; //111 {0~7}
-        const NOT_PUBLIC                = 0x00000000;
-        const PUBLIC                    = 0x00000001;
-        const NESTED_PUBLIC             = 0x00000002;
-        const NESTED_PRIVATE            = 0x00000003;
-        const NESTED_FAMILY             = 0x00000004;
-        const NESTED_ASSEMBLY           = 0x00000005;
-        const NESTED_FAM_AND_ASSEM      = 0x00000006;
-        const NESTED_FAM_OR_ASSEM       = 0x00000007;
-
-        const LAYOUT_MASK               = 0x00000018; //11000 {0, 8, 16, 24}
-        const AUTO_LAYOUT               = 0x00000000;
-        const SEQUENTIAL_LAYOUT         = 0x00000008;        
-        const EXPLICIT_LAYOUT           = 0x00000010;
-
-        const CLASS_SEMANTICS_MASK      = 0x00000020; //100000 {0, 32}
-        const CLASS                     = 0x00000000;
-        const INTERFACE                 = 0x00000020;
-
-        //no mask
-        const ABSTRACT                  = 0x00000080;
-        const SEALED                    = 0x00000100;
-        const SPECIAL_NAME              = 0x00000400;
-        const IMPORT                    = 0x00001000;
-        const SERIALIZABLE              = 0x00002000;
-        const WINDOWS_RUNTIME           = 0x00004000;
-
-        const STRING_FORMAT_MASK        = 0x00030000; //110000000000000000 {0, 65536, 131072, 196608}
-        const ANSI_CLASS                = 0x00000000;
-        const UNICODE_CLASS             = 0x00010000;
-        const AUTO_CLASS                = 0x00020000;
-        const CUSTOM_FORMAT_CLASS       = 0x00030000;
-
-        const CUSTOM_FORMAT_MASK        = 0x00C00000; //110000000000000000000000 {0, 4194304, 8388608, 12582912}
-        const CUSTOM_00                 = 0x00000000;
-        const CUSTOM_01                 = 0x00400000;
-        const CUSTOM_10                 = 0x00800000;
-        const CUSTOM_11                 = 0x00C00000;
-
-        //no mask
-        const BEFORE_FIELD_INIT         = 0x00100000;
-
-        const NO_RESERVE                = 0x00000000;
-        const RTSPECIAL_NAME            = 0x00000800;
-        const HAS_SECURITY              = 0x00040000;
-        const RESERVED_MASK             = 0x00040800; //1000000100000000000 {0, 2048, 262144, 264192}
-
-        //no mask
-        const LOCAL_HEAP                = 0x01000000;
-        const FINALIZE                  = 0x02000000;
-        const NATIVE_TYPE               = 0x04000000;
-        const MARK_FIELDS               = 0x08000000;
-        const NATIVE_CTOR               = 0x10000000;
-        const CONSTRACTED               = 0x20000000;
-        const MANAGED_VTABLE            = 0x40000000;
     }
 }
 
@@ -113,14 +41,6 @@ bitflags! {
         const OPTIONAL          = 0x0010;
         const HAS_DEFAULT       = 0x1000;
         const HAS_FIELD_MARSHAL = 0x2000;
-    }
-}
-
-bitflags! {
-    struct ParamModifier: u8 {
-        const NONE              = 0x00;
-        const PTR               = 0x01;
-        const REF               = 0x02;
     }
 }
 
@@ -151,102 +71,6 @@ bitflags! {
     }
 }
 
-bitflags! {
-    struct MethodImplFlag: u16 {
-        const CODE_TYPE_MASK          = 0x0003;
-        const IL                      = 0x0000;
-        const NATIVE                  = 0x0001;
-        const OPTIL                   = 0x0002;
-        const RUNTIME                 = 0x0003;
-
-        const MANAGED_MASK            = 0x0004;
-        const UNMANAGED               = 0x0004;
-        const MANAGED                 = 0x0000;
-
-        const FORWARD_REF             = 0x0010;
-        const PRESERVE_SIG            = 0x0080;
-        const INTERNAL_CALL           = 0x1000;
-        const SYNCHRONIZED            = 0x0020;
-        const NO_IN_LINING            = 0x0008;
-        const AGGRESSIVE_IN_LINING    = 0x0100;
-        const NO_OPTIMIZATION         = 0x0040;
-        const HAS_RET_VAL             = 0x0200;
-        const EXPOSE_MEMBER           = 0x0400;
-        const EMPTY_CTOR              = 0x0800;
-        const CONTAINS_GENERIC_PARAM  = 0x2000;
-        const HAS_THIS                = 0x4000;
-        const BREAK                   = 0x8000;        
-    }
-}
-
-
-
-//fn as_u32_le(array: &[u8; 4]) -> u32 {
-fn as_u32_le(array: &[u8]) -> u32 {
-    ((array[0] as u32) <<  0) +
-    ((array[1] as u32) <<  8) +
-    ((array[2] as u32) << 16) +
-    ((array[3] as u32) << 24)
-}
-
-fn as_u16_le(array: &[u8]) -> u16 {
-    ((array[0] as u16) <<  0) +
-    ((array[1] as u16) <<  8)
-}
-
-fn as_hex(array: &[u8], len: usize) -> String {
-    let mut s = String::new();
-    if len % 4 == 0 {
-        if len > 4 {
-            /*
-            s += "[in-order-hexBE]";
-            for i in 0..(len/4){
-                for j in (0..4).rev(){
-                    s += &(format!("{:01$X}", array[i*4+j] as u8, 2));
-                }
-                if i < (len/4) - 1 { s += " " }
-            }*/
-            s += "[hexLE]"; //remain order
-            for i in 0..len { //.rev() to get BE
-                if i % 4 == 0 && i > 0 { s += " " }
-                s += &(format!("{:01$X}", array[i] as u8, 2));
-            }
-        }else{ //len = 4
-            s += "[hexBE]"; //remain order
-            for i in (0..len).rev(){
-                s += &(format!("{:01$X}", array[i] as u8, 2));
-            }
-        }
-    }else{
-        s += "[hexLE]"; //remain order
-        for i in 0..len { //.rev() to get BE
-            s += &(format!("{:01$X} ", array[i] as u8, 2));
-        }
-    }
-
-    s
-}
-
-fn display_property_flag(attributes: PropertyFlag) -> String {
-    let mut s = String::new();
-
-    if attributes.contains(PropertyFlag::SPECIAL_NAME) {
-        s += "[special]"
-    }
-
-    if attributes.contains(PropertyFlag::RT_SPECIAL_NAME) {
-        s += "[rt_special]"
-    }
-
-    if attributes.contains(PropertyFlag::HAS_DEFAULT) {
-        s += "[default]"
-    }
-
-    if attributes.contains(PropertyFlag::EXPOSE_MEMBER) {
-        s += "[expose]"
-    }
-    s
-}
 fn display_field_attributes(attributes: FieldAttribute) -> String {
     let mut s = String::new();
 
@@ -255,34 +79,40 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
     }
 
     if attributes.contains(FieldAttribute::NO_SERIALIZE) {
-        s += "[no_serialize]"
+        s += "[no-serialize]"
+    }
+
+    if attributes.contains(FieldAttribute::HAS_RVA) {
+        s += "[has-rva]"
     }
 
     if attributes.contains(FieldAttribute::SPECIAL) {
         s += "[special]"
     }
 
+    if attributes.contains(FieldAttribute::RT_SPECIAL) {
+        s += "[rt-special]"
+    }
+
     if attributes.contains(FieldAttribute::POINTER) {
         s += "[pointer]"
+    }
+
+    if attributes.contains(FieldAttribute::MARSHAL) {
+        s += "[marshal]"
     }
 
     if attributes.contains(FieldAttribute::PINVOKE) {
         s += "[pinvoke]"
     }
 
-    if attributes.contains(FieldAttribute::EXPOSE_MEMBER) {
-        s += "[expose]"
+    if attributes.contains(FieldAttribute::UNK) {
+        s += "[4000]"
     }
 
-    s += match attributes & FieldAttribute::RESERVED_MASK {
-        FieldAttribute::NO_RESERVE => "",
-        FieldAttribute::HAS_RVA => "[has_rva]",
-        FieldAttribute::RT_SPECIAL => "[rt_special]",
-        FieldAttribute::MARSHAL => "[marshal]",
-        FieldAttribute::DEFAULT => "[default]",
-        FieldAttribute::RESERVED_MASK => "[reserve?]",
-        _ => panic!(),
-    };
+    if attributes.contains(FieldAttribute::DEFAULT) {
+        s += "[default]"
+    }
 
     s += match attributes & FieldAttribute::MEMBER_ACCESS_MASK {
         FieldAttribute::PRIVATE_SCOPE => "[hidden]private ",
@@ -295,7 +125,7 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         FieldAttribute::MEMBER_ACCESS_MASK => "[public?] ",
         _ => panic!(),
     };
-   
+
     if attributes.contains(FieldAttribute::STATIC) {
         s += "static "
     }
@@ -303,112 +133,6 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
     if attributes.contains(FieldAttribute::READONLY) {
         s += "readonly "
     }
-
-    s
-}
-
-
-fn display_type_flag(attributes: TypeFlag) -> String {
-    let mut s = String::new();    
-
-    //https://docs.microsoft.com/en-us/dotnet/api/system.reflection.typeattributes?view=net-6.0
-
-    s += match attributes & TypeFlag::LAYOUT_MASK {
-        TypeFlag::AUTO_LAYOUT => "[StructLayoutAttribute(LayoutKind.Auto)]",
-        TypeFlag::SEQUENTIAL_LAYOUT => "[StructLayoutAttribute(LayoutKind.Sequential)]",
-        TypeFlag::EXPLICIT_LAYOUT => "[StructLayoutAttribute(LayoutKind.Explicit)]",
-        _ => panic!(),
-    };
-
-    if attributes.contains(TypeFlag::LOCAL_HEAP) {
-        s += "[LocalHeap]"
-    };
-    if attributes.contains(TypeFlag::FINALIZE) {
-        s += "[Finalize]"
-    };
-    if attributes.contains(TypeFlag::NATIVE_TYPE) {
-        s += "[NativeType]"
-    };
-    if attributes.contains(TypeFlag::MARK_FIELDS) {
-        s += "[MarkFields]"
-    };
-    if attributes.contains(TypeFlag::NATIVE_CTOR) {
-        s += "[NativeCtor]"
-    };
-    if attributes.contains(TypeFlag::CONSTRACTED) {
-        s += "[Constracted]"
-    };
-    if attributes.contains(TypeFlag::MANAGED_VTABLE) {
-        s += "[ManagedVTable]"
-    };
-
-    if attributes.contains(TypeFlag::SPECIAL_NAME) {
-        s += "[SpecialName]"
-    }
-    if attributes.contains(TypeFlag::IMPORT) {
-        s += "[Import]"
-    }
-    if attributes.contains(TypeFlag::SERIALIZABLE) {
-        s += "[SerializableAttribute]"
-    }
-    if attributes.contains(TypeFlag::WINDOWS_RUNTIME) {
-        s += "[WinRT]"
-    }
-
-    s += match attributes & TypeFlag::STRING_FORMAT_MASK {
-        TypeFlag::ANSI_CLASS => "[AnsiClass]",
-        TypeFlag::UNICODE_CLASS => "[UnicodeClass]",
-        TypeFlag::AUTO_CLASS => "[AutoClass]",
-        TypeFlag::CUSTOM_FORMAT_CLASS => "[CustomFormatClass]",
-        _ => panic!(),
-    };
-    
-    s += match attributes & TypeFlag::CUSTOM_FORMAT_MASK {
-        TypeFlag::CUSTOM_00 => "",
-        TypeFlag::CUSTOM_01 => "[Custom01]",
-        TypeFlag::CUSTOM_10 => "[Custom10]",
-        TypeFlag::CUSTOM_11 => "[Custom11]",
-        _ => panic!(),
-    };
-    
-    if attributes.contains(TypeFlag::BEFORE_FIELD_INIT) {
-        s += "[BeforeFieldInit]"
-    };
-
-    s += match attributes & TypeFlag::RESERVED_MASK {
-        TypeFlag::NO_RESERVE => "",
-        TypeFlag::RTSPECIAL_NAME => "[RTSpecial]",
-        TypeFlag::HAS_SECURITY => "[HasSecurity]",
-        TypeFlag::RESERVED_MASK => "[ReservedMask?]",
-        _ => panic!(),
-    };
-
-    s += "\n";
-
-    s += match attributes & TypeFlag::VISIBILITY_MASK {
-        TypeFlag::NOT_PUBLIC => "internal ",
-        TypeFlag::PUBLIC => "public ",
-        TypeFlag::NESTED_PUBLIC => "/*nested*/ public ",
-        TypeFlag::NESTED_PRIVATE => "/*nested*/ private ",
-        TypeFlag::NESTED_FAMILY => "/*nested*/ protected ",
-        TypeFlag::NESTED_ASSEMBLY => "/*nested*/ internal ",
-        TypeFlag::NESTED_FAM_AND_ASSEM => "/*nested*/ private protected ",
-        TypeFlag::NESTED_FAM_OR_ASSEM => "/*nested*/ protected internal ",
-        _ => panic!(),
-    };
-    
-    if attributes.contains(TypeFlag::ABSTRACT) {
-        s += "abstract "
-    }
-    if attributes.contains(TypeFlag::SEALED) {
-        s += "sealed "
-    }
-
-    s += match attributes & TypeFlag::CLASS_SEMANTICS_MASK {
-        TypeFlag::CLASS => "class ",
-        TypeFlag::INTERFACE => "interface ",
-        _ => panic!(),
-    };
 
     s
 }
@@ -452,8 +176,6 @@ fn display_method_attributes(attributes: MethodAttribute) -> String {
         s += "[require_sec_object]";
     }
 
-    s += "\n    ";
-
     s += match attributes & MethodAttribute::MEMBER_ACCESS_MASK {
         MethodAttribute::PRIVATE_SCOPE => "[hidden]private ",
         MethodAttribute::PRIVATE => "private ",
@@ -485,109 +207,29 @@ fn display_method_attributes(attributes: MethodAttribute) -> String {
     s
 }
 
-fn display_method_impl_flag(attributes: MethodImplFlag) -> String {
-    let mut s = String::new();
-
-    s += match attributes & MethodImplFlag::MANAGED_MASK {
-        MethodImplFlag::UNMANAGED => "[Unmanaged]",
-        MethodImplFlag::MANAGED => "",
-        _ => panic!(),
-    };
-
-    if attributes.contains(MethodImplFlag::FORWARD_REF) {
-        s += "[ForwardRef]"
-    }
-    if attributes.contains(MethodImplFlag::PRESERVE_SIG) {
-        s += "[PreserveSig]"
-    }
-    if attributes.contains(MethodImplFlag::INTERNAL_CALL) {
-        s += "[InternalCall]"
-    }
-    if attributes.contains(MethodImplFlag::SYNCHRONIZED) {
-        s += "[Synchronized]"
-    }
-    if attributes.contains(MethodImplFlag::NO_IN_LINING) {
-        s += "[NoInlining]"
-    }
-    if attributes.contains(MethodImplFlag::AGGRESSIVE_IN_LINING) {
-        s += "[AggressiveInlining]"
-    }
-    if attributes.contains(MethodImplFlag::NO_OPTIMIZATION) {
-        s += "[NoOptimization]"
-    }
-    
-    s += match attributes & MethodImplFlag::CODE_TYPE_MASK {
-        MethodImplFlag::IL => "[IL]", //implemented in IL
-        MethodImplFlag::NATIVE => "[native]", //native platform-specific code
-        MethodImplFlag::OPTIL => "[OPTIL]", //optimaized IL
-        MethodImplFlag::RUNTIME => "[RT]", //auto gen by runtime (RVA must be zero)
-        _ => panic!(),
-    };
-
-    if attributes.contains(MethodImplFlag::HAS_RET_VAL) {
-        s += "[has_retval]"
-    }
-    if attributes.contains(MethodImplFlag::EXPOSE_MEMBER) {
-        s += "[expose]"
-    }
-    if attributes.contains(MethodImplFlag::EMPTY_CTOR) {
-        s += "[empty_ctor]"
-    }
-    if attributes.contains(MethodImplFlag::CONTAINS_GENERIC_PARAM) {
-        s += "[has_G_param]"
-    }
-    if attributes.contains(MethodImplFlag::HAS_THIS) {
-        s += "[has_this]"
-    }
-    if attributes.contains(MethodImplFlag::BREAK) {
-        s += "[break]"
-    }
-    s
-}
-
-
 fn display_param_attributes(attributes: ParamAttribute) -> String {
     let mut s = String::new();
     if attributes.contains(ParamAttribute::IN) {
-        s += "in ";
+        s += "in";
     }
     if attributes.contains(ParamAttribute::OUT) {
-        s += "out ";
+        s += "out";
     }
     if attributes.contains(ParamAttribute::LCID) {
-        s += "[lcid] ";
+        s += "[lcid]";
     }
     if attributes.contains(ParamAttribute::RETVAL) {
-        s += "[ret] ";
+        s += "[ret]";
     }
     if attributes.contains(ParamAttribute::OPTIONAL) {
-        s += "[opt] ";
+        s += "[opt]";
     }
     if attributes.contains(ParamAttribute::HAS_DEFAULT) {
-        s += "[default] ";
+        s += "[default]";
     }
     if attributes.contains(ParamAttribute::HAS_FIELD_MARSHAL) {
-        s += "[marshal] ";
+        s += "[marshal]";
     }
-    s
-}
-
-fn display_param_modifier(modifiers: ParamModifier, attributes: ParamAttribute) -> String {
-    let mut s = String::new();
-    if modifiers.contains(ParamModifier::NONE) {
-        s += "";
-    }
-    if modifiers.contains(ParamModifier::PTR) {
-        s += "[ptr] ";
-    }
-    if modifiers.contains(ParamModifier::REF) {
-        if attributes.contains(ParamAttribute::IN) || attributes.contains(ParamAttribute::OUT) {
-            s += "";
-        }else{
-            s += "ref ";
-        }
-    }
-    
     s
 }
 
@@ -604,8 +246,8 @@ impl Tdb {
             bail!("Wrong version for TDB file");
         }
 
-        if file.read_u32()? != 0 { //initialized, zero when its not runtime
-            //bail!("Expected 0");
+        if file.read_u32()? != 0 {
+            bail!("Expected 0");
         }
 
         let type_instance_count = file.read_u32()?;
@@ -624,9 +266,11 @@ impl Tdb {
         let q_count = file.read_u32()?;
         let assembly_count = file.read_u32()?;
 
-        let dev_entry = file.read_u32()?;
+        if file.read_u32()? != 0 {
+            bail!("Expected 0");
+        }
 
-        let app_entry = file.read_u32()?; //appEntry
+        let unknown = file.read_u32()?;
         let string_table_len = file.read_u32()?;
         let heap_len = file.read_u32()?;
 
@@ -648,7 +292,7 @@ impl Tdb {
         let string_table_offset = file.read_u64()?;
         let heap_offset = file.read_u64()?;
         let q_offset = file.read_u64()?;
-        let _ = file.read_u64()?; //pad?
+        let _ = file.read_u64()?;
 
         struct Assembly {
             name_offset: u32,
@@ -688,9 +332,8 @@ impl Tdb {
         struct TypeInstance {
             base_type_instance_index: usize,
             parent_type_instance_index: usize,
-            underlying_type: u64,
-            object_type: u64,
-            arrayize_type_instance_index: usize, 
+            af: u64,
+            arrayize_type_instance_index: usize,
             dearrayize_type_instance_index: usize,
             type_index: usize,
             special_type_id: u64,
@@ -700,8 +343,7 @@ impl Tdb {
             field_membership_start_index: usize,
             template_argument_list_offset: usize,
             hash: u32,
-            crc32: u32,
-            type_flags: TypeFlag,
+            j: u32,
             event_start_index: usize,
             event_count: usize,
             property_membership_start_index: usize,
@@ -711,8 +353,8 @@ impl Tdb {
         file.seek_assert_align_up(type_instance_offset, 16)?;
         let type_instances = (0..type_instance_count)
             .map(|i| {
-                let (index, base_type_instance_index, parent_type_instance_index, underlying_type, object_type) =
-                    file.read_u64()?.bit_split((18, 18, 18, 7, 3));
+                let (index, base_type_instance_index, parent_type_instance_index, af) =
+                    file.read_u64()?.bit_split((18, 18, 18, 10));
 
                 if index != u64::from(i) {
                     bail!("Unexpected index");
@@ -725,16 +367,16 @@ impl Tdb {
                     special_type_id,
                 ) = file.read_u64()?.bit_split((18, 18, 18, 10));
 
-                let type_flags = file.read_u32()?; //type_flags
-                let x = file.read_u32()?; //size {zero when its not runtime}
+                let j = file.read_u32()?;
+                let x = file.read_u32()?;
                 if x != 0 {
-                    //bail!("Expected 0: {}", index);
+                    bail!("Expected 0: {}", index);
                 }
-                let hash = file.read_u32()?; 
-                let crc32 = file.read_u32()?;
+                let hash = file.read_u32()?;
+                file.read_u32()?;
 
                 let default_ctor_method_membership_index = file.read_u32()?;
-                let b = file.read_u32()?; //vt
+                let b = file.read_u32()?;
                 let method_membership_start_index = file.read_u32()?;
                 let field_membership_start_index = file.read_u32()?;
 
@@ -744,32 +386,29 @@ impl Tdb {
                 let interface_list_offset = file.read_u32()?;
                 let template_argument_list_offset = file.read_u32()?;
 
-                let x = file.read_u64()?; //type {zero when its not runtime}
+                let x = file.read_u64()?;
                 if x != 0 {
-                    //bail!("Expected 0: {}", index);
+                    bail!("Expected 0: {}", index);
                 }
-                let x = file.read_u64()?; //managed_vt {zero when its not runtime}
+                let x = file.read_u64()?;
                 if x != 0 {
-                    //bail!("Expected 0: {}", index);
+                    bail!("Expected 0: {}", index);
                 }
                 Ok(TypeInstance {
                     base_type_instance_index: base_type_instance_index.try_into()?,
                     parent_type_instance_index: parent_type_instance_index.try_into()?,
-                    underlying_type, //new //base tyoe of <T>
-                    object_type, //new
+                    af,
                     arrayize_type_instance_index: arrayize_type_instance_index.try_into()?,
                     dearrayize_type_instance_index: dearrayize_type_instance_index.try_into()?,
                     type_index: type_index.try_into()?,
                     special_type_id,
-                    b, //vt byte pool?
+                    b,
                     interface_list_offset: interface_list_offset.try_into()?,
                     method_membership_start_index: method_membership_start_index.try_into()?,
                     field_membership_start_index: field_membership_start_index.try_into()?,
                     template_argument_list_offset: template_argument_list_offset.try_into()?,
                     hash,
-                    crc32,
-                    type_flags: TypeFlag::from_bits(type_flags)
-                        .context("Unknown TypeFlag")?,
+                    j,
                     event_start_index: event_start_index.try_into()?,
                     event_count: event_count.try_into()?,
                     property_count: property_count.try_into()?,
@@ -792,7 +431,7 @@ impl Tdb {
                     file.read_u64()?.bit_split((18, 20, 26));
                 let zero = file.read_u64()?;
                 if zero != 0 {
-                    //bail!("Expected 0")
+                    bail!("Expected 0")
                 }
                 Ok(MethodMembership {
                     type_instance_index: type_instance_index.try_into()?,
@@ -824,7 +463,7 @@ impl Tdb {
             name_offset: u32,
             namespace_offset: u32,
             len: usize,
-            static_field_size: u32,
+            s2: u32,
 
             assembly_index: u8,
             array_dimension: u8,
@@ -832,10 +471,10 @@ impl Tdb {
 
             field_count: usize,
 
-            interface_id: i16,
-            native_vtable_count: u16,
-            attributes_id: u16,
-            vtable_count: u16,
+            n4: u16,
+            n5: u16,
+            n6: u16,
+            n7: u16,
 
             flag_a: u64,
             flag_b: u64,
@@ -847,16 +486,16 @@ impl Tdb {
                 let name_offset = file.read_u32()?;
                 let namespace_offset = file.read_u32()?;
                 let len = file.read_u32()?;
-                let static_field_size = file.read_u32()?;
+                let s2 = file.read_u32()?;
 
                 let assembly_index = file.read_u8()?;
                 let array_dimension = file.read_u8()?;
                 let method_count = file.read_u16()?;
                 let field_count = file.read_u32()?;
-                let interface_id = file.read_i16()?;
-                let native_vtable_count = file.read_u16()?;
-                let attributes_id = file.read_u16()?;
-                let vtable_count = file.read_u16()?;
+                let n4 = file.read_u16()?;
+                let n5 = file.read_u16()?;
+                let n6 = file.read_u16()?;
+                let n7 = file.read_u16()?;
 
                 let flag_a = file.read_u64()?;
                 let flag_b = file.read_u64()?;
@@ -864,15 +503,15 @@ impl Tdb {
                     name_offset,
                     namespace_offset,
                     len: len.try_into()?,
-                    static_field_size,
+                    s2,
                     assembly_index,
                     array_dimension,
                     method_count: method_count.try_into()?,
                     field_count: field_count.try_into()?,
-                    interface_id,
-                    native_vtable_count,
-                    attributes_id,
-                    vtable_count,
+                    n4,
+                    n5,
+                    n6,
+                    n7,
                     flag_a,
                     flag_b,
                 })
@@ -883,7 +522,7 @@ impl Tdb {
             attribute_list_index: usize,
             vtable_slot: i16,
             attributes: MethodAttribute,
-            impl_flags: MethodImplFlag,
+            b2: u16,
             name_offset: u32,
         }
         file.seek_assert_align_up(method_offset, 16)?;
@@ -892,15 +531,14 @@ impl Tdb {
                 let attribute_list_index = file.read_u16()?;
                 let vtable_slot = file.read_i16()?;
                 let attributes = file.read_u16()?;
-                let impl_flags = file.read_u16()?;
+                let b2 = file.read_u16()?;
                 let name_offset = file.read_u32()?;
                 Ok(Method {
                     attribute_list_index: attribute_list_index.try_into()?,
                     vtable_slot,
                     attributes: MethodAttribute::from_bits(attributes)
                         .context("Unknown method attr")?,
-                    impl_flags: MethodImplFlag::from_bits(impl_flags)
-                        .context("Unknown method Implement flag")?,
+                    b2,
                     name_offset,
                 })
             })
@@ -911,24 +549,21 @@ impl Tdb {
             attributes: FieldAttribute,
             type_instance_index: usize,
             constant_index: usize,
-            constant_index_hi: u32,
             name_offset: u32,
         }
         file.seek_assert_align_up(field_offset, 16)?;
         let fields = (0..field_count)
             .map(|_| {
                 let attribute_list_index = file.read_u16()?;
-                let attributes = file.read_u16()?; //flags
-                let (type_instance_index, constant_index_lo) = file.read_u32()?.bit_split((18, 14)); 
-                let (name_offset, constant_index_hi) = file.read_u32()?.bit_split((30, 2)); 
-                let constant_index = constant_index_lo as u32 | ((constant_index_hi as u32) << 14);
+                let attributes = file.read_u16()?;
+                let (type_instance_index, constant_index) = file.read_u32()?.bit_split((18, 14));
+                let name_offset = file.read_u32()?;
                 Ok(Field {
                     attribute_list_index: attribute_list_index.try_into()?,
                     attributes: FieldAttribute::from_bits(attributes)
                         .context("Unknown field attribute")?,
                     type_instance_index: type_instance_index.try_into()?,
                     constant_index: constant_index.try_into()?,
-                    constant_index_hi,
                     name_offset,
                 })
             })
@@ -953,22 +588,21 @@ impl Tdb {
             .collect::<Result<Vec<_>>>()?;
 
         struct Property {
-            flag: PropertyFlag,
+            a: u16,
             attribute_list_index: usize,
             name_offset: u32,
         }
         file.seek_assert_align_up(property_offset, 16)?;
         let properties = (0..property_count)
             .map(|_| {
-                let flag = file.read_u16()?;
-                //if a != 0 && a != 0x4000 {
-                //    bail!("Unexpected flag")
-                //}
+                let a = file.read_u16()?;
+                if a != 0 && a != 0x4000 {
+                    bail!("Unexpected flag")
+                }
                 let attribute_list_index = file.read_u16()?;
                 let name_offset = file.read_u32()?;
                 Ok(Property {
-                    flag: PropertyFlag::from_bits(flag)
-                        .context("Unkn property flag")?,
+                    a,
                     attribute_list_index: attribute_list_index.try_into()?,
                     name_offset,
                 })
@@ -985,7 +619,7 @@ impl Tdb {
             .map(|_| {
                 let a = file.read_u32()?;
                 if a != 0 {
-                    //bail!("expected 0")
+                    bail!("expected 0")
                 }
                 let name_offset = file.read_u32()?;
                 let add_method_membership_index = file.read_u32()?;
@@ -1018,23 +652,22 @@ impl Tdb {
             attribute_list_index: usize,
             default_const_index: usize,
             name_offset: u32,
-            modifier: ParamModifier,
+            no_high: u32,
             type_instance_index: usize,
-            attribute: ParamAttribute, //paramFlag
+            attribute: ParamAttribute,
         }
         file.seek_assert_align_up(param_offset, 16)?;
         let params = (0..param_count)
             .map(|_| {
                 let attribute_list_index = file.read_u16()?;
                 let default_const_index = file.read_u16()?;
-                let (name_offset, modifier) = file.read_u32()?.bit_split((30, 2));
+                let (name_offset, no_high) = file.read_u32()?.bit_split((30, 2));
                 let (type_instance_index, attribute) = file.read_u32()?.bit_split((18, 14));
                 Ok(Param {
                     attribute_list_index: attribute_list_index.try_into()?,
                     default_const_index: default_const_index.try_into()?,
                     name_offset,
-                    modifier: ParamModifier::from_bits(u8::try_from(modifier)?)
-                        .context("Unknown param modifier")?,
+                    no_high,
                     type_instance_index: type_instance_index.try_into()?,
                     attribute: ParamAttribute::from_bits(u16::try_from(attribute)?)
                         .context("Unknown param attr")?,
@@ -1266,16 +899,15 @@ impl Tdb {
 
         for i in order {
             let type_instance = &type_instances[i];
-            println!("/// $Type_Instance[{}]", i);
+            // println!("/// $TI[{}]", i);
             let full_name = &symbols[i].as_ref().unwrap();
             let calc_hash = hash_as_utf8(full_name);
             if i != 0 && calc_hash != type_instance.hash {
                 bail!("Mismatched hash for TI[{}]", i)
             }
-            println!("/// [MMH3(UTF8), CRC]: {:08X} {:08X}", calc_hash, type_instance.crc32); //mmh3utf8
-            print!("{}", display_type_flag(type_instance.type_flags));
+            println!("/// % {:08X}", calc_hash);
             println!(
-                "{}: {}",
+                "class {}: {}",
                 full_name,
                 symbols[type_instance.base_type_instance_index]
                     .as_ref()
@@ -1304,7 +936,7 @@ impl Tdb {
                 continue;
             }
 
-            println!("    // Special(systemTypeId) = {}", type_instance.special_type_id);
+            println!("    // Special = {}", type_instance.special_type_id);
 
             if type_instance.template_argument_list_offset != 0 {
                 let mut template_argument_list =
@@ -1321,7 +953,7 @@ impl Tdb {
                         let flag = template_argument_list.read_u32()?;
                         let name_offset = template_argument_list.read_u32()?;
                         println!(
-                            "    // param {}, 0x{:08X}",
+                            "     // param {}, 0x{:08X}",
                             read_string(name_offset)?,
                             flag
                         );
@@ -1338,11 +970,11 @@ impl Tdb {
                 .get(type_instance.type_index)
                 .context("Type index out of bound")?;
 
-            println!("    // fieldSize: {}", ty.len);
+            // println!("    // size: {}", ty.len);
 
             println!(
-                "    // staticFieldSize={}, interfaceId={}, nativeVTableCount={}, attrsId={}, vtableCount={}",
-                ty.static_field_size, ty.interface_id, ty.native_vtable_count, ty.attributes_id, ty.vtable_count
+                "    // s2={}, n4={}, n5={}, n7={}",
+                ty.s2, ty.n4, ty.n5, /*ty.n6,*/ ty.n7
             );
 
             println!();
@@ -1364,7 +996,7 @@ impl Tdb {
                 if method.attribute_list_index != 0 {
                     print!("    ");
                     print_attributes(method.attribute_list_index)?;
-                    //println!();
+                    println!();
                 }
 
                 let mut mp = &heap[method_membership.param_list_offset..];
@@ -1373,17 +1005,17 @@ impl Tdb {
                 let return_value_index = usize::try_from(mp.read_u32()?)?;
                 let return_value = &params[return_value_index];
                 if return_value.attribute_list_index != 0 {
-                    println!("    /* returns attribute */");
+                    println!("/* returns */");
                     print!("    ");
                     print_attributes(return_value.attribute_list_index)?;
                     println!();
                 }
 
                 println!(
-                    "    {}{}{}{} {} (",
-                    display_method_impl_flag(method.impl_flags),
+                    "    /*{}, {}*/ {} {} {} (",
+                    method.b2,
+                    return_value.no_high,
                     display_method_attributes(method.attributes),
-                    display_param_modifier(return_value.modifier, ParamAttribute::HAS_DEFAULT),
                     symbols[return_value.type_instance_index].as_ref().unwrap(),
                     read_string(method.name_offset)?
                 );
@@ -1396,9 +1028,9 @@ impl Tdb {
                         print_attributes(param.attribute_list_index)?;
                     }
                     print!(
-                        "{}{}{} {}",
+                        "/*{}*/ {} {} {}",
+                        param.no_high,
                         display_param_attributes(param.attribute),
-                        display_param_modifier(param.modifier, param.attribute ),
                         symbols[param.type_instance_index].as_ref().unwrap(),
                         read_string(param.name_offset)?
                     );
@@ -1411,45 +1043,7 @@ impl Tdb {
                                     &type_instances[param.type_instance_index];
                                 let len = types[field_type_instance.type_index].len;
                                 let value = &heap[offset..][..len];
-                                let int_value;
-                                let hex_value = as_hex(&value, len);
-                                match len {
-                                    1 => {
-                                        int_value = value[0] as u32;
-                                        print!(" = {:?} /*{}*/", value, int_value)
-                                    }
-                                    2 => {
-                                        int_value = as_u16_le(&value) as u32;
-                                        print!(" = {:?} /*{}, {}*/", value, int_value, hex_value)
-                                    }
-                                    4 => {
-                                        int_value = as_u32_le(&value) as u32;
-                                        let float_value = f32::from_bits(int_value);
-                                        //let s_int_value = i32::from_bits(int_value);
-                                        let is_positive = int_value >> 31 == 0;
-                                        let display_float;
-                                        let display_int;
-                                        
-                                        print!(" = {:?} /*", value);
-                                        if is_positive { //positive
-                                            if (float_value < 0.0001) | (float_value > 10000.0) { //not float
-                                                display_float = false;
-                                                if int_value > 10000 { display_int = false } else { display_int = true }
-                                            } else {
-                                                display_float = true;
-                                                if int_value > 10000 { display_int = false } else { display_int = true }
-                                            }
-                                        }else{ //negative (display hex directly)
-                                            display_float = false;
-                                            display_int = false
-                                        }
-                                        if display_int { print!(" uint: {}", int_value) }
-                                        if display_float { print!(" float: {}", float_value) }
-                                        print!(" {} */", hex_value);
-
-                                    }
-                                    _ => print!(" = {:?} /*{}*/", value, hex_value),
-                                } 
+                                print!(" = {:?}", value);
                             }
                             Constant::String(offset) => {
                                 let s = read_string(offset)?;
@@ -1494,52 +1088,12 @@ impl Tdb {
 
                 if field.constant_index != 0 {
                     let constant = constants[field.constant_index];
-                    if field.constant_index_hi != 0 {
-                        print!("/*constant_index_hi:{}*/", field.constant_index_hi);
-                    }
                     match constant {
                         Constant::Integral(offset) => {
                             let field_type_instance = &type_instances[field.type_instance_index];
                             let len = types[field_type_instance.type_index].len;
                             let value = &heap[offset..][..len];
-                            let int_value;
-                            let hex_value = as_hex(&value, len);
-                            match len {
-                                1 => {
-                                    int_value = value[0] as u32;
-                                    print!(" = {:?} /*{}*/", value, int_value)
-                                }
-                                2 => {
-                                    int_value = as_u16_le(&value) as u32;
-                                    print!(" = {:?} /*{}, {}*/", value, int_value, hex_value)
-                                }
-                                4 => {
-                                    int_value = as_u32_le(&value) as u32;
-                                    let float_value = f32::from_bits(int_value);
-                                    //let s_int_value = i32::from_bits(int_value);
-                                    let is_positive = int_value >> 31 == 0;
-                                    let display_float;
-                                    let display_int;
-                                    
-                                    print!(" = {:?} /*", value);
-                                    if is_positive { //positive
-                                        if (float_value < 0.0001) | (float_value > 10000.0) { //not float
-                                            display_float = false;
-                                            if int_value > 10000 { display_int = false } else { display_int = true }
-                                        } else {
-                                            display_float = true;
-                                            if int_value > 10000 { display_int = false } else { display_int = true }
-                                        }
-                                    }else{ //negative (display hex directly)
-                                        display_float = false;
-                                        display_int = false
-                                    }
-                                    if display_int { print!(" uint: {}", int_value) }
-                                    if display_float { print!(" float: {}", float_value) }
-                                    print!(" {} */", hex_value);
-                                }
-                                _ => print!(" = {:?} /*{}*/", value, hex_value),
-                            } 
+                            print!(" = {:?}", value);
                         }
                         Constant::String(offset) => {
                             let s = read_string(offset)?;
@@ -1572,8 +1126,7 @@ impl Tdb {
                     println!();
                 }
                 println!(
-                    "    {}public property {};",
-                    display_property_flag(property.flag),
+                    "    public property {};",
                     read_string(property.name_offset)?
                 );
             }

@@ -8,7 +8,7 @@ use rusoto_s3::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor};
+use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom};
 use std::path::*;
 use std::sync::Mutex;
 use structopt::*;
@@ -506,7 +506,41 @@ fn gen_website(pak: Vec<String>, output: String, s3: Option<String>) -> Result<(
 }
 
 fn read_tdb(tdb: String) -> Result<()> {
-    let _ = Tdb::new(File::open(tdb)?)?;
+    let mut file = BufReader::new(File::open(tdb)?);
+    let anchor = b"TDB\0\x46\0\0\0";
+    let offset = loop {
+        let mut magic = vec![0; anchor.len()];
+        file.read_exact(&mut magic)?;
+        if magic == anchor {
+            break file.seek(SeekFrom::Current(-(anchor.len() as i64)))?;
+        } else {
+            file.seek(SeekFrom::Current(-(anchor.len() as i64) + 1))?;
+        }
+    };
+
+    struct OffsetFile<F> {
+        file: F,
+        offset: u64,
+    }
+
+    impl<F: Read> Read for OffsetFile<F> {
+        fn read(&mut self, b: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+            self.file.read(b)
+        }
+    }
+
+    impl<F: Seek> Seek for OffsetFile<F> {
+        fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+            match pos {
+                SeekFrom::Current(_) => self.file.seek(pos),
+                SeekFrom::Start(x) => self.file.seek(SeekFrom::Start(x + self.offset)),
+                _ => unimplemented!(),
+            }
+            .map(|x| x - self.offset)
+        }
+    }
+
+    let _ = Tdb::new(OffsetFile { file, offset })?;
     Ok(())
 }
 
@@ -861,9 +895,9 @@ fn main() -> Result<()> {
             index,
             output,
         } => dump_index(pak, version, index, output),
-        Mhrice::Scan { pak } => scan(pak),
-        Mhrice::GenJson { pak } => gen_json(pak),
-        Mhrice::GenWebsite { pak, output, s3 } => gen_website(pak, output, s3),
+        //Mhrice::Scan { pak } => scan(pak),
+        //Mhrice::GenJson { pak } => gen_json(pak),
+        //Mhrice::GenWebsite { pak, output, s3 } => gen_website(pak, output, s3),
         Mhrice::ReadTdb { tdb } => read_tdb(tdb),
         Mhrice::ReadMsg { msg } => read_msg(msg),
         Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
@@ -871,21 +905,22 @@ fn main() -> Result<()> {
         Mhrice::Grep { pak, pattern } => grep(pak, pattern),
         Mhrice::SearchPath { pak } => search_path(pak),
         Mhrice::DumpTree { pak, list, output } => dump_tree(pak, list, output),
-        Mhrice::ScanMesh { pak } => scan_mesh(pak),
-        Mhrice::ScanRcol { pak } => scan_rcol(pak),
-        Mhrice::ScanTex { pak } => scan_tex(pak),
-        Mhrice::ScanGui { pak } => scan_gui(pak),
-        Mhrice::ScanUvs { pak } => scan_uvs(pak),
-        Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
-        Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
-        Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
+        //Mhrice::ScanMesh { pak } => scan_mesh(pak),
+        //Mhrice::ScanRcol { pak } => scan_rcol(pak),
+        //Mhrice::ScanTex { pak } => scan_tex(pak),
+        //Mhrice::ScanGui { pak } => scan_gui(pak),
+        //Mhrice::ScanUvs { pak } => scan_uvs(pak),
+        //Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
+        //Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
+        //Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
         Mhrice::DumpTex { tex, output } => dump_tex(tex, output),
-        Mhrice::DumpGui { gui } => dump_gui(gui),
-        Mhrice::GenMeat { pak, index, output } => gen_meat(pak, index, output),
-        Mhrice::GenResources { pak, output } => gen_resources(pak, output),
+        //Mhrice::DumpGui { gui } => dump_gui(gui),
+        //Mhrice::GenMeat { pak, index, output } => gen_meat(pak, index, output),
+        //Mhrice::GenResources { pak, output } => gen_resources(pak, output),
         Mhrice::Hash { input, utf16 } => {
             hash(input, utf16);
             Ok(())
         }
+        _ => unimplemented!(),
     }
 }
