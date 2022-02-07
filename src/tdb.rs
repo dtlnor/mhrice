@@ -1559,7 +1559,7 @@ impl Tdb {
                 }
 
                 println!(
-                    "    {}{}{}\n    {} {} (",
+                    "    {}{}{}{} {} (",
                     display_param_modifier(return_value.modifier, true),
                     display_method_impl_flag(method.impl_flag),
                     display_method_attributes(method.attributes),
