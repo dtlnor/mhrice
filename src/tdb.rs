@@ -1325,7 +1325,7 @@ impl Tdb {
                         print_arg(element_type, &mut args_data)?;
                         print!(",");
                     }
-                    print!("]");
+                    print!("])]");
                     return Ok(());
                 } else {
                     print_arg(param_symbol, &mut args_data)?;
@@ -1396,11 +1396,11 @@ impl Tdb {
                 bail!("Mismatched hash for TI[{}]", i)
             }
             println!("/// [MMH3(UTF8), CRC]: {:08X} {:08X}", calc_hash, type_instance.crc32); //mmh3utf8
-            print!("{}", display_type_flag(type_instance.type_flags));
             if ty.attribute_list_index != 0 {
                 print_attributes(attribute_lists[ty.attribute_list_index])?;
-                println!();
+                //println!();
             }
+            print!("{}", display_type_flag(type_instance.type_flags));
 
             println!(
                 "{}: {}",
