@@ -41,34 +41,6 @@ fn as_hex(array: &[u8], len: usize) -> String {
 }
 
 bitflags! {
-    struct FieldAttribute: u16 {
-        const PRIVATE_SCOPE            = 0x0000;
-        const PRIVATE                  = 0x0001;
-        const FAM_AND_ASSEM            = 0x0002;
-        const ASSEMBLY                 = 0x0003;
-        const FAMILY                   = 0x0004;
-        const FAM_OR_ASSEM             = 0x0005;
-        const PUBLIC                   = 0x0006;
-        const MEMBER_ACCESS_MASK       = 0x0007;
-
-        const STATIC                   = 0x0010;
-        const READONLY                 = 0x0020;
-        const LITERAL                  = 0x0040;
-        const NO_SERIALIZE             = 0x0080;
-        const HAS_RVA                  = 0x0100;
-        const SPECIAL                  = 0x0200;
-        const RT_SPECIAL               = 0x0400;
-        const POINTER                  = 0x0800;
-        const MARSHAL                  = 0x1000;
-        const PINVOKE                  = 0x2000;
-        const EXPOSE_MEMBER            = 0x4000;
-        const DEFAULT                  = 0x8000;
-        const RESERVED_MASK            = 0x9500;
-        const NO_RESERVE               = 0x0000;
-    }
-}
-
-bitflags! {
     struct PropertyFlag: u16 {
         const SPECIAL_NAME             = 0x0200;
         const RT_SPECIAL_NAME          = 0x0400;
@@ -139,6 +111,34 @@ bitflags! {
 }
 
 bitflags! {
+    struct FieldAttribute: u16 {
+        const PRIVATE_SCOPE            = 0x0000;
+        const PRIVATE                  = 0x0001;
+        const FAM_AND_ASSEM            = 0x0002;
+        const ASSEMBLY                 = 0x0003;
+        const FAMILY                   = 0x0004;
+        const FAM_OR_ASSEM             = 0x0005;
+        const PUBLIC                   = 0x0006;
+        const MEMBER_ACCESS_MASK       = 0x0007;
+
+        const STATIC                   = 0x0010;
+        const READONLY                 = 0x0020;
+        const LITERAL                  = 0x0040;
+        const NO_SERIALIZE             = 0x0080;
+        const HAS_RVA                  = 0x0100;
+        const SPECIAL                  = 0x0200;
+        const RT_SPECIAL               = 0x0400;
+        const POINTER                  = 0x0800;
+        const MARSHAL                  = 0x1000;
+        const PINVOKE                  = 0x2000;
+        const EXPOSE_MEMBER            = 0x4000;
+        const DEFAULT                  = 0x8000;
+        const RESERVED_MASK            = 0x9500;
+        const NO_RESERVE               = 0x0000;
+    }
+}
+
+bitflags! {
     struct ParamAttribute: u16 {
         const IN                = 0x0001;
         const OUT               = 0x0002;
@@ -147,14 +147,6 @@ bitflags! {
         const OPTIONAL          = 0x0010;
         const HAS_DEFAULT       = 0x1000;
         const HAS_FIELD_MARSHAL = 0x2000;
-    }
-}
-
-bitflags! {
-    struct ParamModifier: u8 {
-        const NONE              = 0x00;
-        const PTR               = 0x01;
-        const REF               = 0x02;
     }
 }
 
@@ -187,52 +179,58 @@ bitflags! {
 
 bitflags! {
     struct MethodImplFlag: u16 {
-        const CODE_TYPE_MASK          = 0x0003;
-        const IL                      = 0x0000;
-        const NATIVE                  = 0x0001;
-        const OPTIL                   = 0x0002;
-        const RUNTIME                 = 0x0003;
-
-        const MANAGED_MASK            = 0x0004;
-        const UNMANAGED               = 0x0004;
-        const MANAGED                 = 0x0000;
-
-        const FORWARD_REF             = 0x0010;
-        const PRESERVE_SIG            = 0x0080;
-        const INTERNAL_CALL           = 0x1000;
-        const SYNCHRONIZED            = 0x0020;
-        const NO_IN_LINING            = 0x0008;
-        const AGGRESSIVE_IN_LINING    = 0x0100;
-        const NO_OPTIMIZATION         = 0x0040;
-        const HAS_RET_VAL             = 0x0200;
-        const EXPOSE_MEMBER           = 0x0400;
-        const EMPTY_CTOR              = 0x0800;
-        const CONTAINS_GENERIC_PARAM  = 0x2000;
-        const HAS_THIS                = 0x4000;
-        const BREAK                   = 0x8000;        
+        const CODE_TYPE_MASK              = 0x0003;
+        const IL                          = 0x0000;
+        const NATIVE                      = 0x0001;
+        const OPTIL                       = 0x0002;
+        const RUNTIME                     = 0x0003;
+        const UNMANAGED                   = 0x0004;
+        const NO_INLINING                 = 0x0008;
+        const FORWARD_REF                 = 0x0010;
+        const SYNCHRONIZED                = 0x0020;
+        const NO_OPTIMIZATION             = 0x0040;
+        const PRESERVE_SIG                = 0x0080;
+        const AGGRESSIVE_INLINING         = 0x0100;
+        const HAS_RET_VAL                 = 0x0200;
+        const EXPOSE_MEMBER               = 0x0400;
+        const EMPTY_CTOR                  = 0x0800;
+        const INTERNAL_CALL               = 0x1000;
+        const CONTAINS_GENERIC_PARAMETERS = 0x2000;
+        const HAS_THIS                    = 0x4000;
+        const THREAD_SAFE                 = 0x8000;    
+        
+        const MANAGED_MASK                = 0x0004;
+        const MANAGED                     = 0x0000;
     }
 }
 
-fn display_property_flag(attributes: PropertyFlag) -> String {
+bitflags! {
+    struct ParamModifier: u8 {
+        const NONE              = 0x00;
+        const PTR               = 0x01;
+        const REF               = 0x02;
+    }
+}
+
+fn display_param_modifier(modifiers: ParamModifier, attributes: ParamAttribute) -> String {
     let mut s = String::new();
-
-    if attributes.contains(PropertyFlag::SPECIAL_NAME) {
-        s += "[special]"
+    if modifiers.contains(ParamModifier::NONE) {
+        s += "";
     }
-
-    if attributes.contains(PropertyFlag::RT_SPECIAL_NAME) {
-        s += "[rt_special]"
+    if modifiers.contains(ParamModifier::PTR) {
+        s += "[ptr] ";
     }
-
-    if attributes.contains(PropertyFlag::HAS_DEFAULT) {
-        s += "[default]"
+    if modifiers.contains(ParamModifier::REF) {
+        if attributes.contains(ParamAttribute::IN) || attributes.contains(ParamAttribute::OUT) {
+            s += "";
+        }else{
+            s += "ref ";
+        }
     }
-
-    if attributes.contains(PropertyFlag::EXPOSE_MEMBER) {
-        s += "[expose]"
-    }
+    
     s
 }
+
 fn display_field_attributes(attributes: FieldAttribute) -> String {
     let mut s = String::new();
 
@@ -290,6 +288,190 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "readonly "
     }
 
+    s
+}
+
+fn display_method_impl_flag(attributes: MethodImplFlag) -> String {
+    let mut s = String::new();
+
+    s += match attributes & MethodImplFlag::CODE_TYPE_MASK {
+        MethodImplFlag::IL => "[il]", //implemented in IL
+        MethodImplFlag::NATIVE => "[native]", //native platform-specific code
+        MethodImplFlag::OPTIL => "[optil]", //optimaized IL
+        MethodImplFlag::RUNTIME => "[runtime]", //auto gen by runtime (RVA must be zero)
+        _ => panic!(),
+    };
+
+    /* //as MANAGED_MASK == UNMANAGED
+    s += match attributes & MethodImplFlag::MANAGED_MASK {
+        MethodImplFlag::UNMANAGED => "[unmanaged]",
+        MethodImplFlag::MANAGED => "",
+        _ => panic!(),
+    };*/
+
+    if attributes.contains(MethodImplFlag::UNMANAGED) {
+        s += "[unmanaged]"
+    }
+
+    if attributes.contains(MethodImplFlag::NO_INLINING) {
+        s += "[no_inline]"
+    }
+
+    if attributes.contains(MethodImplFlag::FORWARD_REF) {
+        s += "[forward_ref]"
+    }
+    if attributes.contains(MethodImplFlag::SYNCHRONIZED) {
+        s += "[synchronized]"
+    }
+    if attributes.contains(MethodImplFlag::NO_OPTIMIZATION) {
+        s += "[no_optimization]"
+    }
+    if attributes.contains(MethodImplFlag::PRESERVE_SIG) {
+        s += "[preserve_sig]"
+    }
+    if attributes.contains(MethodImplFlag::AGGRESSIVE_INLINING) {
+        s += "[inline]"
+    }
+    if attributes.contains(MethodImplFlag::HAS_RET_VAL) {
+        s += "[ret]"
+    }
+    if attributes.contains(MethodImplFlag::EXPOSE_MEMBER) {
+        s += "[expose]"
+    }
+    if attributes.contains(MethodImplFlag::EMPTY_CTOR) {
+        s += "[empty_ctor]"
+    }
+    if attributes.contains(MethodImplFlag::INTERNAL_CALL) {
+        s += "[internal_call]"
+    }
+    if attributes.contains(MethodImplFlag::CONTAINS_GENERIC_PARAMETERS) {
+        s += "[generic]"
+    }
+    if attributes.contains(MethodImplFlag::HAS_THIS) {
+        s += "[has_this]"
+    }
+    if attributes.contains(MethodImplFlag::THREAD_SAFE) {
+        s += "[thread_safe]"
+    }
+    s
+}
+
+fn display_method_attributes(attributes: MethodAttribute) -> String {
+    let mut s = String::new();
+
+    if attributes.contains(MethodAttribute::UNMANAGED_EXPORT) {
+        s += "[export]"
+    }
+
+    if attributes.contains(MethodAttribute::HIDE_BY_SIG) {
+        s += "[hid_by_sig]";
+    }
+
+    if attributes.contains(MethodAttribute::NEW_SLOT) {
+        s += "[new_slot]";
+    }
+
+    if attributes.contains(MethodAttribute::CHECK_ACCESS_ON_OVERRIDE) {
+        s += "[check_access_override]";
+    }
+
+    if attributes.contains(MethodAttribute::SPECIAL_NAME) {
+        s += "[special]";
+    }
+
+    if attributes.contains(MethodAttribute::RT_SPECIAL_NAME) {
+        s += "[rt_special]";
+    }
+
+    if attributes.contains(MethodAttribute::PINVOKE_IMPL) {
+        s += "[pinvoke]";
+    }
+
+    if attributes.contains(MethodAttribute::HAS_SECURITY) {
+        s += "[has_security]";
+    }
+
+    if attributes.contains(MethodAttribute::REQUIRE_SEC_OBJECT) {
+        s += "[require_sec_object]";
+    }
+
+    s += "\n    ";
+
+    s += match attributes & MethodAttribute::MEMBER_ACCESS_MASK {
+        MethodAttribute::PRIVATE_SCOPE => "[hidden]private ",
+        MethodAttribute::PRIVATE => "private ",
+        MethodAttribute::FAM_AND_ASSEM => "private protected ",
+        MethodAttribute::ASSEMBLY => "internal ",
+        MethodAttribute::FAMILY => "protected ",
+        MethodAttribute::FAM_OR_ASSEM => "protected internal ",
+        MethodAttribute::PUBLIC => "public ",
+        MethodAttribute::MEMBER_ACCESS_MASK => "[public?] ",
+        _ => panic!(),
+    };
+
+    if attributes.contains(MethodAttribute::STATIC) {
+        s += "static ";
+    }
+
+    if attributes.contains(MethodAttribute::FINAL) {
+        s += "sealed ";
+    }
+
+    if attributes.contains(MethodAttribute::VIRTUAL) {
+        s += "virtual ";
+    }
+
+    if attributes.contains(MethodAttribute::ABSTRACT) {
+        s += "abstract ";
+    }
+
+    s
+}
+
+fn display_param_attributes(attributes: ParamAttribute) -> String {
+    let mut s = String::new();
+    if attributes.contains(ParamAttribute::IN) {
+        s += "in ";
+    }
+    if attributes.contains(ParamAttribute::OUT) {
+        s += "out ";
+    }
+    if attributes.contains(ParamAttribute::LCID) {
+        s += "[lcid] ";
+    }
+    if attributes.contains(ParamAttribute::RETVAL) {
+        s += "[ret] ";
+    }
+    if attributes.contains(ParamAttribute::OPTIONAL) {
+        s += "[opt] ";
+    }
+    if attributes.contains(ParamAttribute::HAS_DEFAULT) {
+        s += "[default] ";
+    }
+    if attributes.contains(ParamAttribute::HAS_FIELD_MARSHAL) {
+        s += "[marshal] ";
+    }
+    s
+}
+
+fn display_property_flag(attributes: PropertyFlag) -> String {
+    let mut s = String::new();
+
+    if attributes.contains(PropertyFlag::SPECIAL_NAME) {
+        s += "[special]"
+    }
+
+    if attributes.contains(PropertyFlag::RT_SPECIAL_NAME) {
+        s += "[rt_special]"
+    }
+
+    if attributes.contains(PropertyFlag::HAS_DEFAULT) {
+        s += "[default]"
+    }
+
+    if attributes.contains(PropertyFlag::EXPOSE_MEMBER) {
+        s += "[expose]"
+    }
     s
 }
 
@@ -396,184 +578,6 @@ fn display_type_flag(attributes: TypeFlag) -> String {
         _ => panic!(),
     };
 
-    s
-}
-
-fn display_method_attributes(attributes: MethodAttribute) -> String {
-    let mut s = String::new();
-
-    if attributes.contains(MethodAttribute::UNMANAGED_EXPORT) {
-        s += "[export]"
-    }
-
-    if attributes.contains(MethodAttribute::HIDE_BY_SIG) {
-        s += "[hid_by_sig]";
-    }
-
-    if attributes.contains(MethodAttribute::NEW_SLOT) {
-        s += "[new_slot]";
-    }
-
-    if attributes.contains(MethodAttribute::CHECK_ACCESS_ON_OVERRIDE) {
-        s += "[check_access_override]";
-    }
-
-    if attributes.contains(MethodAttribute::SPECIAL_NAME) {
-        s += "[special]";
-    }
-
-    if attributes.contains(MethodAttribute::RT_SPECIAL_NAME) {
-        s += "[rt_special]";
-    }
-
-    if attributes.contains(MethodAttribute::PINVOKE_IMPL) {
-        s += "[pinvoke]";
-    }
-
-    if attributes.contains(MethodAttribute::HAS_SECURITY) {
-        s += "[has_security]";
-    }
-
-    if attributes.contains(MethodAttribute::REQUIRE_SEC_OBJECT) {
-        s += "[require_sec_object]";
-    }
-
-    s += "\n    ";
-
-    s += match attributes & MethodAttribute::MEMBER_ACCESS_MASK {
-        MethodAttribute::PRIVATE_SCOPE => "[hidden]private ",
-        MethodAttribute::PRIVATE => "private ",
-        MethodAttribute::FAM_AND_ASSEM => "private protected ",
-        MethodAttribute::ASSEMBLY => "internal ",
-        MethodAttribute::FAMILY => "protected ",
-        MethodAttribute::FAM_OR_ASSEM => "protected internal ",
-        MethodAttribute::PUBLIC => "public ",
-        MethodAttribute::MEMBER_ACCESS_MASK => "[public?] ",
-        _ => panic!(),
-    };
-
-    if attributes.contains(MethodAttribute::STATIC) {
-        s += "static ";
-    }
-
-    if attributes.contains(MethodAttribute::FINAL) {
-        s += "sealed ";
-    }
-
-    if attributes.contains(MethodAttribute::VIRTUAL) {
-        s += "virtual ";
-    }
-
-    if attributes.contains(MethodAttribute::ABSTRACT) {
-        s += "abstract ";
-    }
-
-    s
-}
-
-fn display_method_impl_flag(attributes: MethodImplFlag) -> String {
-    let mut s = String::new();
-
-    s += match attributes & MethodImplFlag::MANAGED_MASK {
-        MethodImplFlag::UNMANAGED => "[Unmanaged]",
-        MethodImplFlag::MANAGED => "",
-        _ => panic!(),
-    };
-
-    if attributes.contains(MethodImplFlag::FORWARD_REF) {
-        s += "[ForwardRef]"
-    }
-    if attributes.contains(MethodImplFlag::PRESERVE_SIG) {
-        s += "[PreserveSig]"
-    }
-    if attributes.contains(MethodImplFlag::INTERNAL_CALL) {
-        s += "[InternalCall]"
-    }
-    if attributes.contains(MethodImplFlag::SYNCHRONIZED) {
-        s += "[Synchronized]"
-    }
-    if attributes.contains(MethodImplFlag::NO_IN_LINING) {
-        s += "[NoInlining]"
-    }
-    if attributes.contains(MethodImplFlag::AGGRESSIVE_IN_LINING) {
-        s += "[AggressiveInlining]"
-    }
-    if attributes.contains(MethodImplFlag::NO_OPTIMIZATION) {
-        s += "[NoOptimization]"
-    }
-    
-    s += match attributes & MethodImplFlag::CODE_TYPE_MASK {
-        MethodImplFlag::IL => "[IL]", //implemented in IL
-        MethodImplFlag::NATIVE => "[native]", //native platform-specific code
-        MethodImplFlag::OPTIL => "[OPTIL]", //optimaized IL
-        MethodImplFlag::RUNTIME => "[RT]", //auto gen by runtime (RVA must be zero)
-        _ => panic!(),
-    };
-
-    if attributes.contains(MethodImplFlag::HAS_RET_VAL) {
-        s += "[has_retval]"
-    }
-    if attributes.contains(MethodImplFlag::EXPOSE_MEMBER) {
-        s += "[expose]"
-    }
-    if attributes.contains(MethodImplFlag::EMPTY_CTOR) {
-        s += "[empty_ctor]"
-    }
-    if attributes.contains(MethodImplFlag::CONTAINS_GENERIC_PARAM) {
-        s += "[has_G_param]"
-    }
-    if attributes.contains(MethodImplFlag::HAS_THIS) {
-        s += "[has_this]"
-    }
-    if attributes.contains(MethodImplFlag::BREAK) {
-        s += "[break]"
-    }
-    s
-}
-
-
-fn display_param_attributes(attributes: ParamAttribute) -> String {
-    let mut s = String::new();
-    if attributes.contains(ParamAttribute::IN) {
-        s += "in ";
-    }
-    if attributes.contains(ParamAttribute::OUT) {
-        s += "out ";
-    }
-    if attributes.contains(ParamAttribute::LCID) {
-        s += "[lcid] ";
-    }
-    if attributes.contains(ParamAttribute::RETVAL) {
-        s += "[ret] ";
-    }
-    if attributes.contains(ParamAttribute::OPTIONAL) {
-        s += "[opt] ";
-    }
-    if attributes.contains(ParamAttribute::HAS_DEFAULT) {
-        s += "[default] ";
-    }
-    if attributes.contains(ParamAttribute::HAS_FIELD_MARSHAL) {
-        s += "[marshal] ";
-    }
-    s
-}
-
-fn display_param_modifier(modifiers: ParamModifier, attributes: ParamAttribute) -> String {
-    let mut s = String::new();
-    if modifiers.contains(ParamModifier::NONE) {
-        s += "";
-    }
-    if modifiers.contains(ParamModifier::PTR) {
-        s += "[ptr] ";
-    }
-    if modifiers.contains(ParamModifier::REF) {
-        if attributes.contains(ParamAttribute::IN) || attributes.contains(ParamAttribute::OUT) {
-            s += "";
-        }else{
-            s += "ref ";
-        }
-    }
-    
     s
 }
 
@@ -908,7 +912,7 @@ impl Tdb {
                     attributes: MethodAttribute::from_bits(attributes)
                         .context("Unknown method attr")?,
                     impl_flags: MethodImplFlag::from_bits(impl_flags)
-                        .context("Unknown method Implement flag")?,
+                        .context("Unknown method Impl flag")?,
                     name_offset,
                 })
             })
@@ -1311,8 +1315,7 @@ impl Tdb {
                         print_arg(element_type, &mut args_data)?;
                         print!(",");
                     }
-                    print!("])]");
-                    return Ok(());
+                    print!("]");
                 } else {
                     print_arg(param_symbol, &mut args_data)?;
                 }
