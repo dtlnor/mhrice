@@ -248,6 +248,11 @@ enum Mhrice {
         #[structopt(short, long)]
         utf16: bool,
     },
+
+    ReadUser {
+        #[structopt(short, long)]
+        user: String,
+    },
 }
 
 fn open_pak_files(mut pak: Vec<String>) -> Result<Vec<File>> {
@@ -255,7 +260,7 @@ fn open_pak_files(mut pak: Vec<String>) -> Result<Vec<File>> {
         eprintln!("Listing all PAK files in the folder...");
         let dir = pak.pop().unwrap();
         let dir = Path::new(&dir);
-        for entry in std::fs::read_dir(dir)?.into_iter() {
+        for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             if entry
                 .file_name()
@@ -292,6 +297,8 @@ fn dump_index(pak: Vec<String>, version: usize, index: usize, output: String) ->
     Ok(())
 }
 
+/*
+
 #[derive(Debug, Clone)]
 struct TreeNode {
     parsed: bool,
@@ -301,7 +308,7 @@ struct TreeNode {
     visited: bool,
 }
 
-/*fn visit_tree(nodes: &mut [TreeNode], current: usize, depth: i32) {
+fn visit_tree(nodes: &mut [TreeNode], current: usize, depth: i32) {
     for _ in 0..depth {
         print!("    ")
     }
@@ -886,6 +893,14 @@ fn hash(input: String, utf16: bool) {
     }
 }
 
+fn read_user(user: String) -> Result<()> {
+    let nodes = User::new(File::open(user)?)?.rsz.deserialize()?;
+    for node in nodes {
+        println!("{}", node.to_json()?);
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     gpu::gpu_init();
     match Mhrice::from_args() {
@@ -897,8 +912,8 @@ fn main() -> Result<()> {
             output,
         } => dump_index(pak, version, index, output),
         Mhrice::Scan { pak } => scan(pak),
-        //Mhrice::GenJson { pak } => gen_json(pak),
-        //Mhrice::GenWebsite { pak, output, s3 } => gen_website(pak, output, s3),
+        Mhrice::GenJson { pak } => gen_json(pak),
+        Mhrice::GenWebsite { pak, output, s3 } => gen_website(pak, output, s3),
         Mhrice::ReadTdb { tdb } => read_tdb(tdb),
         Mhrice::ReadMsg { msg } => read_msg(msg),
         Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
@@ -911,17 +926,17 @@ fn main() -> Result<()> {
         Mhrice::ScanTex { pak } => scan_tex(pak),
         Mhrice::ScanGui { pak } => scan_gui(pak),
         Mhrice::ScanUvs { pak } => scan_uvs(pak),
-        //Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
-        //Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
-        //Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
+        Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
+        Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
+        Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
         Mhrice::DumpTex { tex, output } => dump_tex(tex, output),
-        //Mhrice::DumpGui { gui } => dump_gui(gui),
-        //Mhrice::GenMeat { pak, index, output } => gen_meat(pak, index, output),
-        //Mhrice::GenResources { pak, output } => gen_resources(pak, output),
+        Mhrice::DumpGui { gui } => dump_gui(gui),
+        Mhrice::GenMeat { pak, index, output } => gen_meat(pak, index, output),
+        Mhrice::GenResources { pak, output } => gen_resources(pak, output),
         Mhrice::Hash { input, utf16 } => {
             hash(input, utf16);
             Ok(())
         }
-        _ => unimplemented!(),
+        Mhrice::ReadUser { user } => read_user(user),
     }
 }
