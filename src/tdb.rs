@@ -5,6 +5,40 @@ use anyhow::*;
 use bitflags::*;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek};
+use std::char::{REPLACEMENT_CHARACTER};
+
+fn as_hex(array: &[u8], len: usize) -> String {
+    let mut s = String::new();
+    if len % 4 == 0 {
+        if len > 4 {
+            /*
+            s += "[in-order-hexBE]";
+            for i in 0..(len/4){
+                for j in (0..4).rev(){
+                    s += &(format!("{:01$X}", array[i*4+j] as u8, 2));
+                }
+                if i < (len/4) - 1 { s += " " }
+            }*/
+            s += "[hexLE]"; //remain order
+            for i in 0..len { //.rev() to get BE
+                if i % 4 == 0 && i > 0 { s += " " }
+                s += &(format!("{:01$X}", array[i] as u8, 2));
+            }
+        }else{ //len = 4
+            s += "[hexBE]"; //remain order
+            for i in (0..len).rev(){
+                s += &(format!("{:01$X}", array[i] as u8, 2));
+            }
+        }
+    }else{
+        s += "[hexLE]"; //remain order
+        for i in 0..len { //.rev() to get BE
+            s += &(format!("{:01$X} ", array[i] as u8, 2));
+        }
+    }
+
+    s
+}
 
 bitflags! {
     struct FieldAttribute: u16 {
@@ -177,54 +211,6 @@ bitflags! {
         const HAS_THIS                = 0x4000;
         const BREAK                   = 0x8000;        
     }
-}
-
-
-
-//fn as_u32_le(array: &[u8; 4]) -> u32 {
-fn as_u32_le(array: &[u8]) -> u32 {
-    ((array[0] as u32) <<  0) +
-    ((array[1] as u32) <<  8) +
-    ((array[2] as u32) << 16) +
-    ((array[3] as u32) << 24)
-}
-
-fn as_u16_le(array: &[u8]) -> u16 {
-    ((array[0] as u16) <<  0) +
-    ((array[1] as u16) <<  8)
-}
-
-fn as_hex(array: &[u8], len: usize) -> String {
-    let mut s = String::new();
-    if len % 4 == 0 {
-        if len > 4 {
-            /*
-            s += "[in-order-hexBE]";
-            for i in 0..(len/4){
-                for j in (0..4).rev(){
-                    s += &(format!("{:01$X}", array[i*4+j] as u8, 2));
-                }
-                if i < (len/4) - 1 { s += " " }
-            }*/
-            s += "[hexLE]"; //remain order
-            for i in 0..len { //.rev() to get BE
-                if i % 4 == 0 && i > 0 { s += " " }
-                s += &(format!("{:01$X}", array[i] as u8, 2));
-            }
-        }else{ //len = 4
-            s += "[hexBE]"; //remain order
-            for i in (0..len).rev(){
-                s += &(format!("{:01$X}", array[i] as u8, 2));
-            }
-        }
-    }else{
-        s += "[hexLE]"; //remain order
-        for i in 0..len { //.rev() to get BE
-            s += &(format!("{:01$X} ", array[i] as u8, 2));
-        }
-    }
-
-    s
 }
 
 fn display_property_flag(attributes: PropertyFlag) -> String {
@@ -1381,6 +1367,80 @@ impl Tdb {
             Ok(())
         };
 
+        let print_constants = |value: &[u8], len: usize, data_type: &String| -> Result<()> {
+            let hex_value = as_hex(&value, len);
+
+            print!(" = {:?} /*", value);
+            match data_type.as_str() {
+                //"System.Boolean" => {
+                //}
+                "System.UInt16" => {
+                    print!(" uint: {}", u16::from_le_bytes(value[0..2].try_into().unwrap()));
+                }
+                "System.Int16" => {
+                    print!(" int: {}", i16::from_le_bytes(value[0..2].try_into().unwrap()));
+                }
+                "System.Char" => {
+                    let u = u16::from_le_bytes(value[0..2].try_into().unwrap()); //to let utf16 decode
+                    let c = char::decode_utf16([u].iter().cloned())
+                                                .map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
+                                                .collect::<String>();
+                    print!(" char: {}, {}", c, hex_value);
+                }
+                "System.UInt32" => {
+                    print!(" uint: {}", u32::from_le_bytes(value[0..4].try_into().unwrap()));
+                }
+                "System.Int32" => {
+                    print!(" int: {}", i32::from_le_bytes(value[0..4].try_into().unwrap()));
+                }
+                "System.Single" => {
+                    print!(" float: {}", f32::from_le_bytes(value[0..4].try_into().unwrap()));
+                }
+                _ => {
+                    match len {
+                        1 => {
+                        }
+                        2 => {
+                            print!(" {}, {}", u16::from_le_bytes(value[0..2].try_into().unwrap()), hex_value)
+                        }
+                        4 => {
+                            let uint_value = u32::from_le_bytes(value[0..4].try_into().unwrap());
+                            let float_value = f32::from_le_bytes(value[0..4].try_into().unwrap());
+                            let int_value = i32::from_le_bytes(value[0..4].try_into().unwrap());
+                            let is_positive = int_value >> 31 == 0;
+                            let display_float;
+                            let display_int;
+                            if is_positive { //positive
+                                if (float_value < 0.0001) | (float_value > 10000.0) { //not float
+                                    display_float = false;
+                                    if int_value > 10000 { display_int = false } else { display_int = true }
+                                } else {
+                                    display_float = true;
+                                    if int_value > 10000 { display_int = false } else { display_int = true }
+                                }
+                                if display_int { print!(" uint: {}", uint_value) }
+                                if display_float { print!(" float: {}", float_value) }
+                            }else{ 
+                                if (float_value > -0.0001) | (float_value < -10000.0) { //not float
+                                    display_float = false;
+                                    if int_value < -10000 { display_int = false } else { display_int = true }
+                                } else {
+                                    display_float = true;
+                                    if int_value < -10000 { display_int = false } else { display_int = true }
+                                }
+                                if display_int { print!(" int: {}", int_value) }
+                                if display_float { print!(" float: {}", float_value) }
+                            }
+                            print!(" {}", hex_value);
+                        }
+                        _ => print!(" {}", hex_value),
+                    }
+                }
+            }
+            print!(" */");
+            Ok(())
+        };
+
         let mut order: Vec<_> = (0..type_instances.len()).collect();
         order.sort_by_key(|&i| symbols[i].as_ref().unwrap());
 
@@ -1409,6 +1469,7 @@ impl Tdb {
                     .as_ref()
                     .unwrap()
             );
+            let is_enum = (symbols[type_instance.base_type_instance_index].as_ref().unwrap()).eq_ignore_ascii_case("System.Enum");
 
             let mut interface_list = &heap[type_instance.interface_list_offset..];
             let interface_count = interface_list.read_u32()?;
@@ -1465,7 +1526,7 @@ impl Tdb {
             println!("    // fieldSize: {}", ty.len);
 
             println!(
-                "    // staticFieldSize={}, interfaceId={}, nativeVTableCount={}, attrsId={}, vtableCount={}",
+                "    // staticFieldSize={}, interfaceId={}, nativeVTableCount={}, attribute_list_index={}, vtableCount={}",
                 ty.static_field_size, ty.interface_id, ty.native_vtable_count, ty.attribute_list_index, ty.vtable_count
             );
 
@@ -1526,6 +1587,8 @@ impl Tdb {
                         read_string(param.name_offset)?
                     );
 
+                    let param_type = symbols[param.type_instance_index].as_ref().unwrap();
+
                     if param.default_const_index != 0 {
                         let constant = constants[param.default_const_index];
                         match constant {
@@ -1534,45 +1597,9 @@ impl Tdb {
                                     &type_instances[param.type_instance_index];
                                 let len = types[field_type_instance.type_index].len;
                                 let value = &heap[offset..][..len];
-                                let int_value;
-                                let hex_value = as_hex(&value, len);
-                                match len {
-                                    1 => {
-                                        int_value = value[0] as u32;
-                                        print!(" = {:?} /*{}*/", value, int_value)
-                                    }
-                                    2 => {
-                                        int_value = as_u16_le(&value) as u32;
-                                        print!(" = {:?} /*{}, {}*/", value, int_value, hex_value)
-                                    }
-                                    4 => {
-                                        int_value = as_u32_le(&value) as u32;
-                                        let float_value = f32::from_bits(int_value);
-                                        //let s_int_value = i32::from_bits(int_value);
-                                        let is_positive = int_value >> 31 == 0;
-                                        let display_float;
-                                        let display_int;
-                                        
-                                        print!(" = {:?} /*", value);
-                                        if is_positive { //positive
-                                            if (float_value < 0.0001) | (float_value > 10000.0) { //not float
-                                                display_float = false;
-                                                if int_value > 10000 { display_int = false } else { display_int = true }
-                                            } else {
-                                                display_float = true;
-                                                if int_value > 10000 { display_int = false } else { display_int = true }
-                                            }
-                                        }else{ //negative (display hex directly)
-                                            display_float = false;
-                                            display_int = false
-                                        }
-                                        if display_int { print!(" uint: {}", int_value) }
-                                        if display_float { print!(" float: {}", float_value) }
-                                        print!(" {} */", hex_value);
+                                
+                                print_constants(value, len, param_type)?;
 
-                                    }
-                                    _ => print!(" = {:?} /*{}*/", value, hex_value),
-                                } 
                             }
                             Constant::String(offset) => {
                                 let s = read_string(offset)?;
@@ -1620,49 +1647,20 @@ impl Tdb {
                     if field.constant_index_hi != 0 {
                         print!("/*constant_index_hi:{}*/", field.constant_index_hi);
                     }
+                    
+                    let field_type = symbols[field.type_instance_index].as_ref().unwrap();
+
                     match constant {
                         Constant::Integral(offset) => {
                             let field_type_instance = &type_instances[field.type_instance_index];
                             let len = types[field_type_instance.type_index].len;
                             let value = &heap[offset..][..len];
-                            let int_value;
                             let hex_value = as_hex(&value, len);
-                            match len {
-                                1 => {
-                                    int_value = value[0] as u32;
-                                    print!(" = {:?} /*{}*/", value, int_value)
-                                }
-                                2 => {
-                                    int_value = as_u16_le(&value) as u32;
-                                    print!(" = {:?} /*{}, {}*/", value, int_value, hex_value)
-                                }
-                                4 => {
-                                    int_value = as_u32_le(&value) as u32;
-                                    let float_value = f32::from_bits(int_value);
-                                    //let s_int_value = i32::from_bits(int_value);
-                                    let is_positive = int_value >> 31 == 0;
-                                    let display_float;
-                                    let display_int;
-                                    
-                                    print!(" = {:?} /*", value);
-                                    if is_positive { //positive
-                                        if (float_value < 0.0001) | (float_value > 10000.0) { //not float
-                                            display_float = false;
-                                            if int_value > 10000 { display_int = false } else { display_int = true }
-                                        } else {
-                                            display_float = true;
-                                            if int_value > 10000 { display_int = false } else { display_int = true }
-                                        }
-                                    }else{ //negative (display hex directly)
-                                        display_float = false;
-                                        display_int = false
-                                    }
-                                    if display_int { print!(" uint: {}", int_value) }
-                                    if display_float { print!(" float: {}", float_value) }
-                                    print!(" {} */", hex_value);
-                                }
-                                _ => print!(" = {:?} /*{}*/", value, hex_value),
-                            } 
+                            if is_enum{
+                                print!(" = {:?} /*{}*/", value, hex_value);
+                            }else{
+                                print_constants(value, len, field_type)?;
+                            }
                         }
                         Constant::String(offset) => {
                             let s = read_string(offset)?;
