@@ -4,6 +4,7 @@ use crate::rsz_newtype;
 use crate::rsz_struct;
 use serde::*;
 
+// snow.data.DataDef.PlEquipSkillId
 rsz_enum! {
     #[rsz(u8)]
     #[derive(Debug, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
@@ -14,24 +15,29 @@ rsz_enum! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.PlEquipSkillBaseUserData.Param")]
+    #[rsz("snow.data.PlEquipSkillBaseUserData.Param",
+        0x90d277a2 = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct PlEquipSkillBaseUserDataParam {
         pub id: PlEquipSkillId,
-        pub max_level: i32, // 0 = level 1
-        pub icon_color: i32,
+        pub max_level: i32, // snow.data.PlSkillData.SkillLvTypes, 0 = level 1
+        pub icon_color: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor
         pub worth_point_list: u32,
     }
 }
 
 rsz_struct! {
-    #[rsz("snow.data.PlEquipSkillBaseUserData")]
+    #[rsz("snow.data.PlEquipSkillBaseUserData",
+        0x576909aa = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct PlEquipSkillBaseUserData {
         pub param: Vec<PlEquipSkillBaseUserDataParam>,
     }
 }
 
+// snow.data.plHyakuryuSkill.ApplyRules
 rsz_enum! {
     #[rsz(i32)]
     #[derive(Debug, Serialize)]
@@ -55,6 +61,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.GameItemEnum.BulletType
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize, Copy, Clone, Hash, PartialEq, Eq)]
@@ -112,6 +119,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.BowWeaponBaseData.BottlePowerUpTypes
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize, PartialEq, Eq, Copy, Clone)]
@@ -124,6 +132,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.ElementData.ElementType
 rsz_enum! {
     #[rsz(i32)]
     #[derive(Debug, Serialize)]
@@ -141,6 +150,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.GunLanceFireData.GunLanceFireType
 rsz_enum! {
     #[rsz(i32)]
     #[derive(Debug, Serialize)]
@@ -151,6 +161,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.GunLanceFireData.GunLanceFireLv
 rsz_newtype! {
     #[rsz_offset(1)]
     #[derive(Debug, Serialize)]
@@ -158,6 +169,7 @@ rsz_newtype! {
     pub struct GunLanceFireLv(pub i32);
 }
 
+// snow.data.ChargeAxeWeaponBaseData.BottleTypes
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize)]
@@ -167,6 +179,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.SlashAxeWeaponBaseData.BottleTypes
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize)]
@@ -180,6 +193,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.HeavyBowgunWeaponData.UniqueBulletType
 rsz_enum! {
     #[rsz(i32)]
     #[derive(Debug, Serialize)]
@@ -189,6 +203,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.BowWeaponBaseData.ChargeTypes
 rsz_enum! {
     #[rsz(i32)]
     #[derive(Debug, Serialize)]
@@ -212,6 +227,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.BowWeaponBaseData.BottleTypes
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize)]
@@ -228,6 +244,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.DataDef.PlHyakuryuSkillId
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -237,6 +254,7 @@ rsz_enum! {
     }
 }
 
+// snow.data.BowWeaponBaseData.ChageStartLvTypes
 rsz_newtype! {
     #[rsz_offset(1)]
     #[derive(Debug, Serialize)]
@@ -244,6 +262,7 @@ rsz_newtype! {
     pub struct BowChageStartLvTypes(pub i32);
 }
 
+// snow.data.InsectGlaiveWeaponBaseData.InsectLevelTypes
 rsz_newtype! {
     #[rsz_offset(1)]
     #[derive(Debug, Serialize)]
@@ -252,11 +271,13 @@ rsz_newtype! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.PlHyakuryuSkillBaseUserData.Param")]
+    #[rsz("snow.data.PlHyakuryuSkillBaseUserData.Param",
+        0x352d582d = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct PlHyakuryuSkillBaseUserDataParam {
         pub id: PlHyakuryuSkillId,
-        pub item_color: i32,
+        pub item_color: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor
         pub apply_rule: ApplyRules,
         pub add_atk: i8,
         pub add_def_list: Vec<i8>,
@@ -295,7 +316,9 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.PlHyakuryuSkillBaseUserData")]
+    #[rsz("snow.data.PlHyakuryuSkillBaseUserData",
+        0xaa891f5b = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct PlHyakuryuSkillBaseUserData {
         pub param: Vec<PlHyakuryuSkillBaseUserDataParam>,
@@ -303,7 +326,9 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.PlHyakuryuSkillRecipeUserData.Param")]
+    #[rsz("snow.data.PlHyakuryuSkillRecipeUserData.Param",
+        0xd8943d8c = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct PlHyakuryuSkillRecipeUserDataParam {
         pub recipe_no: u32,
@@ -315,13 +340,16 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.PlHyakuryuSkillRecipeUserData")]
+    #[rsz("snow.data.PlHyakuryuSkillRecipeUserData",
+        0x57557b64 = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct PlHyakuryuSkillRecipeUserData {
         pub param: Vec<PlHyakuryuSkillRecipeUserDataParam>,
     }
 }
 
+// snow.equip.DecorationsId
 rsz_enum! {
     #[rsz(u32)]
     #[derive(Debug, Serialize, Copy, Clone, Hash, PartialEq, Eq)]
@@ -332,13 +360,15 @@ rsz_enum! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.DecorationsBaseUserData.Param")]
+    #[rsz("snow.data.DecorationsBaseUserData.Param",
+        0xf2ad08c4 = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct DecorationsBaseUserDataParam {
         pub id: DecorationsId,
         pub sort_id: u32,
         pub rare: RareTypes,
-        pub icon_color: i32,
+        pub icon_color: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor
         pub decoration_lv: i32,
         pub skill_id_list: Vec<PlEquipSkillId>,
         pub skill_lv_list: Vec<i32>,
@@ -347,7 +377,9 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.DecorationsBaseUserData")]
+    #[rsz("snow.data.DecorationsBaseUserData",
+        0x7a6f3daa = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct DecorationsBaseUserData {
         pub param: Vec<DecorationsBaseUserDataParam>,
@@ -355,7 +387,9 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.DecorationsProductUserData.Param")]
+    #[rsz("snow.data.DecorationsProductUserData.Param",
+        0x556b482b = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct DecorationsProductUserDataParam {
         pub id: DecorationsId,
@@ -368,7 +402,9 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.data.DecorationsProductUserData")]
+    #[rsz("snow.data.DecorationsProductUserData",
+        0x320514c0 = 0
+    )]
     #[derive(Debug, Serialize)]
     pub struct DecorationsProductUserData {
         pub param: Vec<DecorationsProductUserDataParam>,
