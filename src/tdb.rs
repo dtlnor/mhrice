@@ -242,6 +242,10 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "[pointer]"
     }
 
+    if attributes.contains(FieldAttribute::MARSHAL) { //RESERVED_MASK
+        s += "[marshal]"
+    }
+
     if attributes.contains(FieldAttribute::PINVOKE) {
         s += "[pinvoke]"
     }
@@ -250,6 +254,10 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "[expose]"
     }
 
+    if attributes.contains(FieldAttribute::DEFAULT) { //RESERVED_MASK
+        s += "[default]"
+    }
+    /*
     s += match attributes & FieldAttribute::RESERVED_MASK {
         FieldAttribute::NO_RESERVE => "",
         FieldAttribute::HAS_RVA => "[has_rva]",
@@ -258,7 +266,7 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         FieldAttribute::DEFAULT => "[default]",
         FieldAttribute::RESERVED_MASK => "[reserve?]",
         _ => panic!(),
-    };
+    };*/
 
     s += match attributes & FieldAttribute::MEMBER_ACCESS_MASK {
         FieldAttribute::PRIVATE_SCOPE => "[hidden]private ",
@@ -294,7 +302,7 @@ fn display_method_impl_flag(attributes: MethodImplFlag) -> String {
         _ => panic!(),
     };
 
-    /* //as MANAGED_MASK == UNMANAGED
+    /*
     s += match attributes & MethodImplFlag::MANAGED_MASK {
         MethodImplFlag::UNMANAGED => "[unmanaged]",
         MethodImplFlag::MANAGED => "",
@@ -423,25 +431,25 @@ fn display_method_attributes(attributes: MethodAttribute) -> String {
 fn display_param_attributes(attributes: ParamAttribute) -> String {
     let mut s = String::new();
     if attributes.contains(ParamAttribute::IN) {
-        s += "in ";
+        s += "in";
     }
     if attributes.contains(ParamAttribute::OUT) {
-        s += "out ";
+        s += "out";
     }
     if attributes.contains(ParamAttribute::LCID) {
-        s += "[lcid] ";
+        s += "[lcid]";
     }
     if attributes.contains(ParamAttribute::RETVAL) {
-        s += "[ret] ";
+        s += "[ret]";
     }
     if attributes.contains(ParamAttribute::OPTIONAL) {
-        s += "[opt] ";
+        s += "[opt]";
     }
     if attributes.contains(ParamAttribute::HAS_DEFAULT) {
-        s += "[default] ";
+        s += "[default]";
     }
     if attributes.contains(ParamAttribute::HAS_FIELD_MARSHAL) {
-        s += "[marshal] ";
+        s += "[marshal]";
     }
     s
 }
