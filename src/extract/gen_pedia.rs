@@ -10,7 +10,7 @@ use crate::rsz::*;
 use crate::tex::*;
 use crate::user::User;
 use crate::uvs::*;
-use anyhow::*;
+use anyhow::{bail, ensure, Context, Result};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
@@ -331,14 +331,29 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let normal_quest_data = get_user(pak, "Quest/QuestData/NormalQuestData.user")?;
     let normal_quest_data_for_enemy =
         get_user(pak, "Quest/QuestData/NormalQuestDataForEnemy.user")?;
+    let dl_quest_data = get_user(pak, "Quest/QuestData/DlQuestData.user")?;
+    let dl_quest_data_for_enemy = get_user(pak, "Quest/QuestData/DlQuestDataForEnemy.user")?;
     let difficulty_rate = get_user(pak, "enemy/user_data/system_difficulty_rate_data.user")?;
     let random_scale = get_user(pak, "enemy/user_data/system_boss_random_scale_data.user")?;
     let size_list = get_user(pak, "enemy/user_data/system_enemy_sizelist_data.user")?;
     let discover_em_set_data = get_user(pak, "Quest/QuestData/DiscoverEmSetData.user")?;
+    let quest_data_for_reward = get_user(
+        pak,
+        "data/Define/Quest/System/QuestRewardSystem/QuestDataForRewardData.user",
+    )?;
+    let reward_id_lot_table = get_user(
+        pak,
+        "data/Define/Quest/System/QuestRewardSystem/RewardIdLotTableData.user",
+    )?;
+    let main_target_reward_lot_num = get_user(
+        pak,
+        "data/Define/Quest/System/QuestRewardSystem/MainTargetLotNumDefineData.user",
+    )?;
     let quest_hall_msg = get_msg(pak, "Message/Quest/QuestData_Hall.msg")?;
     let quest_village_msg = get_msg(pak, "Message/Quest/QuestData_Village.msg")?;
     let quest_tutorial_msg = get_msg(pak, "Message/Quest/QuestData_Tutorial.msg")?;
     let quest_arena_msg = get_msg(pak, "Message/Quest/QuestData_Arena.msg")?;
+    let quest_dlc_msg = get_msg(pak, "Message/Quest/QuestData_Dlc.msg")?;
 
     let armor = get_user(pak, "data/Define/Player/Armor/ArmorBaseData.user")?;
     let armor_series = get_user(pak, "data/Define/Player/Armor/ArmorSeriesData.user")?;
@@ -353,6 +368,13 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let armor_arm_name_msg = get_msg(pak, "data/Define/Player/Armor/Arm/A_Arm_Name.msg")?;
     let armor_waist_name_msg = get_msg(pak, "data/Define/Player/Armor/Waist/A_Waist_Name.msg")?;
     let armor_leg_name_msg = get_msg(pak, "data/Define/Player/Armor/Leg/A_Leg_Name.msg")?;
+    let armor_head_explain_msg = get_msg(pak, "data/Define/Player/Armor/Head/A_Head_Explain.msg")?;
+    let armor_chest_explain_msg =
+        get_msg(pak, "data/Define/Player/Armor/Chest/A_Chest_Explain.msg")?;
+    let armor_arm_explain_msg = get_msg(pak, "data/Define/Player/Armor/Arm/A_Arm_Explain.msg")?;
+    let armor_waist_explain_msg =
+        get_msg(pak, "data/Define/Player/Armor/Waist/A_Waist_Explain.msg")?;
+    let armor_leg_explain_msg = get_msg(pak, "data/Define/Player/Armor/Leg/A_Leg_Explain.msg")?;
     let armor_series_name_msg =
         get_msg(pak, "data/Define/Player/Armor/ArmorSeries_Hunter_Name.msg")?;
 
@@ -475,14 +497,20 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         parts_type,
         normal_quest_data,
         normal_quest_data_for_enemy,
+        dl_quest_data,
+        dl_quest_data_for_enemy,
         difficulty_rate,
         random_scale,
         size_list,
         discover_em_set_data,
+        quest_data_for_reward,
+        reward_id_lot_table,
+        main_target_reward_lot_num,
         quest_hall_msg,
         quest_village_msg,
         quest_tutorial_msg,
         quest_arena_msg,
+        quest_dlc_msg,
         armor,
         armor_series,
         armor_product,
@@ -493,6 +521,11 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         armor_arm_name_msg,
         armor_waist_name_msg,
         armor_leg_name_msg,
+        armor_head_explain_msg,
+        armor_chest_explain_msg,
+        armor_arm_explain_msg,
+        armor_waist_explain_msg,
+        armor_leg_explain_msg,
         armor_series_name_msg,
         equip_skill,
         player_skill_detail_msg,
@@ -935,6 +968,13 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
                 .iter()
                 .map(|entry| (&entry.name, entry)),
         )
+        .chain(
+            pedia
+                .quest_dlc_msg
+                .entries
+                .iter()
+                .map(|entry| (&entry.name, entry)),
+        )
         .collect();
 
     let mut enemy_params: HashMap<i32, &NormalQuestDataForEnemyParam> = pedia
@@ -942,6 +982,27 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .param
         .iter()
         .map(|param| (param.quest_no, param))
+        .chain(
+            pedia
+                .dl_quest_data_for_enemy
+                .param
+                .iter()
+                .map(|param| (param.quest_no, param)),
+        )
+        .collect();
+
+    let mut reward_params: HashMap<i32, &QuestDataForRewardUserDataParam> = pedia
+        .quest_data_for_reward
+        .param
+        .iter()
+        .map(|param| (param.quest_numer, param))
+        .collect();
+
+    let reward_lot: HashMap<u32, &RewardIdLotTableUserDataParam> = pedia
+        .reward_id_lot_table
+        .param
+        .iter()
+        .map(|param| (param.id, param))
         .collect();
 
     pedia
@@ -949,16 +1010,103 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .param
         .iter()
         .filter(|param| param.quest_no != 0)
-        .map(|param| {
+        .map(|param| (param, false))
+        .chain(
+            pedia
+                .dl_quest_data
+                .param
+                .iter()
+                .filter(|param| param.quest_no != 0)
+                .map(|param| (param, true)),
+        )
+        .map(|(param, is_dl)| {
             let name_msg_name = format!("QN{:06}_01", param.quest_no);
+            let requester_msg_name = format!("QN{:06}_02", param.quest_no);
+            let detail_msg_name = format!("QN{:06}_03", param.quest_no);
             let target_msg_name = format!("QN{:06}_04", param.quest_no);
             let condition_msg_name = format!("QN{:06}_05", param.quest_no);
+
+            let reward = if let Some(reward) = reward_params.remove(&param.quest_no) {
+                let additional_target_reward = if reward.additional_target_reward_table_index != 0 {
+                    Some(
+                        *reward_lot
+                            .get(&reward.additional_target_reward_table_index)
+                            .with_context(|| {
+                                format!(
+                                    "Can't find additional_target_reward for quest {}, id {}",
+                                    param.quest_no, reward.additional_target_reward_table_index
+                                )
+                            })?,
+                    )
+                } else {
+                    None
+                };
+
+                let common_material_reward = if reward.common_material_reward_table_index != 0 {
+                    Some(
+                        *reward_lot
+                            .get(&reward.common_material_reward_table_index)
+                            .with_context(|| {
+                                format!(
+                                    "Can't find common_material_reward for quest {}, id {}",
+                                    param.quest_no, reward.common_material_reward_table_index
+                                )
+                            })?,
+                    )
+                } else {
+                    None
+                };
+
+                let additional_quest_reward = reward
+                    .additional_quest_reward_table_index
+                    .iter()
+                    .filter(|&&i| i != 0)
+                    .map(|i| {
+                        Ok(*reward_lot.get(i).with_context(|| {
+                            format!(
+                                "Can't find additional_quest_reward for quest {}, id {}",
+                                param.quest_no, i
+                            )
+                        })?)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+
+                let cloth_ticket = if reward.cloth_ticket_index != 0 {
+                    Some(
+                        *reward_lot
+                            .get(&reward.cloth_ticket_index)
+                            .with_context(|| {
+                                format!(
+                                    "Can't find cloth_ticket for quest {}, id {}",
+                                    param.quest_no, reward.cloth_ticket_index
+                                )
+                            })?,
+                    )
+                } else {
+                    None
+                };
+
+                Some(QuestReward {
+                    param: reward,
+                    additional_target_reward,
+                    common_material_reward,
+                    additional_quest_reward,
+                    cloth_ticket,
+                })
+            } else {
+                None
+            };
+
             Ok(Quest {
                 param,
                 enemy_param: enemy_params.remove(&param.quest_no),
                 name: all_msg.remove(&name_msg_name),
+                requester: all_msg.remove(&requester_msg_name),
+                detail: all_msg.remove(&detail_msg_name),
                 target: all_msg.remove(&target_msg_name),
                 condition: all_msg.remove(&condition_msg_name),
+                is_dl,
+                reward,
             })
         })
         .collect::<Result<Vec<_>>>()
@@ -1159,12 +1307,37 @@ fn prepare_armors(pedia: &Pedia) -> Result<Vec<ArmorSeries<'_>>> {
             continue;
         }
 
-        let (mut slot, msg, id) = match armor.pl_armor_id {
-            PlArmorId::Head(id) => (0, &pedia.armor_head_name_msg, id),
-            PlArmorId::Chest(id) => (1, &pedia.armor_chest_name_msg, id),
-            PlArmorId::Arm(id) => (2, &pedia.armor_arm_name_msg, id),
-            PlArmorId::Waist(id) => (3, &pedia.armor_waist_name_msg, id),
-            PlArmorId::Leg(id) => (4, &pedia.armor_leg_name_msg, id),
+        let (mut slot, msg, explain_msg, id) = match armor.pl_armor_id {
+            PlArmorId::Head(id) => (
+                0,
+                &pedia.armor_head_name_msg,
+                &pedia.armor_head_explain_msg,
+                id,
+            ),
+            PlArmorId::Chest(id) => (
+                1,
+                &pedia.armor_chest_name_msg,
+                &pedia.armor_chest_explain_msg,
+                id,
+            ),
+            PlArmorId::Arm(id) => (
+                2,
+                &pedia.armor_arm_name_msg,
+                &pedia.armor_arm_explain_msg,
+                id,
+            ),
+            PlArmorId::Waist(id) => (
+                3,
+                &pedia.armor_waist_name_msg,
+                &pedia.armor_waist_explain_msg,
+                id,
+            ),
+            PlArmorId::Leg(id) => (
+                4,
+                &pedia.armor_leg_name_msg,
+                &pedia.armor_leg_explain_msg,
+                id,
+            ),
             _ => bail!("Unknown armor ID {:?}", armor.pl_armor_id),
         };
 
@@ -1175,6 +1348,10 @@ fn prepare_armors(pedia: &Pedia) -> Result<Vec<ArmorSeries<'_>>> {
         let id = usize::try_from(id)?;
 
         let name = msg
+            .entries
+            .get(id)
+            .with_context(|| format!("Cannot find name for armor {:?}", armor.pl_armor_id))?; // ?!
+        let explain = explain_msg
             .entries
             .get(id)
             .with_context(|| format!("Cannot find name for armor {:?}", armor.pl_armor_id))?; // ?!
@@ -1198,6 +1375,7 @@ fn prepare_armors(pedia: &Pedia) -> Result<Vec<ArmorSeries<'_>>> {
 
         series.pieces[slot] = Some(Armor {
             name,
+            explain,
             data: armor,
             product,
             overwear: None,
@@ -1412,7 +1590,7 @@ where
     let mut name_map = weapon_list.name.get_name_map();
     let mut explain_map = weapon_list.explain.get_name_map();
 
-    let mut weapons = HashMap::new();
+    let mut weapons = BTreeMap::new();
     for param in &*weapon_list.base_data {
         let id = param.to_base().id;
         if id == WeaponId::None || id == WeaponId::Null {

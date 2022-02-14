@@ -1,10 +1,12 @@
 use crate::bitfield::*;
 use crate::file_ext::*;
 use crate::hash::*;
-use anyhow::*;
+use anyhow::{bail, Context, Result};
 use bitflags::*;
+use std::collections::*;
 use std::convert::{TryFrom, TryInto};
-use std::io::{Read, Seek};
+use std::fs::File;
+use std::io::{Read, Seek, Write};
 
 bitflags! {
     struct FieldAttribute: u16 {
@@ -72,6 +74,56 @@ bitflags! {
 }
 
 bitflags! {
+    struct TypeFlag: u32 {
+        const NOT_PUBLIC           = 0x00000000;
+        const PUBLIC               = 0x00000001;
+        const NESTED_PUBLIC        = 0x00000002;
+        const NESTED_PRIVATE       = 0x00000003;
+        const NESTED_FAMILY        = 0x00000004;
+        const NESTED_ASSEMBLY      = 0x00000005;
+        const NESTED_FAMANDASSEM   = 0x00000006;
+        const NESTED_FAMORASSEM    = 0x00000007;
+        const VISIBILITY_MASK      = 0x00000007;
+
+        const AUTO_LAYOUT          = 0x00000000;
+        const SEQUENTIAL_LAYOUT    = 0x00000008;
+        const EXPLICIT_LAYOUT      = 0x00000010;
+        const LAYOUT_MASK          = 0x00000018;
+
+        const INTERFACE            = 0x00000020;
+        // no 0x0040
+        const ABSTRACT             = 0x00000080;
+        const SEALED               = 0x00000100;
+        // no 0x0200
+        const SPECIAL_NAME         = 0x00000400;
+        const RT_SPECIAL_NAME      = 0x00000800;
+        const IMPORT               = 0x00001000;
+        const SERIALIZABLE         = 0x00002000;
+        const WINDOWS_RUNTIME      = 0x00004000;
+        // no 0x8000
+
+        const ANSI_CLASS           = 0x00000000;
+        const UNICODE_CLASS        = 0x00010000;
+        const AUTO_CLASS           = 0x00020000;
+        const CUSTOM_FORMAT_CLASS  = 0x00030000;
+        const STRING_FORMAT_MASK   = 0x00030000;
+
+        const HAS_SECURITY         = 0x00040000;
+        // no 0x080000
+        const BEFORE_FIELD_INIT    = 0x00100000;
+        // no 0x200000
+        const CUSTOM_FORMAT_MASK   = 0x00C00000;
+        const LOCAL_HEAP           = 0x01000000;
+        const FINALIZE             = 0x02000000;
+        const NATIVE_TYPE          = 0x04000000;
+        const UNK_08000000         = 0x08000000;
+        const NATIVE_CTOR          = 0x10000000;
+        // no 0x20000000
+        const MANAGED_VTABLE       = 0x40000000;
+    }
+}
+
+bitflags! {
     struct MethodImplFlag: u16 {
         const CODE_TYPE_MASK              = 0x0003;
         const IL                          = 0x0000;
@@ -95,6 +147,32 @@ bitflags! {
     }
 }
 
+bitflags! {
+    struct PropertyFlag: u16 {
+        const SPECIAL_NAME    = 0x0200;
+        const RT_SPECIAL_NAME = 0x0400;
+        const HAS_DEFAULT     = 0x1000;
+        const EXPOSE_MEMBER   = 0x4000;
+    }
+}
+
+fn display_property_flag(flags: PropertyFlag) -> String {
+    let mut s = String::new();
+    if flags.contains(PropertyFlag::SPECIAL_NAME) {
+        s += "[special]";
+    }
+    if flags.contains(PropertyFlag::RT_SPECIAL_NAME) {
+        s += "[rt_special]";
+    }
+    if flags.contains(PropertyFlag::HAS_DEFAULT) {
+        s += "[default]";
+    }
+    if flags.contains(PropertyFlag::EXPOSE_MEMBER) {
+        s += "[expose]";
+    }
+    s
+}
+
 fn display_param_modifier(param_modifier: u32, return_pos: bool) -> String {
     let return_pos = if return_pos { "return:" } else { "" };
     let tag = match param_modifier {
@@ -104,6 +182,88 @@ fn display_param_modifier(param_modifier: u32, return_pos: bool) -> String {
         _ => "unknown-mod",
     };
     format!("[{}{}]", return_pos, tag)
+}
+
+fn display_type_flags(flags: TypeFlag) -> String {
+    let mut s = String::new();
+
+    s += match flags & TypeFlag::LAYOUT_MASK {
+        TypeFlag::AUTO_LAYOUT => "[auto]",
+        TypeFlag::SEQUENTIAL_LAYOUT => "[sequential]",
+        TypeFlag::EXPLICIT_LAYOUT => "[explicit]",
+        _ => "[unknown_layout]",
+    };
+
+    if flags.contains(TypeFlag::INTERFACE) {
+        s += "[interface]"
+    }
+    if flags.contains(TypeFlag::ABSTRACT) {
+        s += "[abstract]"
+    }
+    if flags.contains(TypeFlag::SEALED) {
+        s += "[sealed]"
+    }
+    if flags.contains(TypeFlag::SPECIAL_NAME) {
+        s += "[special]"
+    }
+    if flags.contains(TypeFlag::RT_SPECIAL_NAME) {
+        s += "[rt_special]"
+    }
+    if flags.contains(TypeFlag::IMPORT) {
+        s += "[import]"
+    }
+    if flags.contains(TypeFlag::SERIALIZABLE) {
+        s += "[serializable]"
+    }
+    if flags.contains(TypeFlag::WINDOWS_RUNTIME) {
+        s += "[windows_runtime]"
+    }
+
+    s += match flags & TypeFlag::STRING_FORMAT_MASK {
+        TypeFlag::ANSI_CLASS => "[ansi]",
+        TypeFlag::UNICODE_CLASS => "[unicode]",
+        TypeFlag::AUTO_CLASS => "[auto_format]",
+        TypeFlag::CUSTOM_FORMAT_CLASS => "[custom_format]",
+        _ => panic!(),
+    };
+    if flags.contains(TypeFlag::HAS_SECURITY) {
+        s += "[has_security]"
+    }
+    if flags.contains(TypeFlag::BEFORE_FIELD_INIT) {
+        s += "[before_field_init]"
+    }
+    if flags.contains(TypeFlag::LOCAL_HEAP) {
+        s += "[local_heap]"
+    }
+    if flags.contains(TypeFlag::FINALIZE) {
+        s += "[finalize]"
+    }
+    if flags.contains(TypeFlag::NATIVE_TYPE) {
+        s += "[native]"
+    }
+    if flags.contains(TypeFlag::UNK_08000000) {
+        s += "[UNK_08000000]"
+    }
+    if flags.contains(TypeFlag::NATIVE_CTOR) {
+        s += "[native_ctor]"
+    }
+    if flags.contains(TypeFlag::MANAGED_VTABLE) {
+        s += "[managed_vtable]"
+    }
+
+    s += match flags & TypeFlag::VISIBILITY_MASK {
+        TypeFlag::NOT_PUBLIC => "",
+        TypeFlag::PUBLIC => "public ",
+        TypeFlag::NESTED_PUBLIC => "[nested]public",
+        TypeFlag::NESTED_PRIVATE => "[nested]private",
+        TypeFlag::NESTED_FAMILY => "[nested]protected",
+        TypeFlag::NESTED_ASSEMBLY => "[nested]internal",
+        TypeFlag::NESTED_FAMANDASSEM => "[nested]private protected",
+        TypeFlag::NESTED_FAMORASSEM => "[nested]protected internal",
+        _ => panic!(),
+    };
+
+    s
 }
 
 fn display_field_attributes(attributes: FieldAttribute) -> String {
@@ -330,7 +490,7 @@ pub struct Tdb {}
 
 impl Tdb {
     #[allow(unused_variables, dead_code)]
-    pub fn new<F: Read + Seek>(mut file: F) -> Result<Tdb> {
+    pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) -> Result<Tdb> {
         if &file.read_magic()? != b"TDB\0" {
             bail!("Wrong magic for TDB file");
         }
@@ -386,24 +546,24 @@ impl Tdb {
         let string_table_len = file.read_u32()?;
         let heap_len = file.read_u32()?;
 
-        let assembly_offset = file.read_u64()?;
-        let type_instance_offset = file.read_u64()?;
-        let type_offset = file.read_u64()?;
-        let method_membership_offset = file.read_u64()?;
-        let method_offset = file.read_u64()?;
-        let field_membership_offset = file.read_u64()?;
-        let field_offset = file.read_u64()?;
-        let property_membership_offset = file.read_u64()?;
-        let property_offset = file.read_u64()?;
-        let event_offset = file.read_u64()?;
-        let param_offset = file.read_u64()?;
-        let attribute_offset = file.read_u64()?;
-        let constant_offset = file.read_u64()?;
-        let attribute_list_offset = file.read_u64()?;
-        let data_attribute_list_offset = file.read_u64()?;
-        let string_table_offset = file.read_u64()?;
-        let heap_offset = file.read_u64()?;
-        let q_offset = file.read_u64()?;
+        let assembly_offset = file.read_u64()? - base_address;
+        let type_instance_offset = file.read_u64()? - base_address;
+        let type_offset = file.read_u64()? - base_address;
+        let method_membership_offset = file.read_u64()? - base_address;
+        let method_offset = file.read_u64()? - base_address;
+        let field_membership_offset = file.read_u64()? - base_address;
+        let field_offset = file.read_u64()? - base_address;
+        let property_membership_offset = file.read_u64()? - base_address;
+        let property_offset = file.read_u64()? - base_address;
+        let event_offset = file.read_u64()? - base_address;
+        let param_offset = file.read_u64()? - base_address;
+        let attribute_offset = file.read_u64()? - base_address;
+        let constant_offset = file.read_u64()? - base_address;
+        let attribute_list_offset = file.read_u64()? - base_address;
+        let data_attribute_list_offset = file.read_u64()? - base_address;
+        let string_table_offset = file.read_u64()? - base_address;
+        let heap_offset = file.read_u64()? - base_address;
+        let q_offset = file.read_u64()? - base_address;
         let _ = file.read_u64()?;
 
         struct Assembly {
@@ -455,7 +615,7 @@ impl Tdb {
             field_membership_start_index: usize,
             template_argument_list_offset: usize,
             hash: u32,
-            j: u32,
+            flags: TypeFlag,
             event_start_index: usize,
             event_count: usize,
             property_membership_start_index: usize,
@@ -479,10 +639,10 @@ impl Tdb {
                     special_type_id,
                 ) = file.read_u64()?.bit_split((18, 18, 18, 10));
 
-                let j = file.read_u32()?;
+                let flags = file.read_u32()?;
                 let x = file.read_u32()?;
                 if x != 0 {
-                    bail!("Expected 0: {}", index);
+                    // bail!("Expected 0: {}", index);
                 }
                 let hash = file.read_u32()?;
                 file.read_u32()?;
@@ -500,11 +660,11 @@ impl Tdb {
 
                 let x = file.read_u64()?;
                 if x != 0 {
-                    bail!("Expected 0: {}", index);
+                    //bail!("Expected 0: {}", index);
                 }
                 let x = file.read_u64()?;
                 if x != 0 {
-                    bail!("Expected 0: {}", index);
+                    //bail!("Expected 0: {}", index);
                 }
                 Ok(TypeInstance {
                     base_type_instance_index: base_type_instance_index.try_into()?,
@@ -520,7 +680,7 @@ impl Tdb {
                     field_membership_start_index: field_membership_start_index.try_into()?,
                     template_argument_list_offset: template_argument_list_offset.try_into()?,
                     hash,
-                    j,
+                    flags: TypeFlag::from_bits(flags).context("Unknown type flag")?,
                     event_start_index: event_start_index.try_into()?,
                     event_count: event_count.try_into()?,
                     property_count: property_count.try_into()?,
@@ -535,20 +695,19 @@ impl Tdb {
             type_instance_index: usize,
             method_index: usize,
             param_list_offset: usize,
+            address: u64,
         }
         file.seek_assert_align_up(method_membership_offset, 16)?;
         let method_memberships = (0..method_membership_count)
             .map(|_| {
                 let (type_instance_index, method_index, param_list_offset) =
                     file.read_u64()?.bit_split((18, 20, 26));
-                let zero = file.read_u64()?;
-                if zero != 0 {
-                    bail!("Expected 0")
-                }
+                let address = file.read_u64()?;
                 Ok(MethodMembership {
                     type_instance_index: type_instance_index.try_into()?,
                     method_index: method_index.try_into()?,
                     param_list_offset: param_list_offset.try_into()?,
+                    address,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -670,7 +829,7 @@ impl Tdb {
                 let attribute_list_index = file.read_u16()?;
                 let attributes = file.read_u16()?;
                 let (type_instance_index, constant_index) = file.read_u32()?.bit_split((18, 14));
-                let name_offset = file.read_u32()?;
+                let name_offset = file.read_u32()?; // is there a high bits of this for something else?
                 Ok(Field {
                     attribute_list_index: attribute_list_index.try_into()?,
                     attributes: FieldAttribute::from_bits(attributes)
@@ -701,21 +860,18 @@ impl Tdb {
             .collect::<Result<Vec<_>>>()?;
 
         struct Property {
-            a: u16,
+            flags: PropertyFlag,
             attribute_list_index: usize,
             name_offset: u32,
         }
         file.seek_assert_align_up(property_offset, 16)?;
         let properties = (0..property_count)
             .map(|_| {
-                let a = file.read_u16()?;
-                if a != 0 && a != 0x4000 {
-                    bail!("Unexpected flag")
-                }
+                let flags = file.read_u16()?;
                 let attribute_list_index = file.read_u16()?;
                 let name_offset = file.read_u32()?;
                 Ok(Property {
-                    a,
+                    flags: PropertyFlag::from_bits(flags).context("Unknown property flag")?,
                     attribute_list_index: attribute_list_index.try_into()?,
                     name_offset,
                 })
@@ -1105,6 +1261,8 @@ impl Tdb {
             Ok(())
         };
 
+        let mut function_map: BTreeMap<u64, Vec<String>> = BTreeMap::new();
+
         let mut order: Vec<_> = (0..type_instances.len()).collect();
         order.sort_by_key(|&i| symbols[i].as_ref().unwrap());
 
@@ -1124,6 +1282,7 @@ impl Tdb {
                 print_attributes(attribute_lists[ty.attribute_list_index], false)?;
                 println!();
             }
+            println!("{}", display_type_flags(type_instance.flags));
             println!(
                 "class {}: {}",
                 full_name,
@@ -1224,13 +1383,15 @@ impl Tdb {
                     println!();
                 }
 
+                let method_name = read_string(method.name_offset)?;
+
                 println!(
                     "    {}{}{}\n    {} {} (",
                     display_param_modifier(return_value.modifier, true),
                     display_method_impl_flag(method.impl_flag),
                     display_method_attributes(method.attributes),
                     symbols[return_value.type_instance_index].as_ref().unwrap(),
-                    read_string(method.name_offset)?
+                    method_name
                 );
 
                 for _ in 0..param_count {
@@ -1267,7 +1428,17 @@ impl Tdb {
                     println!(",");
                 }
 
-                println!("    );\n");
+                let address = if method_membership.address != 0 {
+                    function_map
+                        .entry(method_membership.address)
+                        .or_default()
+                        .push(format!("{}.{}", full_name, method_name));
+                    format!(" = 0x{:016X}", method_membership.address)
+                } else {
+                    "".to_string()
+                };
+
+                println!("    ){};\n", address);
             }
 
             println!();
@@ -1339,7 +1510,8 @@ impl Tdb {
                     println!();
                 }
                 println!(
-                    "    public property {};",
+                    "    {}public property {};",
+                    display_property_flag(property.flags),
                     read_string(property.name_offset)?
                 );
             }
@@ -1359,6 +1531,15 @@ impl Tdb {
                 read_string(assembly.full_path_offset)?,
                 read_string(assembly.dll_name_offset)?
             );
+        }
+
+        if let Some(map) = map {
+            let mut map = File::create(map)?;
+            for (address, names) in function_map {
+                for name in names {
+                    writeln!(map, "{} {:016X} f", name, address)?
+                }
+            }
         }
 
         Ok(Tdb {})

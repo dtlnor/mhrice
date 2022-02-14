@@ -54,14 +54,20 @@ pub struct Pedia {
 
     pub normal_quest_data: NormalQuestData,
     pub normal_quest_data_for_enemy: NormalQuestDataForEnemy,
+    pub dl_quest_data: NormalQuestData,
+    pub dl_quest_data_for_enemy: NormalQuestDataForEnemy,
     pub difficulty_rate: SystemDifficultyRateData,
     pub random_scale: EnemyBossRandomScaleData,
     pub size_list: EnemySizeListData,
     pub discover_em_set_data: DiscoverEmSetData,
+    pub quest_data_for_reward: QuestDataForRewardUserData,
+    pub reward_id_lot_table: RewardIdLotTableUserData,
+    pub main_target_reward_lot_num: MainTargetRewardLotNumDefineUserData,
     pub quest_hall_msg: Msg,
     pub quest_village_msg: Msg,
     pub quest_tutorial_msg: Msg,
     pub quest_arena_msg: Msg,
+    pub quest_dlc_msg: Msg,
 
     pub armor: ArmorBaseUserData,
     pub armor_series: ArmorSeriesUserData,
@@ -73,6 +79,11 @@ pub struct Pedia {
     pub armor_arm_name_msg: Msg,
     pub armor_waist_name_msg: Msg,
     pub armor_leg_name_msg: Msg,
+    pub armor_head_explain_msg: Msg,
+    pub armor_chest_explain_msg: Msg,
+    pub armor_arm_explain_msg: Msg,
+    pub armor_waist_explain_msg: Msg,
+    pub armor_leg_explain_msg: Msg,
     pub armor_series_name_msg: Msg,
 
     pub equip_skill: PlEquipSkillBaseUserData,
@@ -121,12 +132,24 @@ pub struct Pedia {
     pub horn_melody: Msg,
 }
 
+pub struct QuestReward<'a> {
+    pub param: &'a QuestDataForRewardUserDataParam,
+    pub additional_target_reward: Option<&'a RewardIdLotTableUserDataParam>,
+    pub common_material_reward: Option<&'a RewardIdLotTableUserDataParam>,
+    pub additional_quest_reward: Vec<&'a RewardIdLotTableUserDataParam>,
+    pub cloth_ticket: Option<&'a RewardIdLotTableUserDataParam>,
+}
+
 pub struct Quest<'a> {
     pub param: &'a NormalQuestDataParam,
     pub enemy_param: Option<&'a NormalQuestDataForEnemyParam>,
     pub name: Option<&'a MsgEntry>,
+    pub requester: Option<&'a MsgEntry>,
+    pub detail: Option<&'a MsgEntry>,
     pub target: Option<&'a MsgEntry>,
     pub condition: Option<&'a MsgEntry>,
+    pub is_dl: bool,
+    pub reward: Option<QuestReward<'a>>,
 }
 
 pub struct Deco<'a> {
@@ -152,6 +175,7 @@ pub struct HyakuryuSkill<'a> {
 
 pub struct Armor<'a> {
     pub name: &'a MsgEntry,
+    pub explain: &'a MsgEntry,
     pub data: &'a ArmorBaseUserDataParam,
     pub product: Option<&'a ArmorProductUserDataParam>,
     pub overwear: Option<&'a PlOverwearBaseUserDataParam>,
@@ -190,7 +214,7 @@ pub struct Weapon<'a, Param> {
 }
 
 pub struct WeaponTree<'a, Param> {
-    pub weapons: HashMap<WeaponId, Weapon<'a, Param>>,
+    pub weapons: BTreeMap<WeaponId, Weapon<'a, Param>>,
     pub roots: Vec<WeaponId>,
     pub unpositioned: Vec<WeaponId>,
 }

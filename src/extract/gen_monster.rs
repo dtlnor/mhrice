@@ -3,12 +3,50 @@ use super::gen_quest::*;
 use super::gen_website::{gen_multi_lang, head_common, navbar};
 use super::pedia::*;
 use crate::rsz::*;
-use anyhow::*;
+use anyhow::{bail, Result};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::write;
 use std::path::*;
 use typed_html::{dom::*, elements::*, html, text};
+
+pub fn gen_monster_tag(pedia: &Pedia, em_type: EmTypes, is_target: bool) -> Box<div<String>> {
+    let (id, is_large) = match em_type {
+        EmTypes::Em(id) => (id, true),
+        EmTypes::Ems(id) => (id, false),
+    };
+
+    let monster = pedia.monsters.iter().find(|m| (m.id | m.sub_id << 8) == id);
+    let monster_name = (|| {
+        let name_name = format!("EnemyIndex{:03}", monster?.enemy_type?);
+        Some(gen_multi_lang(pedia.monster_names.get_entry(&name_name)?))
+    })()
+    .unwrap_or(html!(<span>{text!("Monster {0:03}_{1:02}",
+                                id & 0xFF, id >> 8)}</span>));
+
+    let icon_path = format!(
+        "/resources/{}{:03}_{:02}_icon.png",
+        if is_large { "em" } else { "ems" },
+        id & 0xFF,
+        id >> 8
+    );
+
+    let target_tag = if is_target {
+        html!(<span class="tag is-primary">"Target"</span>)
+    } else {
+        html!(<span />)
+    };
+    html!(<div>
+        <a href={format!("/{}/{:03}_{:02}.html",
+            if is_large { "monster" } else { "small-monster" }, id & 0xFF, id >> 8)}>
+            <img class="mh-quest-list-monster-icon" src=icon_path />
+            <span  class="mh-quest-list-monster-name">
+                {monster_name}
+            </span>
+        </a>
+        {target_tag}
+    </div>)
+}
 
 fn gen_extractive_type(extractive_type: ExtractiveType) -> Result<Box<span<String>>> {
     match extractive_type {
@@ -448,30 +486,6 @@ fn gen_condition_steel_fang(
     Ok(content)
 }
 
-fn gen_reward_table<'a>(
-    pedia_ex: &'a PediaEx,
-    item: &'a [ItemId],
-    num: &'a [u32],
-    probability: &'a [u32],
-) -> impl Iterator<Item = Box<tr<String>>> + 'a {
-    item.iter()
-        .zip(num)
-        .zip(probability)
-        .filter(|&((&item, _), _)| item != ItemId::None)
-        .map(move |((&item, &num), probability)| {
-            let item = if let Some(item) = pedia_ex.items.get(&item) {
-                html!(<span>{gen_item_label(item)}</span>)
-            } else {
-                html!(<span>{text!("{:?}", item)}</span>)
-            };
-
-            html!(<tr>
-                <td>{text!("{}x ", num)}{item}</td>
-                <td>{text!("{}%", probability)}</td>
-            </tr>)
-        })
-}
-
 fn gen_grouped_reward_table<'a>(
     pedia_ex: &'a PediaEx,
     drop_dictionary: &'a HashMap<EnemyRewardPopTypes, Vec<String>>,
@@ -716,7 +730,7 @@ pub fn gen_lot(
         <div class="mh-reward-box">
         <table>
             <thead><tr>
-                <th>"From buddy (?)"</th>
+                <th>"From buddy"</th>
                 <th>"Probability"</th>
             </tr></thead>
             <tbody> {
@@ -788,27 +802,11 @@ pub fn gen_monster(
             <tbody> {
                 pedia_ex.quests.iter().flat_map(|quest| {
                     quest.param.boss_em_type.iter().copied().enumerate().filter(
-                        |&(i, em_type)|em_type == monster_em_type
+                        |&(_, em_type)|em_type == monster_em_type
                     )
                     .map(move |(i, em_type)|{
-
-                        let target_tag = if quest.param.has_target(em_type) {
-                            html!(<span class="tag is-primary">"Target"</span>)
-                        } else {
-                            html!(<span />)
-                        };
-
                         html!(<tr>
-                            <td>
-                                <span class="tag">{text!("{:?}-{:?}", quest.param.enemy_level, quest.param.quest_level)}</span>
-                                <a href={format!("/quest/{:06}.html", quest.param.quest_no)}>
-                                {quest.name.map_or(
-                                    html!(<span>{text!("Quest {:06}", quest.param.quest_no)}</span>),
-                                    gen_multi_lang
-                                )}
-                                </a>
-                                {target_tag}
-                            </td>
+                            <td> { gen_quest_tag(quest, quest.param.has_target(em_type)) } </td>
                             { gen_quest_monster_data(quest.enemy_param.as_ref().map(|p|&p.param),
                                 em_type, i, pedia, pedia_ex) }
                         </tr>)
@@ -928,7 +926,7 @@ pub fn gen_monster(
                                 </td>),
                             ]);
 
-                            let invalid = &meats.meat_group_info == &[
+                            let invalid = meats.meat_group_info == [
                                 MeatGroupInfo {
                                     slash: 0,
                                     strike: 0,
@@ -956,7 +954,7 @@ pub fn gen_monster(
                                         phase
                                     }).copied().map_or(html!(<span></span>), gen_multi_lang);
 
-                                    let mut tds = part_common.take().unwrap_or_else(||vec![]);
+                                    let mut tds = part_common.take().unwrap_or_else(Vec::new);
                                     tds.extend(vec![
                                         html!(<td>{text!("{}", phase)}</td>),
                                         html!(<td>{name}</td>),
@@ -970,7 +968,7 @@ pub fn gen_monster(
                                         html!(<td>{text!("{}", group_info.dragon)}</td>),
                                         html!(<td>{text!("{}", group_info.piyo)}</td>),
                                     ]);
-                                    html!(<tr class=hidden.clone()> {tds} </tr>)
+                                    html!(<tr class=hidden> {tds} </tr>)
                                 })
                         })
                     }</tbody>
