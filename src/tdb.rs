@@ -1,8 +1,9 @@
 use crate::bitfield::*;
 use crate::file_ext::*;
 use crate::hash::*;
-use anyhow::*;
+use anyhow::{bail, Context, Result};
 use bitflags::*;
+use std::collections::*;
 use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::io::{Read, Seek, Write};
@@ -110,7 +111,6 @@ bitflags! {
 
 bitflags! {
     struct TypeFlag: u32 {
-
         const NOT_PUBLIC           = 0x00000000;
         const PUBLIC               = 0x00000001;
         const NESTED_PUBLIC        = 0x00000002;
@@ -201,19 +201,19 @@ bitflags! {
     }
 }
 
-fn display_property_flag(attributes: PropertyFlag) -> String {
+fn display_property_flag(flags: PropertyFlag) -> String {
     let mut s = String::new();
-    if attributes.contains(PropertyFlag::SPECIAL_NAME) {
-        s += "[special]"
+    if flags.contains(PropertyFlag::SPECIAL_NAME) {
+        s += "[special]";
     }
-    if attributes.contains(PropertyFlag::RT_SPECIAL_NAME) {
-        s += "[rt_special]"
+    if flags.contains(PropertyFlag::RT_SPECIAL_NAME) {
+        s += "[rt_special]";
     }
-    if attributes.contains(PropertyFlag::HAS_DEFAULT) {
-        s += "[default]"
+    if flags.contains(PropertyFlag::HAS_DEFAULT) {
+        s += "[default]";
     }
-    if attributes.contains(PropertyFlag::EXPOSE_MEMBER) {
-        s += "[expose]"
+    if flags.contains(PropertyFlag::EXPOSE_MEMBER) {
+        s += "[expose]";
     }
     s
 }
@@ -571,7 +571,7 @@ pub struct Tdb {}
 
 impl Tdb {
     #[allow(unused_variables, dead_code)]
-    pub fn new<F: Read + Seek>(mut file: F) -> Result<Tdb> {
+    pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) -> Result<Tdb> {
         if &file.read_magic()? != b"TDB\0" {
             bail!("Wrong magic for TDB file");
         }
@@ -628,25 +628,25 @@ impl Tdb {
         let string_table_len = file.read_u32()?;
         let heap_len = file.read_u32()?;
 
-        let assembly_offset = file.read_u64()?;
-        let type_instance_offset = file.read_u64()?;
-        let type_offset = file.read_u64()?;
-        let method_membership_offset = file.read_u64()?;
-        let method_offset = file.read_u64()?;
-        let field_membership_offset = file.read_u64()?;
-        let field_offset = file.read_u64()?;
-        let property_membership_offset = file.read_u64()?;
-        let property_offset = file.read_u64()?;
-        let event_offset = file.read_u64()?;
-        let param_offset = file.read_u64()?;
-        let attribute_offset = file.read_u64()?;
-        let constant_offset = file.read_u64()?;
-        let attribute_list_offset = file.read_u64()?;
-        let data_attribute_list_offset = file.read_u64()?;
-        let string_table_offset = file.read_u64()?;
-        let heap_offset = file.read_u64()?;
-        let q_offset = file.read_u64()?;
-        let _ = file.read_u64()?; //pad?
+        let assembly_offset = file.read_u64()? - base_address;
+        let type_instance_offset = file.read_u64()? - base_address;
+        let type_offset = file.read_u64()? - base_address;
+        let method_membership_offset = file.read_u64()? - base_address;
+        let method_offset = file.read_u64()? - base_address;
+        let field_membership_offset = file.read_u64()? - base_address;
+        let field_offset = file.read_u64()? - base_address;
+        let property_membership_offset = file.read_u64()? - base_address;
+        let property_offset = file.read_u64()? - base_address;
+        let event_offset = file.read_u64()? - base_address;
+        let param_offset = file.read_u64()? - base_address;
+        let attribute_offset = file.read_u64()? - base_address;
+        let constant_offset = file.read_u64()? - base_address;
+        let attribute_list_offset = file.read_u64()? - base_address;
+        let data_attribute_list_offset = file.read_u64()? - base_address;
+        let string_table_offset = file.read_u64()? - base_address;
+        let heap_offset = file.read_u64()? - base_address;
+        let q_offset = file.read_u64()? - base_address;
+        let _ = file.read_u64()?;
 
         struct Assembly {
             name_offset: u32,
@@ -699,7 +699,7 @@ impl Tdb {
             template_argument_list_offset: usize,
             hash: u32,
             crc32: u32,
-            type_flags: TypeFlag,
+            flags: TypeFlag,
             event_start_index: usize,
             event_count: usize,
             property_membership_start_index: usize,
@@ -723,10 +723,10 @@ impl Tdb {
                     special_type_id,
                 ) = file.read_u64()?.bit_split((18, 18, 18, 10));
 
-                let type_flags = file.read_u32()?; //type_flags
+                let flags = file.read_u32()?; //type_flags
                 let x = file.read_u32()?; //size {zero when its not runtime}
                 if x != 0 {
-                    //bail!("Expected 0: {}", index);
+                    // bail!("Expected 0: {}", index);
                 }
                 let hash = file.read_u32()?; 
                 let crc32 = file.read_u32()?;
@@ -766,8 +766,7 @@ impl Tdb {
                     template_argument_list_offset: template_argument_list_offset.try_into()?,
                     hash,
                     crc32,
-                    type_flags: TypeFlag::from_bits(type_flags)
-                        .context("Unknown TypeFlag")?,
+                    flags: TypeFlag::from_bits(flags).context("Unknown type flag")?,
                     event_start_index: event_start_index.try_into()?,
                     event_count: event_count.try_into()?,
                     property_count: property_count.try_into()?,
@@ -782,20 +781,19 @@ impl Tdb {
             type_instance_index: usize,
             method_index: usize,
             param_list_offset: usize,
+            address: u64,
         }
         file.seek_assert_align_up(method_membership_offset, 16)?;
         let method_memberships = (0..method_membership_count)
             .map(|_| {
                 let (type_instance_index, method_index, param_list_offset) =
                     file.read_u64()?.bit_split((18, 20, 26));
-                let zero = file.read_u64()?;
-                if zero != 0 {
-                    //bail!("Expected 0")
-                }
+                let address = file.read_u64()?;
                 Ok(MethodMembership {
                     type_instance_index: type_instance_index.try_into()?,
                     method_index: method_index.try_into()?,
                     param_list_offset: param_list_offset.try_into()?,
+                    address,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -918,8 +916,8 @@ impl Tdb {
                 let attribute_list_index = file.read_u16()?;
                 let attributes = file.read_u16()?; //flags
                 let (type_instance_index, constant_index_lo) = file.read_u32()?.bit_split((18, 14)); 
-                let (name_offset, constant_index_hi) = file.read_u32()?.bit_split((30, 2)); 
-                let constant_index = constant_index_lo as u32 | ((constant_index_hi as u32) << 14);
+                let (name_offset, constant_index_hi) = file.read_u32()?.bit_split((30, 2));  // is there a high bits of this for something else?
+                let constant_index = constant_index_lo as u32 | ((constant_index_hi as u32) << 14); // assume there a high bits of constant_index
                 Ok(Field {
                     attribute_list_index: attribute_list_index.try_into()?,
                     attributes: FieldAttribute::from_bits(attributes)
@@ -951,22 +949,18 @@ impl Tdb {
             .collect::<Result<Vec<_>>>()?;
 
         struct Property {
-            flag: PropertyFlag,
+            flags: PropertyFlag,
             attribute_list_index: usize,
             name_offset: u32,
         }
         file.seek_assert_align_up(property_offset, 16)?;
         let properties = (0..property_count)
             .map(|_| {
-                let flag = file.read_u16()?;
-                //if a != 0 && a != 0x4000 {
-                //    bail!("Unexpected flag")
-                //}
+                let flags = file.read_u16()?;
                 let attribute_list_index = file.read_u16()?;
                 let name_offset = file.read_u32()?;
                 Ok(Property {
-                    flag: PropertyFlag::from_bits(flag)
-                        .context("Unkn property flag")?,
+                    flags: PropertyFlag::from_bits(flags).context("Unknown property flag")?,
                     attribute_list_index: attribute_list_index.try_into()?,
                     name_offset,
                 })
@@ -1429,6 +1423,7 @@ impl Tdb {
             print!(" */");
             Ok(())
         };
+        let mut function_map: BTreeMap<u64, Vec<String>> = BTreeMap::new();
 
         let mut order: Vec<_> = (0..type_instances.len()).collect();
         order.sort_by_key(|&i| symbols[i].as_ref().unwrap());
@@ -1449,7 +1444,7 @@ impl Tdb {
                 print_attributes(attribute_lists[ty.attribute_list_index], false)?;
                 println!();
             }
-            print!("{}", display_type_flag(type_instance.type_flags));
+            print!("{}", display_type_flag(type_instance.flags));
 
             println!(
                 "{}: {}",
@@ -1552,13 +1547,15 @@ impl Tdb {
                     println!();
                 }
 
+                let method_name = read_string(method.name_offset)?;
+
                 println!(
                     "    {}{}{}{} {} (",
                     display_param_modifier(return_value.modifier, true),
                     display_method_impl_flag(method.impl_flag),
                     display_method_attributes(method.attributes),
                     symbols[return_value.type_instance_index].as_ref().unwrap(),
-                    read_string(method.name_offset)?
+                    method_name
                 );
 
                 for _ in 0..param_count {
@@ -1599,7 +1596,17 @@ impl Tdb {
                     println!(",");
                 }
 
-                println!("    );\n");
+                let address = if method_membership.address != 0 {
+                    function_map
+                        .entry(method_membership.address)
+                        .or_default()
+                        .push(format!("{}.{}", full_name, method_name));
+                    format!(" = 0x{:016X}", method_membership.address)
+                } else {
+                    "".to_string()
+                };
+
+                println!("    ){};\n", address);
             }
 
             println!();
@@ -1683,7 +1690,7 @@ impl Tdb {
                 }
                 println!(
                     "    {}public property {};",
-                    display_property_flag(property.flag),
+                    display_property_flag(property.flags),
                     read_string(property.name_offset)?
                 );
             }
@@ -1703,6 +1710,15 @@ impl Tdb {
                 read_string(assembly.full_path_offset)?,
                 read_string(assembly.dll_name_offset)?
             );
+        }
+
+        if let Some(map) = map {
+            let mut map = File::create(map)?;
+            for (address, names) in function_map {
+                for name in names {
+                    writeln!(map, "{} {:016X} f", name, address)?
+                }
+            }
         }
 
         Ok(Tdb {})

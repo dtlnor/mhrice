@@ -3,6 +3,7 @@ use crate::rsz_bitflags;
 use crate::rsz_enum;
 use crate::rsz_struct;
 use serde::*;
+use std::cmp::*;
 
 // snow.quest.QuestType
 rsz_bitflags! {
@@ -229,6 +230,27 @@ rsz_enum! {
     pub enum EmTypes {
         Em(u32) = 0x0000..=0x0FFF,
         Ems(u32) = 0x1000..=0x1FFF,
+    }
+}
+
+impl EmTypes {
+    fn order_index(&self) -> u32 {
+        match *self {
+            EmTypes::Em(i) => (i & 0xFF) << 16 | (i & 0xF00),
+            EmTypes::Ems(i) => (i & 0xFF) << 16 | (i & 0xF00) | 0x80000000,
+        }
+    }
+}
+
+impl PartialOrd<EmTypes> for EmTypes {
+    fn partial_cmp(&self, other: &EmTypes) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for EmTypes {
+    fn cmp(&self, other: &EmTypes) -> Ordering {
+        self.order_index().cmp(&other.order_index())
     }
 }
 
@@ -554,5 +576,90 @@ rsz_struct! {
     #[derive(Debug, Serialize)]
     pub struct DiscoverEmSetData {
         pub param: Vec<DiscoverEmSetDataParam>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.MainTargetRewardLotNumDefineUserData.Param",
+        0x266cce0b = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MainTargetRewardLotNumDefineUserDataParam {
+        pub target_num: u32,
+        pub base_lot_num: u32,
+        pub max_lot_num: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.MainTargetRewardLotNumDefineUserData",
+        0x360c1a50 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MainTargetRewardLotNumDefineUserData {
+        pub param: Vec<MainTargetRewardLotNumDefineUserDataParam>
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.QuestDataForRewardUserData.Param",
+        0x5a13ba06 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestDataForRewardUserDataParam {
+        pub quest_numer: i32,
+        pub target_reward_add_num: u32,
+        pub additional_target_reward_table_index: u32,
+        pub common_material_add_num: u32,
+        pub common_material_reward_table_index: u32,
+        pub additional_quest_reward_table_index: Vec<u32>,
+        pub cloth_ticket_index: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.QuestDataForRewardUserData",
+        0x424e2f4b = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestDataForRewardUserData {
+        pub param: Vec<QuestDataForRewardUserDataParam>
+    }
+}
+
+// snow.data.ItemLotTable.LotRule
+rsz_enum! {
+    #[rsz(i32)]
+    #[derive(Debug, Serialize, Clone, Copy)]
+    pub enum LotRule {
+        Random = 0,
+        RandomOut1 = 1,
+        RandomOut2 = 2,
+        RandomOut3 = 3,
+        FirstFix = 4,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.RewardIdLotTableUserData.Param",
+        0x214bfede = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct RewardIdLotTableUserDataParam {
+        pub id: u32,
+        pub lot_rule: LotRule,
+        pub item_id_list: Vec<ItemId>,
+        pub num_list: Vec<u32>,
+        pub probability_list: Vec<u32>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.RewardIdLotTableUserData",
+        0xdb631ed5 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct RewardIdLotTableUserData {
+        pub param: Vec<RewardIdLotTableUserDataParam>
     }
 }

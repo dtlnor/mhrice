@@ -38,7 +38,7 @@ pub use weapon::*;
 
 use crate::file_ext::*;
 use crate::hash::*;
-use anyhow::*;
+use anyhow::{anyhow, bail, Context, Result};
 use bitflags::*;
 use once_cell::sync::Lazy;
 use serde::*;
@@ -776,6 +776,12 @@ static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszDeserializerPackage>> = Lazy::new(|| {
         EnemySizeListData,
         DiscoverEmSetDataParam,
         DiscoverEmSetData,
+        MainTargetRewardLotNumDefineUserDataParam,
+        MainTargetRewardLotNumDefineUserData,
+        QuestDataForRewardUserDataParam,
+        QuestDataForRewardUserData,
+        RewardIdLotTableUserDataParam,
+        RewardIdLotTableUserData,
     );
 
     r!(

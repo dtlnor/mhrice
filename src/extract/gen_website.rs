@@ -8,7 +8,7 @@ use super::pedia::*;
 use crate::msg::*;
 use crate::part_color::*;
 use crate::rsz::*;
-use anyhow::*;
+use anyhow::Result;
 use chrono::prelude::*;
 use std::convert::TryInto;
 use std::fs::{create_dir, remove_dir_all, write, File};
@@ -218,18 +218,21 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
             } else {
                 (tag, "")
             };
-            let tag = Tag {
+            let mut tag = Tag {
                 tag,
                 arg,
                 seq: Seq { nodes: vec![] },
             };
-            if tag.tag == "LSNR" {
+            if matches!(tag.tag, "LSNR" | "PL" | "ПУСТО") {
                 let tag = Node::Tagged(tag);
                 if let Some(last) = stack.last_mut() {
                     last.seq.nodes.push(tag);
                 } else {
                     root.nodes.push(tag);
                 }
+            } else if tag.tag == "COLS" {
+                tag.tag = "COL";
+                stack.push(tag);
             } else {
                 stack.push(tag);
             }
@@ -260,11 +263,17 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
                     }
                     "LSNR" => {
                         // Gender selector
-                        html!(<span> {text!("{}", t.arg)} </span>)
+                        html!(<span class="mh-msg-place-holder"> {text!("{}", t.arg)} </span>)
                     }
                     "BSL" => {
                         // Text direction change?
                         html!(<span> {inner} </span>)
+                    }
+                    "PL" => {
+                        html!(<span class="mh-msg-place-holder"> "{Player}" </span>)
+                    }
+                    "ПУСТО" => {
+                        html!(<span> "<ПУСТО>" </span>)
                     }
                     _ => {
                         eprintln!("Unknown tag: {}", t.tag);
@@ -477,7 +486,7 @@ pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &str) -> Resul
     gen_armor_list(&pedia_ex.armors, &root)?;
     gen_monsters(pedia, pedia_ex, &root)?;
     gen_quest_list(&pedia_ex.quests, &root)?;
-    gen_items(pedia_ex, &root)?;
+    gen_items(pedia, pedia_ex, &root)?;
     gen_item_list(pedia_ex, &root)?;
     gen_weapons(pedia_ex, &root)?;
     gen_about(&root)?;

@@ -4,10 +4,28 @@ use super::gen_skill::*;
 use super::gen_website::*;
 use super::pedia::*;
 use crate::rsz::*;
-use anyhow::*;
+use anyhow::Result;
 use std::fs::{create_dir, write};
 use std::path::*;
-use typed_html::{dom::*, html, text};
+use typed_html::{dom::*, elements::*, html, text};
+
+pub fn gen_armor_label(piece: Option<&Armor>) -> Box<div<String>> {
+    let piece_name = if let Some(piece) = piece {
+        let icon = format!(
+            "/resources/equip/{:03}",
+            piece.data.pl_armor_id.icon_index()
+        );
+        html!(<div class="mh-icon-text">
+            { gen_rared_icon(piece.data.rare, &icon) }
+            <span>{ gen_multi_lang(piece.name) }</span>
+        </div>)
+    } else {
+        html!(<div>"-"</div>)
+    };
+    html!(<div>
+        { piece_name }
+    </div>)
+}
 
 pub fn gen_armor_list(serieses: &[ArmorSeries], root: &Path) -> Result<()> {
     let doc: DOMTree<String> = html!(
@@ -26,7 +44,7 @@ pub fn gen_armor_list(serieses: &[ArmorSeries], root: &Path) -> Result<()> {
                     </div>
                 </article>
                 <ul class="mh-armor-series-list">{
-                    serieses.into_iter().map(|series|{
+                    serieses.iter().map(|series|{
                         let series_name = if let Some(name) = series.name.as_ref() {
                             gen_multi_lang(name)
                         } else {
@@ -40,18 +58,8 @@ pub fn gen_armor_list(serieses: &[ArmorSeries], root: &Path) -> Result<()> {
                             }</h2>
                             <ul class="mh-armor-list"> {
                                 series.pieces.iter().take(5).map(|piece| {
-                                    let piece_name = if let Some(piece) = piece {
-                                        let icon = format!("/resources/equip/{:03}",
-                                            piece.data.pl_armor_id.icon_index());
-                                        html!(<div class="mh-icon-text">
-                                            { gen_rared_icon(piece.data.rare, &icon) }
-                                            <span>{ gen_multi_lang(&piece.name) }</span>
-                                        </div>)
-                                    } else {
-                                        html!(<div>"-"</div>)
-                                    };
                                     html!(<li class="mh-armor-list">
-                                        { piece_name }
+                                        { gen_armor_label(piece.as_ref()) }
                                     </li>)
                                 })
                             } </ul>
@@ -78,8 +86,30 @@ fn gen_armor(series: &ArmorSeries, pedia_ex: &PediaEx, path: &Path) -> Result<()
         );
         html!(<div class="mh-icon-text">
             { gen_rared_icon(piece.data.rare, &icon) }
-            <span>{ gen_multi_lang(&piece.name) }</span>
+            <span>{ gen_multi_lang(piece.name) }</span>
         </div>)
+    };
+
+    let gen_explain = |pieces: &[Option<Armor<'_>>]| {
+        html!(<table>
+            <thead><tr>
+                <th>"Name"</th>
+                <th>"Description"</th>
+            </tr></thead>
+            <tbody> {
+                pieces.iter().map(|piece| {
+                    let piece = if let Some(piece) = piece {
+                        piece
+                    } else {
+                        return html!(<tr><td colspan="2">"-"</td></tr>)
+                    };
+                    html!(<tr>
+                        <td>{gen_label(piece)}</td>
+                        <td>{gen_multi_lang(piece.explain)}</td>
+                    </tr>)
+                })
+            } </tbody>
+        </table>)
     };
 
     let gen_stat = |pieces: &[Option<Armor<'_>>]| {
@@ -114,7 +144,7 @@ fn gen_armor(series: &ArmorSeries, pedia_ex: &PediaEx, path: &Path) -> Result<()
                                 html!(<span><a href={format!("/skill/{}", skill_page(skill))}
                                     class="mh-icon-text">
                                     {gen_colored_icon(skill_data.icon_color, "/resources/skill", &[])}
-                                    {gen_multi_lang(&skill_data.name)}
+                                    {gen_multi_lang(skill_data.name)}
                                 </a></span>)
                             } else {
                                 html!(<span>"<UNKNOWN>"</span>)
@@ -168,6 +198,12 @@ fn gen_armor(series: &ArmorSeries, pedia_ex: &PediaEx, path: &Path) -> Result<()
                         html!(<span>"<Unknown>"</span>)
                     }
                 } </h1>
+
+                <section class="section">
+                <h2 class="title">"Description"</h2>
+                { gen_explain(&series.pieces[0..5])}
+                </section>
+
                 <section class="section">
                 <h2 class="title">"Stat"</h2>
                 { gen_stat(&series.pieces[0..5])}
@@ -175,12 +211,19 @@ fn gen_armor(series: &ArmorSeries, pedia_ex: &PediaEx, path: &Path) -> Result<()
 
                 {
                     series.pieces[5..10].iter().any(|p|p.is_some()).then(||{
-                        html!(<section class="section">
-                            <h2 class="title">"EX Stat"</h2>
-                            { gen_stat(&series.pieces[5..10])}
-                            </section>
-                        )
-                    })
+                        [
+                            html!(<section class="section">
+                                <h2 class="title">"EX Description"</h2>
+                                { gen_explain(&series.pieces[5..10])}
+                                </section>
+                            ),
+                            html!(<section class="section">
+                                <h2 class="title">"EX Stat"</h2>
+                                { gen_stat(&series.pieces[5..10])}
+                                </section>
+                            )
+                        ]
+                    }).into_iter().flatten()
                 }
 
                 <section class="section">

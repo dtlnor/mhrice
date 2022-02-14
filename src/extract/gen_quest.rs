@@ -1,11 +1,36 @@
+use super::gen_item::*;
+use super::gen_monster::*;
 use super::gen_website::*;
 use super::pedia::*;
 use crate::rsz::*;
-use anyhow::*;
+use anyhow::Result;
 use std::collections::BTreeMap;
 use std::fs::{create_dir, write};
 use std::path::*;
 use typed_html::{dom::*, elements::*, html, text};
+
+pub fn gen_quest_tag(quest: &Quest, is_target: bool) -> Box<div<String>> {
+    let target_tag = if is_target {
+        html!(<span class="tag is-primary">"Target"</span>)
+    } else {
+        html!(<span />)
+    };
+    html!(<div>
+        <span class="tag">{text!("{:?}-{:?}", quest.param.enemy_level, quest.param.quest_level)}</span>
+        {
+            quest.is_dl.then(
+                ||html!(<span class="tag">{text!("Event")}</span>)
+            )
+        }
+        <a href={format!("/quest/{:06}.html", quest.param.quest_no)}>
+        {quest.name.map_or(
+            html!(<span>{text!("Quest {:06}", quest.param.quest_no)}</span>),
+            gen_multi_lang
+        )}
+        </a>
+        {target_tag}
+    </div>)
+}
 
 pub fn gen_quest_list(quests: &[Quest], root: &Path) -> Result<()> {
     let mut quests_ordered: BTreeMap<_, BTreeMap<_, Vec<&Quest>>> = BTreeMap::new();
@@ -49,6 +74,11 @@ pub fn gen_quest_list(quests: &[Quest], root: &Path) -> Result<()> {
                                                 html!{<li>
                                                     <a href={link} class="mh-icon-text">
                                                     <img src={img} class="mh-quest-icon"/>
+                                                    {
+                                                        quest.is_dl.then(
+                                                            ||html!(<span class="tag">{text!("Event")}</span>)
+                                                        )
+                                                    }
                                                     {name}
                                                     </a>
                                                 </li>}
@@ -225,11 +255,23 @@ fn gen_multi_factor(data: &MultiData) -> Box<div<String>> {
     </ul></div>)
 }
 
+fn translate_rule(rule: LotRule) -> Box<span<String>> {
+    let desc = match rule {
+        LotRule::Random => "Get random amount",
+        LotRule::RandomOut1 => "Get one",
+        LotRule::RandomOut2 => "Get two",
+        LotRule::RandomOut3 => "Get three",
+        LotRule::FirstFix => "First one fixed",
+    };
+    html!(<span class="mh-lot-rule">{ text!("{}", desc) }</span>)
+}
+
+#[allow(clippy::vec_box)]
 fn gen_quest_monster_multi_player_data(
     enemy_param: Option<&SharedEnemyParam>,
     index: usize,
     pedia: &Pedia,
-) -> impl IntoIterator<Item = Box<td<String>>> {
+) -> Vec<Box<td<String>>> {
     let no_data = || vec![html!(<td colspan=9>"[NO DATA]"</td>)];
 
     let enemy_param = if let Some(enemy_param) = enemy_param.as_ref() {
@@ -260,38 +302,6 @@ fn gen_quest_monster_multi_player_data(
         .collect()
 }
 
-fn gen_monster_tag(quest: &Quest, pedia: &Pedia, em_type: EmTypes) -> Box<td<String>> {
-    let id = match em_type {
-        EmTypes::Em(id) => id,
-        EmTypes::Ems(_) => return html!(<td>"Unexpected small monster"</td>),
-    };
-
-    let monster = pedia.monsters.iter().find(|m| (m.id | m.sub_id << 8) == id);
-    let monster_name = (|| {
-        let name_name = format!("EnemyIndex{:03}", monster?.enemy_type?);
-        Some(gen_multi_lang(pedia.monster_names.get_entry(&name_name)?))
-    })()
-    .unwrap_or(html!(<span>{text!("Monster {0:03}_{1:02}",
-                                id & 0xFF, id >> 8)}</span>));
-
-    let icon_path = format!("/resources/em{0:03}_{1:02}_icon.png", id & 0xFF, id >> 8);
-
-    let target_tag = if quest.param.has_target(em_type) {
-        html!(<span class="tag is-primary">"Target"</span>)
-    } else {
-        html!(<span />)
-    };
-    html!(<td>
-        <a href={format!("/monster/{:03}_{1:02}.html", id & 0xFF, id >> 8)}>
-            <img class="mh-quest-list-monster-icon" src=icon_path />
-            <span  class="mh-quest-list-monster-name">
-                {monster_name}
-            </span>
-        </a>
-        {target_tag}
-    </td>)
-}
-
 fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) -> Result<()> {
     let img = format!(
         "/resources/questtype_{}.png",
@@ -312,6 +322,11 @@ fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) 
                 <h1 class="title">
                 <span class="tag">{text!("{:?}-{:?}", quest.param.enemy_level, quest.param.quest_level)}</span>
                 {
+                    quest.is_dl.then(
+                        ||html!(<span class="tag">{text!("Event")}</span>)
+                    )
+                }
+                {
                     quest.name.map_or(
                         html!(<span>{text!("Quest {:06}", quest.param.quest_no)}</span>),
                         gen_multi_lang
@@ -323,12 +338,24 @@ fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) 
                         gen_multi_lang
                     )
                 }</span></p>
+                <p><span>"From: "</span><span> {
+                    quest.requester.map_or(
+                        html!(<span>"-"</span>),
+                        gen_multi_lang
+                    )
+                }</span></p>
+                <p><span>"Detail: "</span><span> {
+                    quest.detail.map_or(
+                        html!(<span>"-"</span>),
+                        gen_multi_lang
+                    )
+                }</span></p>
                 <section class="section">
                 <h2 class="title">"Monster stats"</h2>
                 <table>
                     <thead><tr>
                         <th>"Monster"</th>
-                        <th>"Size (?)"</th>
+                        <th>"Size"</th>
                         <th>"HP"</th>
                         <th>"Attack"</th>
                         <th>"Parts"</th>
@@ -345,7 +372,7 @@ fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) 
                         .filter(|&(_, em_type)|em_type != EmTypes::Em(0))
                         .map(|(i, em_type)|{
                             html!(<tr>
-                                { gen_monster_tag(quest, pedia, em_type) }
+                                <td>{ gen_monster_tag(pedia, em_type, quest.param.has_target(em_type)) }</td>
                                 { gen_quest_monster_data(quest.enemy_param.as_ref().map(|p|&p.param),
                                     em_type, i, pedia, pedia_ex) }
                             </tr>)
@@ -354,7 +381,7 @@ fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) 
                 </table>
                 </section>
                 <section class="section">
-                <h2 class="title">"Multiplayer Factor (Column header might be wrong)"</h2>
+                <h2 class="title">"Multiplayer Factor"</h2>
 
                 <table>
                     <thead><tr>
@@ -377,7 +404,7 @@ fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) 
                         .filter(|&(_, em_type)|em_type != EmTypes::Em(0))
                         .map(|(i, em_type)|{
                             html!(<tr>
-                                { gen_monster_tag(quest, pedia, em_type) }
+                                <td>{ gen_monster_tag(pedia, em_type, quest.param.has_target(em_type)) }</td>
                                 { gen_quest_monster_multi_player_data(
                                     quest.enemy_param.as_ref().map(|p|&p.param), i, pedia) }
                             </tr>)
@@ -385,6 +412,95 @@ fn gen_quest(quest: &Quest, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) 
                     } </tbody>
                 </table>
 
+                </section>
+                <section>
+                <h2 class="title">"Rewards"</h2>
+                { if let Some(reward) = &quest.reward {
+                    html!(<div>
+                    <p>{text!("Addtional target rewards: {}", reward.param.target_reward_add_num)}</p>
+                    <p>{text!("Addtional quest rewards: {}", reward.param.common_material_add_num)}</p>
+                    <p>"See monster's page for target rewards."</p>
+                    <div class="mh-reward-tables">
+
+                    { if let Some(common_material_reward) = &reward.common_material_reward {
+                        html!(<div class="mh-reward-box">
+                        <table>
+                            <thead><tr>
+                                <th>"Quest rewards"<br/>{translate_rule(common_material_reward.lot_rule)}</th>
+                                <th>"Probability"</th>
+                            </tr></thead>
+                            <tbody> {
+                                gen_reward_table(pedia_ex,
+                                    &common_material_reward.item_id_list,
+                                    &common_material_reward.num_list,
+                                    &common_material_reward.probability_list)
+                            } </tbody>
+                        </table>
+                        </div>)
+                    } else {
+                        html!(<div></div>)
+                    }}
+
+                    { if let Some(additional_target_reward) = reward.additional_target_reward {
+                        html!(<div class="mh-reward-box">
+                        <table>
+                            <thead><tr>
+                                <th>"Addtional target rewards"<br/>{translate_rule(additional_target_reward.lot_rule)}</th>
+                                <th>"Probability"</th>
+                            </tr></thead>
+                            <tbody> {
+                                gen_reward_table(pedia_ex,
+                                    &additional_target_reward.item_id_list,
+                                    &additional_target_reward.num_list,
+                                    &additional_target_reward.probability_list)
+                            } </tbody>
+                        </table>
+                        </div>)
+                    } else {
+                        html!(<div></div>)
+                    }}
+
+                    { reward.additional_quest_reward.iter().map(|additional_quest_reward| {
+                        html!(<div class="mh-reward-box">
+                        <table>
+                            <thead><tr>
+                                <th>"Addtional rewards"<br/>{translate_rule(additional_quest_reward.lot_rule)}</th>
+                                <th>"Probability"</th>
+                            </tr></thead>
+                            <tbody> {
+                                gen_reward_table(pedia_ex,
+                                    &additional_quest_reward.item_id_list,
+                                    &additional_quest_reward.num_list,
+                                    &additional_quest_reward.probability_list)
+                            } </tbody>
+                        </table>
+                        </div>)
+                    })}
+
+                    { if let Some(cloth_ticket) = &reward.cloth_ticket {
+                        html!(<div class="mh-reward-box">
+                        <table>
+                            <thead><tr>
+                                <th>"Outfit voucher"<br/>{translate_rule(cloth_ticket.lot_rule)}</th>
+                                <th>"Probability"</th>
+                            </tr></thead>
+                            <tbody> {
+                                gen_reward_table(pedia_ex,
+                                    &cloth_ticket.item_id_list,
+                                    &cloth_ticket.num_list,
+                                    &cloth_ticket.probability_list)
+                            } </tbody>
+                        </table>
+                        </div>)
+                    } else {
+                        html!(<div></div>)
+                    }}
+
+                    </div>
+                    </div>)
+                } else {
+                    html!(<div>"No data"</div>)
+                }}
                 </section>
                 </div> </div> </main>
             </body>
