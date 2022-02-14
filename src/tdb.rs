@@ -4,7 +4,8 @@ use crate::hash::*;
 use anyhow::*;
 use bitflags::*;
 use std::convert::{TryFrom, TryInto};
-use std::io::{Read, Seek};
+use std::fs::File;
+use std::io::{Read, Seek, Write};
 use std::char::{REPLACEMENT_CHARACTER};
 
 fn as_hex(array: &[u8], len: usize) -> String {
@@ -38,76 +39,6 @@ fn as_hex(array: &[u8], len: usize) -> String {
     }
 
     s
-}
-
-bitflags! {
-    struct PropertyFlag: u16 {
-        const SPECIAL_NAME             = 0x0200;
-        const RT_SPECIAL_NAME          = 0x0400;
-        const HAS_DEFAULT              = 0x1000;
-        const EXPOSE_MEMBER            = 0x4000;
-    }
-}
-
-bitflags! {
-    struct TypeFlag: u32 {
-
-        const VISIBILITY_MASK           = 0x00000007; //111 {0~7}
-        const NOT_PUBLIC                = 0x00000000;
-        const PUBLIC                    = 0x00000001;
-        const NESTED_PUBLIC             = 0x00000002;
-        const NESTED_PRIVATE            = 0x00000003;
-        const NESTED_FAMILY             = 0x00000004;
-        const NESTED_ASSEMBLY           = 0x00000005;
-        const NESTED_FAM_AND_ASSEM      = 0x00000006;
-        const NESTED_FAM_OR_ASSEM       = 0x00000007;
-
-        const LAYOUT_MASK               = 0x00000018; //11000 {0, 8, 16, 24}
-        const AUTO_LAYOUT               = 0x00000000;
-        const SEQUENTIAL_LAYOUT         = 0x00000008;        
-        const EXPLICIT_LAYOUT           = 0x00000010;
-
-        const CLASS_SEMANTICS_MASK      = 0x00000020; //100000 {0, 32}
-        const CLASS                     = 0x00000000;
-        const INTERFACE                 = 0x00000020;
-
-        //no mask
-        const ABSTRACT                  = 0x00000080;
-        const SEALED                    = 0x00000100;
-        const SPECIAL_NAME              = 0x00000400;
-        const IMPORT                    = 0x00001000;
-        const SERIALIZABLE              = 0x00002000;
-        const WINDOWS_RUNTIME           = 0x00004000;
-
-        const STRING_FORMAT_MASK        = 0x00030000; //110000000000000000 {0, 65536, 131072, 196608}
-        const ANSI_CLASS                = 0x00000000;
-        const UNICODE_CLASS             = 0x00010000;
-        const AUTO_CLASS                = 0x00020000;
-        const CUSTOM_FORMAT_CLASS       = 0x00030000;
-
-        const CUSTOM_FORMAT_MASK        = 0x00C00000; //110000000000000000000000 {0, 4194304, 8388608, 12582912}
-        const CUSTOM_00                 = 0x00000000;
-        const CUSTOM_01                 = 0x00400000;
-        const CUSTOM_10                 = 0x00800000;
-        const CUSTOM_11                 = 0x00C00000;
-
-        //no mask
-        const BEFORE_FIELD_INIT         = 0x00100000;
-
-        const NO_RESERVE                = 0x00000000;
-        const RTSPECIAL_NAME            = 0x00000800;
-        const HAS_SECURITY              = 0x00040000;
-        const RESERVED_MASK             = 0x00040800; //1000000100000000000 {0, 2048, 262144, 264192}
-
-        //no mask
-        const LOCAL_HEAP                = 0x01000000;
-        const FINALIZE                  = 0x02000000;
-        const NATIVE_TYPE               = 0x04000000;
-        const MARK_FIELDS               = 0x08000000;
-        const NATIVE_CTOR               = 0x10000000;
-        const CONSTRACTED               = 0x20000000;
-        const MANAGED_VTABLE            = 0x40000000;
-    }
 }
 
 bitflags! {
@@ -178,6 +109,63 @@ bitflags! {
 }
 
 bitflags! {
+    struct TypeFlag: u32 {
+
+        const NOT_PUBLIC           = 0x00000000;
+        const PUBLIC               = 0x00000001;
+        const NESTED_PUBLIC        = 0x00000002;
+        const NESTED_PRIVATE       = 0x00000003;
+        const NESTED_FAMILY        = 0x00000004;
+        const NESTED_ASSEMBLY      = 0x00000005;
+        const NESTED_FAMANDASSEM   = 0x00000006;
+        const NESTED_FAMORASSEM    = 0x00000007;
+        const VISIBILITY_MASK      = 0x00000007; //111 {0~7}
+
+        const AUTO_LAYOUT          = 0x00000000;
+        const SEQUENTIAL_LAYOUT    = 0x00000008;        
+        const EXPLICIT_LAYOUT      = 0x00000010;
+        const LAYOUT_MASK          = 0x00000018; //11000 {0, 8, 16, 24}
+
+        const CLASS                = 0x00000000;
+        const INTERFACE            = 0x00000020;
+        const CLASS_SEMANTICS_MASK = 0x00000020; //100000 {0, 32} 
+        // no 0x0040
+        //no mask
+        const ABSTRACT             = 0x00000080;
+        const SEALED               = 0x00000100;
+        // no 0x0200
+        const SPECIAL_NAME         = 0x00000400;
+        const RT_SPECIAL_NAME      = 0x00000800;
+        const IMPORT               = 0x00001000;
+        const SERIALIZABLE         = 0x00002000;
+        const WINDOWS_RUNTIME      = 0x00004000;
+        // no 0x8000
+
+        const ANSI_CLASS           = 0x00000000;
+        const UNICODE_CLASS        = 0x00010000;
+        const AUTO_CLASS           = 0x00020000;
+        const CUSTOM_FORMAT_CLASS  = 0x00030000;
+        const STRING_FORMAT_MASK   = 0x00030000; //110000000000000000 {0, 65536, 131072, 196608}
+
+        const HAS_SECURITY         = 0x00040000;
+        // no 0x080000
+        const BEFORE_FIELD_INIT    = 0x00100000;
+        // no 0x200000
+        //const NO_RESERVE           = 0x00000000;
+        //const RESERVED_MASK        = 0x00040800; //1000000100000000000 {0, 2048, 262144, 264192}
+        // no 0x200000
+        const CUSTOM_FORMAT_MASK   = 0x00C00000; //110000000000000000000000 {0, 4194304, 8388608, 12582912}
+        const LOCAL_HEAP           = 0x01000000;
+        const FINALIZE             = 0x02000000;
+        const NATIVE_TYPE          = 0x04000000;
+        const MARK_FIELDS          = 0x08000000;
+        const NATIVE_CTOR          = 0x10000000;
+        // no 0x20000000
+        const MANAGED_VTABLE       = 0x40000000;
+    }
+}
+
+bitflags! {
     struct MethodImplFlag: u16 {
         const CODE_TYPE_MASK              = 0x0003;
         const IL                          = 0x0000;
@@ -204,6 +192,32 @@ bitflags! {
     }
 }
 
+bitflags! {
+    struct PropertyFlag: u16 {
+        const SPECIAL_NAME    = 0x0200;
+        const RT_SPECIAL_NAME = 0x0400;
+        const HAS_DEFAULT     = 0x1000;
+        const EXPOSE_MEMBER   = 0x4000;
+    }
+}
+
+fn display_property_flag(attributes: PropertyFlag) -> String {
+    let mut s = String::new();
+    if attributes.contains(PropertyFlag::SPECIAL_NAME) {
+        s += "[special]"
+    }
+    if attributes.contains(PropertyFlag::RT_SPECIAL_NAME) {
+        s += "[rt_special]"
+    }
+    if attributes.contains(PropertyFlag::HAS_DEFAULT) {
+        s += "[default]"
+    }
+    if attributes.contains(PropertyFlag::EXPOSE_MEMBER) {
+        s += "[expose]"
+    }
+    s
+}
+
 fn display_param_modifier(param_modifier: u32, return_pos: bool) -> String {
     let return_pos = if return_pos { "return:" } else { "" };
     let tag = match param_modifier {
@@ -213,6 +227,105 @@ fn display_param_modifier(param_modifier: u32, return_pos: bool) -> String {
         _ => "unknown-mod",
     };
     format!("[{}{}]", return_pos, tag)
+}
+
+fn display_type_flag(flags: TypeFlag) -> String {
+    let mut s = String::new();    
+    //https://docs.microsoft.com/en-us/dotnet/api/system.reflection.typeattributes?view=net-6.0
+
+    s += match flags & TypeFlag::LAYOUT_MASK {
+        TypeFlag::AUTO_LAYOUT => "[auto]", //"[StructLayoutAttribute(LayoutKind.Auto)]",
+        TypeFlag::SEQUENTIAL_LAYOUT => "[sequential]", //"[StructLayoutAttribute(LayoutKind.Sequential)]",
+        TypeFlag::EXPLICIT_LAYOUT => "[explicit]", //"[StructLayoutAttribute(LayoutKind.Explicit)]",
+        _ => "[unknown_layout]",
+    };
+
+    if flags.contains(TypeFlag::SPECIAL_NAME) {
+        s += "[special]"
+    }
+    if flags.contains(TypeFlag::RT_SPECIAL_NAME) {
+        s += "[rt_special]"
+    }
+    if flags.contains(TypeFlag::IMPORT) {
+        s += "[import]"
+    }
+    if flags.contains(TypeFlag::SERIALIZABLE) {
+        s += "[serializable]"
+    }
+    if flags.contains(TypeFlag::WINDOWS_RUNTIME) {
+        s += "[windows_runtime]"
+    }
+
+    s += match flags & TypeFlag::STRING_FORMAT_MASK {
+        TypeFlag::ANSI_CLASS => "[ansi]",
+        TypeFlag::UNICODE_CLASS => "[unicode]",
+        TypeFlag::AUTO_CLASS => "[auto_format]",
+        TypeFlag::CUSTOM_FORMAT_CLASS => "[custom_format]",
+        _ => panic!(),
+    };
+    
+    /*
+    s += match flags & TypeFlag::CUSTOM_FORMAT_MASK {
+        TypeFlag::CUSTOM_00 => "",
+        TypeFlag::CUSTOM_01 => "[Custom01]",
+        TypeFlag::CUSTOM_10 => "[Custom10]",
+        TypeFlag::CUSTOM_11 => "[Custom11]",
+        _ => panic!(),
+    };*/
+    
+    if flags.contains(TypeFlag::HAS_SECURITY) {
+        s += "[has_security]"
+    }
+    if flags.contains(TypeFlag::BEFORE_FIELD_INIT) {
+        s += "[before_field_init]"
+    }
+    if flags.contains(TypeFlag::LOCAL_HEAP) {
+        s += "[local_heap]"
+    }
+    if flags.contains(TypeFlag::FINALIZE) {
+        s += "[finalize]"
+    }
+    if flags.contains(TypeFlag::NATIVE_TYPE) {
+        s += "[native]"
+    }
+    if flags.contains(TypeFlag::MARK_FIELDS) {
+        s += "[MarkFields]"
+    }
+    if flags.contains(TypeFlag::NATIVE_CTOR) {
+        s += "[native_ctor]"
+    }
+    if flags.contains(TypeFlag::MANAGED_VTABLE) {
+        s += "[managed_vtable]"
+    }
+
+    s += "\n";
+
+    s += match flags & TypeFlag::VISIBILITY_MASK {
+        TypeFlag::NOT_PUBLIC => "",
+        TypeFlag::PUBLIC => "public ",
+        TypeFlag::NESTED_PUBLIC => "/*nested*/ public ",
+        TypeFlag::NESTED_PRIVATE => "/*nested*/ private ",
+        TypeFlag::NESTED_FAMILY => "/*nested*/ protected ",
+        TypeFlag::NESTED_ASSEMBLY => "/*nested*/ internal ",
+        TypeFlag::NESTED_FAMANDASSEM => "/*nested*/ private protected ",
+        TypeFlag::NESTED_FAMORASSEM => "/*nested*/ protected internal ",
+        _ => panic!(),
+    };
+    
+    if flags.contains(TypeFlag::ABSTRACT) {
+        s += "abstract "
+    }
+    if flags.contains(TypeFlag::SEALED) {
+        s += "sealed "
+    }
+
+    s += match flags & TypeFlag::CLASS_SEMANTICS_MASK {
+        TypeFlag::CLASS => "class ",
+        TypeFlag::INTERFACE => "interface ",
+        _ => panic!(),
+    };
+
+    s
 }
 
 fn display_field_attributes(attributes: FieldAttribute) -> String {
@@ -451,133 +564,6 @@ fn display_param_attributes(attributes: ParamAttribute) -> String {
     if attributes.contains(ParamAttribute::HAS_FIELD_MARSHAL) {
         s += "[marshal]";
     }
-    s
-}
-
-fn display_property_flag(attributes: PropertyFlag) -> String {
-    let mut s = String::new();
-
-    if attributes.contains(PropertyFlag::SPECIAL_NAME) {
-        s += "[special]"
-    }
-
-    if attributes.contains(PropertyFlag::RT_SPECIAL_NAME) {
-        s += "[rt_special]"
-    }
-
-    if attributes.contains(PropertyFlag::HAS_DEFAULT) {
-        s += "[default]"
-    }
-
-    if attributes.contains(PropertyFlag::EXPOSE_MEMBER) {
-        s += "[expose]"
-    }
-    s
-}
-
-
-fn display_type_flag(attributes: TypeFlag) -> String {
-    let mut s = String::new();    
-
-    //https://docs.microsoft.com/en-us/dotnet/api/system.reflection.typeattributes?view=net-6.0
-
-    s += match attributes & TypeFlag::LAYOUT_MASK {
-        TypeFlag::AUTO_LAYOUT => "[StructLayoutAttribute(LayoutKind.Auto)]",
-        TypeFlag::SEQUENTIAL_LAYOUT => "[StructLayoutAttribute(LayoutKind.Sequential)]",
-        TypeFlag::EXPLICIT_LAYOUT => "[StructLayoutAttribute(LayoutKind.Explicit)]",
-        _ => panic!(),
-    };
-
-    if attributes.contains(TypeFlag::LOCAL_HEAP) {
-        s += "[LocalHeap]"
-    };
-    if attributes.contains(TypeFlag::FINALIZE) {
-        s += "[Finalize]"
-    };
-    if attributes.contains(TypeFlag::NATIVE_TYPE) {
-        s += "[NativeType]"
-    };
-    if attributes.contains(TypeFlag::MARK_FIELDS) {
-        s += "[MarkFields]"
-    };
-    if attributes.contains(TypeFlag::NATIVE_CTOR) {
-        s += "[NativeCtor]"
-    };
-    if attributes.contains(TypeFlag::CONSTRACTED) {
-        s += "[Constracted]"
-    };
-    if attributes.contains(TypeFlag::MANAGED_VTABLE) {
-        s += "[ManagedVTable]"
-    };
-
-    if attributes.contains(TypeFlag::SPECIAL_NAME) {
-        s += "[SpecialName]"
-    }
-    if attributes.contains(TypeFlag::IMPORT) {
-        s += "[Import]"
-    }
-    if attributes.contains(TypeFlag::SERIALIZABLE) {
-        s += "[SerializableAttribute]"
-    }
-    if attributes.contains(TypeFlag::WINDOWS_RUNTIME) {
-        s += "[WinRT]"
-    }
-
-    s += match attributes & TypeFlag::STRING_FORMAT_MASK {
-        TypeFlag::ANSI_CLASS => "[AnsiClass]",
-        TypeFlag::UNICODE_CLASS => "[UnicodeClass]",
-        TypeFlag::AUTO_CLASS => "[AutoClass]",
-        TypeFlag::CUSTOM_FORMAT_CLASS => "[CustomFormatClass]",
-        _ => panic!(),
-    };
-    
-    s += match attributes & TypeFlag::CUSTOM_FORMAT_MASK {
-        TypeFlag::CUSTOM_00 => "",
-        TypeFlag::CUSTOM_01 => "[Custom01]",
-        TypeFlag::CUSTOM_10 => "[Custom10]",
-        TypeFlag::CUSTOM_11 => "[Custom11]",
-        _ => panic!(),
-    };
-    
-    if attributes.contains(TypeFlag::BEFORE_FIELD_INIT) {
-        s += "[BeforeFieldInit]"
-    };
-
-    s += match attributes & TypeFlag::RESERVED_MASK {
-        TypeFlag::NO_RESERVE => "",
-        TypeFlag::RTSPECIAL_NAME => "[RTSpecial]",
-        TypeFlag::HAS_SECURITY => "[HasSecurity]",
-        TypeFlag::RESERVED_MASK => "[ReservedMask?]",
-        _ => panic!(),
-    };
-
-    s += "\n";
-
-    s += match attributes & TypeFlag::VISIBILITY_MASK {
-        TypeFlag::NOT_PUBLIC => "internal ",
-        TypeFlag::PUBLIC => "public ",
-        TypeFlag::NESTED_PUBLIC => "/*nested*/ public ",
-        TypeFlag::NESTED_PRIVATE => "/*nested*/ private ",
-        TypeFlag::NESTED_FAMILY => "/*nested*/ protected ",
-        TypeFlag::NESTED_ASSEMBLY => "/*nested*/ internal ",
-        TypeFlag::NESTED_FAM_AND_ASSEM => "/*nested*/ private protected ",
-        TypeFlag::NESTED_FAM_OR_ASSEM => "/*nested*/ protected internal ",
-        _ => panic!(),
-    };
-    
-    if attributes.contains(TypeFlag::ABSTRACT) {
-        s += "abstract "
-    }
-    if attributes.contains(TypeFlag::SEALED) {
-        s += "sealed "
-    }
-
-    s += match attributes & TypeFlag::CLASS_SEMANTICS_MASK {
-        TypeFlag::CLASS => "class ",
-        TypeFlag::INTERFACE => "interface ",
-        _ => panic!(),
-    };
-
     s
 }
 
