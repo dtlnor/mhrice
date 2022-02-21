@@ -2,6 +2,7 @@
 
 mod gen_armor;
 mod gen_common;
+mod gen_hyakuryu_skill;
 mod gen_item;
 mod gen_monster;
 mod gen_pedia;
@@ -10,6 +11,7 @@ mod gen_skill;
 mod gen_weapon;
 mod gen_website;
 mod pedia;
+pub mod sink;
 
 pub use gen_pedia::gen_resources;
 pub use gen_pedia::{gen_pedia, gen_pedia_ex};

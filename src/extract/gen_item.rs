@@ -1,13 +1,15 @@
 use super::gen_armor::*;
+use super::gen_hyakuryu_skill::*;
 use super::gen_monster::*;
 use super::gen_quest::*;
+use super::gen_skill::*;
 use super::gen_weapon::*;
 use super::gen_website::*;
 use super::pedia::*;
+use super::sink::*;
 use crate::rsz::*;
 use anyhow::Result;
-use std::fs::{create_dir, write};
-use std::path::*;
+use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
 pub fn item_page(item: ItemId) -> String {
@@ -352,7 +354,60 @@ fn gen_item_usage_armor(item_id: ItemId, pedia_ex: &PediaEx) -> Option<Box<div<S
     }
 }
 
-pub fn gen_item(item: &Item, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path) -> Result<()> {
+fn gen_item_usage_hyakuryu(item_id: ItemId, pedia_ex: &PediaEx) -> Option<Box<div<String>>> {
+    let mut htmls = vec![];
+
+    for skill in pedia_ex.hyakuryu_skills.values() {
+        if let Some(reciepe) = skill.recipe {
+            if reciepe.recipe_item_id_list.contains(&item_id) {
+                htmls.push(html!(<li class="mh-list-item-in-out">
+                    { gen_hyakuryu_skill_label(skill) }
+                </li>))
+            }
+        }
+    }
+
+    if !htmls.is_empty() {
+        Some(html!(<div> <h3>"For enabling ramp-up skills: "</h3>
+            <ul class="mh-list-item-in-out">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+fn gen_item_usage_deco(item_id: ItemId, pedia_ex: &PediaEx) -> Option<Box<div<String>>> {
+    let mut htmls = vec![];
+
+    for (&id, skill) in &pedia_ex.skills {
+        if let Some(deco) = &skill.deco {
+            if deco.product.item_id_list.contains(&item_id) {
+                htmls.push(html!(<li class="mh-list-item-in-out">
+                    <a href={format!("/skill/{}", skill_page(id))}>
+                    { gen_deco_label(deco) }
+                    </a>
+                </li>))
+            }
+        }
+    }
+
+    if !htmls.is_empty() {
+        Some(html!(<div> <h3>"For crafting decorations: "</h3>
+            <ul class="mh-list-item-in-out">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+pub fn gen_item(
+    item: &Item,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx<'_>,
+    mut output: impl Write,
+) -> Result<()> {
     let material_categories = item.param.material_category.iter().filter_map(|&category| {
         if category == MaterialCategory(0) {
             return None;
@@ -439,18 +494,20 @@ pub fn gen_item(item: &Item, pedia: &Pedia, pedia_ex: &PediaEx<'_>, path: &Path)
                 <h2 class="title">"Where to use"</h2>
                 {gen_item_usage_weapon(item.param.id, pedia_ex)}
                 {gen_item_usage_armor(item.param.id, pedia_ex)}
+                {gen_item_usage_deco(item.param.id, pedia_ex)}
+                {gen_item_usage_hyakuryu(item.param.id, pedia_ex)}
                 </section>
 
                 </div></div></main>
             </body>
         </html>
     );
-    write(&path, doc.to_string())?;
+    output.write_all(doc.to_string().as_bytes())?;
 
     Ok(())
 }
 
-pub fn gen_item_list(pedia_ex: &PediaEx<'_>, root: &Path) -> Result<()> {
+pub fn gen_item_list(pedia_ex: &PediaEx<'_>, output: &impl Sink) -> Result<()> {
     let doc: DOMTree<String> = html!(
         <html>
             <head>
@@ -480,18 +537,18 @@ pub fn gen_item_list(pedia_ex: &PediaEx<'_>, root: &Path) -> Result<()> {
             </body>
         </html>: String
     );
-    let quests_path = root.join("item.html");
-    write(&quests_path, doc.to_string())?;
+    output
+        .create_html("item.html")?
+        .write_all(doc.to_string().as_bytes())?;
 
     Ok(())
 }
 
-pub fn gen_items(pedia: &Pedia, pedia_ex: &PediaEx, root: &Path) -> Result<()> {
-    let item_path = root.join("item");
-    create_dir(&item_path)?;
+pub fn gen_items(pedia: &Pedia, pedia_ex: &PediaEx, output: &impl Sink) -> Result<()> {
+    let item_path = output.sub_sink("item")?;
     for (&id, item) in &pedia_ex.items {
-        let path = item_path.join(item_page(id));
-        gen_item(item, pedia, pedia_ex, &path)?
+        let path = item_path.create_html(&item_page(id))?;
+        gen_item(item, pedia, pedia_ex, path)?
     }
     Ok(())
 }

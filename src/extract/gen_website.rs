@@ -1,19 +1,19 @@
 use super::gen_armor::*;
+use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_monster::*;
 use super::gen_quest::*;
 use super::gen_skill::*;
 use super::gen_weapon::*;
 use super::pedia::*;
+use super::sink::*;
 use crate::msg::*;
 use crate::part_color::*;
 use crate::rsz::*;
 use anyhow::Result;
 use chrono::prelude::*;
 use std::convert::TryInto;
-use std::fs::{create_dir, remove_dir_all, write, File};
 use std::io::Write;
-use std::path::*;
 use typed_html::{dom::*, elements::*, html, text, types::*};
 
 const LANGUAGE_MAP: [Option<&str>; 32] = [
@@ -89,9 +89,21 @@ pub fn navbar() -> Box<div<String>> {
                     <a class="navbar-item" href="/quest.html">
                         "Quests"
                     </a>
-                    <a class="navbar-item" href="/skill.html">
+
+                    <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link">
                         "Skills"
                     </a>
+                    <div class="navbar-dropdown">
+                        <a class="navbar-item" href="/skill.html">
+                            "Armor skills"
+                        </a>
+                        <a class="navbar-item" href="/hyakuryu_skill.html">
+                            "Ramp-up skills"
+                        </a>
+                    </div>
+                    </div>
+
                     <a class="navbar-item" href="/armor.html">
                         "Armors"
                     </a>
@@ -350,8 +362,8 @@ fn gen_colored_icon_inner(color_class: &str, icon: &str, addons: &[&str]) -> Box
     </div>)
 }
 
-pub fn gen_monsters(pedia: &Pedia, pedia_ex: &PediaEx<'_>, root: &Path) -> Result<()> {
-    let monsters_path = root.join("monster.html");
+pub fn gen_monsters(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) -> Result<()> {
+    let mut monsters_path = output.create_html("monster.html")?;
 
     let doc: DOMTree<String> = html!(
         <html>
@@ -409,23 +421,21 @@ pub fn gen_monsters(pedia: &Pedia, pedia_ex: &PediaEx<'_>, root: &Path) -> Resul
         </html>: String
     );
 
-    write(&monsters_path, doc.to_string())?;
+    monsters_path.write_all(doc.to_string().as_bytes())?;
 
-    let monster_path = root.join("monster");
-    create_dir(&monster_path)?;
+    let monster_path = output.sub_sink("monster")?;
     for monster in &pedia.monsters {
         gen_monster(true, monster, pedia, pedia_ex, &monster_path)?;
     }
 
-    let monster_path = root.join("small-monster");
-    create_dir(&monster_path)?;
+    let monster_path = output.sub_sink("small-monster")?;
     for monster in &pedia.small_monsters {
         gen_monster(false, monster, pedia, pedia_ex, &monster_path)?;
     }
     Ok(())
 }
 
-pub fn gen_about(root: &Path) -> Result<()> {
+pub fn gen_about(output: &impl Sink) -> Result<()> {
     let doc: DOMTree<String> = html!(
         <html>
             <head>
@@ -471,30 +481,28 @@ pub fn gen_about(root: &Path) -> Result<()> {
         </html>
     );
 
-    let about_path = root.join("about.html");
-    write(&about_path, doc.to_string())?;
+    output
+        .create_html("about.html")?
+        .write_all(doc.to_string().as_bytes())?;
 
     Ok(())
 }
 
-pub fn gen_static(root: &Path) -> Result<()> {
-    write(
-        root.to_path_buf().join("mhrice.css"),
-        include_bytes!("static/mhrice.css"),
-    )?;
-    write(
-        root.to_path_buf().join("mhrice.js"),
-        include_bytes!("static/mhrice.js"),
-    )?;
-    write(
-        root.to_path_buf().join("favicon.png"),
-        include_bytes!("static/favicon.png"),
-    )?;
+pub fn gen_static(output: &impl Sink) -> Result<()> {
+    output
+        .create("mhrice.css")?
+        .write_all(include_bytes!("static/mhrice.css"))?;
+    output
+        .create("mhrice.js")?
+        .write_all(include_bytes!("static/mhrice.js"))?;
+    output
+        .create("favicon.png")?
+        .write_all(include_bytes!("static/favicon.png"))?;
     Ok(())
 }
 
-pub fn gen_part_color_css(root: &Path) -> Result<()> {
-    let mut file = File::create(root.to_path_buf().join("part_color.css"))?;
+pub fn gen_part_color_css(output: &impl Sink) -> Result<()> {
+    let mut file = output.create("part_color.css")?;
 
     for (i, color) in PART_COLORS.iter().enumerate() {
         writeln!(file, ".mh-part-{} {{color: {}}}", i, color)?;
@@ -503,25 +511,21 @@ pub fn gen_part_color_css(root: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &str) -> Result<()> {
-    let root = PathBuf::from(output);
-    if root.exists() {
-        remove_dir_all(&root)?;
-    }
-    create_dir(&root)?;
-
-    gen_quests(pedia, pedia_ex, &root)?;
-    gen_skills(pedia_ex, &root)?;
-    gen_skill_list(&pedia_ex.skills, &root)?;
-    gen_armors(pedia_ex, &root)?;
-    gen_armor_list(&pedia_ex.armors, &root)?;
-    gen_monsters(pedia, pedia_ex, &root)?;
-    gen_quest_list(&pedia_ex.quests, &root)?;
-    gen_items(pedia, pedia_ex, &root)?;
-    gen_item_list(pedia_ex, &root)?;
-    gen_weapons(pedia_ex, &root)?;
-    gen_about(&root)?;
-    gen_static(&root)?;
-    gen_part_color_css(&root)?;
+pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) -> Result<()> {
+    gen_quests(pedia, pedia_ex, output)?;
+    gen_quest_list(&pedia_ex.quests, output)?;
+    gen_skills(pedia_ex, output)?;
+    gen_skill_list(&pedia_ex.skills, output)?;
+    gen_hyakuryu_skills(pedia_ex, output)?;
+    gen_hyakuryu_skill_list(&pedia_ex.hyakuryu_skills, output)?;
+    gen_armors(pedia_ex, output)?;
+    gen_armor_list(&pedia_ex.armors, output)?;
+    gen_monsters(pedia, pedia_ex, output)?;
+    gen_items(pedia, pedia_ex, output)?;
+    gen_item_list(pedia_ex, output)?;
+    gen_weapons(pedia_ex, output)?;
+    gen_about(output)?;
+    gen_static(output)?;
+    gen_part_color_css(output)?;
     Ok(())
 }

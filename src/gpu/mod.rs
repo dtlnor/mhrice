@@ -4,8 +4,8 @@ use glium::*;
 use nalgebra_glm::*;
 use once_cell::sync::Lazy;
 use std::convert::TryFrom;
+use std::io::Write;
 use std::marker::*;
-use std::path::Path;
 use std::sync::mpsc::*;
 use std::thread::*;
 
@@ -89,8 +89,7 @@ impl RgbaImage {
         }
     }
 
-    pub fn save_png(&self, output: &Path) -> anyhow::Result<()> {
-        let output = std::fs::File::create(output)?;
+    pub fn save_png(&self, output: impl Write) -> anyhow::Result<()> {
         let mut encoder = png::Encoder::new(output, self.width, self.height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
