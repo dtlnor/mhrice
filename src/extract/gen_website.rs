@@ -183,8 +183,9 @@ pub fn navbar() -> Box<div<String>> {
     </div>: String)
 }
 
-pub fn translate_msg(content: &str) -> Box<span<String>> {
+pub fn translate_msg(content: &str) -> (Box<span<String>>, bool) {
     let mut msg = content;
+    let mut has_warning = false;
     struct Tag<'a> {
         tag: &'a str,
         arg: &'a str,
@@ -206,25 +207,41 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
         let next_stop = if let Some(next_stop) = msg.find('<') {
             next_stop
         } else {
-            if !stack.is_empty() {
-                eprintln!("Parse error: {}", content);
-            }
-            root.nodes.push(Node::Raw(msg));
-            break;
+            msg.len()
         };
 
         let raw = Node::Raw(&msg[0..next_stop]);
-        msg = &msg[(next_stop + 1)..];
         if let Some(last) = stack.last_mut() {
             last.seq.nodes.push(raw);
         } else {
             root.nodes.push(raw);
         }
 
+        if msg.len() == next_stop {
+            if !stack.is_empty() {
+                has_warning = true;
+                //eprintln!("Unfinished tag: {}", content);
+            }
+
+            while let Some(stack_tag) = stack.pop() {
+                let tag = Node::Tagged(stack_tag);
+                if let Some(last) = stack.last_mut() {
+                    last.seq.nodes.push(tag);
+                } else {
+                    root.nodes.push(tag);
+                }
+            }
+
+            break;
+        }
+
+        msg = &msg[(next_stop + 1)..];
+
         let next_stop = if let Some(next_stop) = msg.find('>') {
             next_stop
         } else {
             if !stack.is_empty() {
+                has_warning = true;
                 eprintln!("Parse error: {}", content);
             }
             break;
@@ -236,10 +253,12 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
             let stack_tag = if let Some(stack_tag) = stack.pop() {
                 stack_tag
             } else {
+                has_warning = true;
                 eprintln!("Parse error: {}", content);
                 break;
             };
             if stack_tag.tag != tag {
+                has_warning = true;
                 eprintln!("Parse error: {}", content);
             }
             let tag = Node::Tagged(stack_tag);
@@ -259,18 +278,22 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
                 arg,
                 seq: Seq { nodes: vec![] },
             };
-            if matches!(tag.tag, "LSNR" | "PL" | "ПУСТО") {
+
+            if tag.tag == "COLS" {
+                tag.tag = "COL";
+                stack.push(tag);
+            } else if matches!(
+                tag.tag,
+                "COLOR" | "COL" | "BSL" | "LEFT" | "FONT" | "TCU" | "size"
+            ) {
+                stack.push(tag);
+            } else {
                 let tag = Node::Tagged(tag);
                 if let Some(last) = stack.last_mut() {
                     last.seq.nodes.push(tag);
                 } else {
                     root.nodes.push(tag);
                 }
-            } else if tag.tag == "COLS" {
-                tag.tag = "COL";
-                stack.push(tag);
-            } else {
-                stack.push(tag);
             }
         }
     }
@@ -288,7 +311,8 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
                     "COL" => {
                         let color = match t.arg {
                             "RED" => "red",
-                            "YEL" => "yellow",
+                            "YEL" | "YELLOW" => "yellow",
+                            "GRAY" => "gray",
                             _ => {
                                 eprintln!("Unknown color: {}", t.arg);
                                 "black"
@@ -313,14 +337,19 @@ pub fn translate_msg(content: &str) -> Box<span<String>> {
                     }
                     _ => {
                         eprintln!("Unknown tag: {}", t.tag);
-                        html!(<span> {inner} </span>)
+                        html!(<span>
+                            <span class="mh-msg-place-holder">{text!("<{} {}>", t.tag, t.arg)}</span>
+                            {inner}
+                            <span class="mh-msg-place-holder">{text!("</{}>", t.tag)}</span>
+                        </span>)
                     }
                 }
             }
         }
     }
 
-    html!(<span> {root.nodes.iter().map(translate_rec)} </span>)
+    let result = html!(<span> {root.nodes.iter().map(translate_rec)} </span>);
+    (result, has_warning)
 }
 
 pub fn gen_multi_lang(msg: &MsgEntry) -> Box<span<String>> {
@@ -331,8 +360,12 @@ pub fn gen_multi_lang(msg: &MsgEntry) -> Box<span<String>> {
             } else {
                 " mh-hidden"
             };
+            let (msg, warning) = translate_msg(&msg.content[i]);
+            let warning = warning.then(||html!(<span class="icon has-text-warning">
+                <i class="fas fa-exclamation-triangle" title="There is a parsing error"/>
+            </span>));
             html! (<span class={format!("mh-lang-{}{}", i, hidden).as_str()}>
-                {translate_msg(&msg.content[i])}
+                {msg} {warning}
             </span>)
         })
     } </span>)

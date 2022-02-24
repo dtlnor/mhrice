@@ -10,19 +10,26 @@ use std::convert::TryFrom;
 use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
-pub fn gen_monster_tag(pedia: &Pedia, em_type: EmTypes, is_target: bool) -> Box<div<String>> {
+pub fn gen_monster_tag(
+    pedia: &Pedia,
+    em_type: EmTypes,
+    is_target: bool,
+    short: bool,
+) -> Box<div<String>> {
     let (id, is_large) = match em_type {
         EmTypes::Em(id) => (id, true),
         EmTypes::Ems(id) => (id, false),
     };
 
     let monster = pedia.monsters.iter().find(|m| (m.id | m.sub_id << 8) == id);
-    let monster_name = (|| {
-        let name_name = format!("EnemyIndex{:03}", monster?.enemy_type?);
-        Some(gen_multi_lang(pedia.monster_names.get_entry(&name_name)?))
-    })()
-    .unwrap_or(html!(<span>{text!("Monster {0:03}_{1:02}",
-                                id & 0xFF, id >> 8)}</span>));
+    let monster_name = (!short).then(|| {
+        (|| {
+            let name_name = format!("EnemyIndex{:03}", monster?.enemy_type?);
+            Some(gen_multi_lang(pedia.monster_names.get_entry(&name_name)?))
+        })()
+        .unwrap_or(html!(<span>{text!("Monster {0:03}_{1:02}",
+                                id & 0xFF, id >> 8)}</span>))
+    });
 
     let icon_path = format!(
         "/resources/{}{:03}_{:02}_icon.png",
@@ -781,6 +788,16 @@ pub fn gen_monster(
         if is_large { EmTypes::Em } else { EmTypes::Ems }(monster_id | (monster_sub_id << 8));
     let condition_preset = &pedia.condition_preset;
 
+    let explains = pedia.monster_explains.get_name_map();
+    let explain1 = monster
+        .enemy_type
+        .and_then(|e| explains.get(&format!("HN_MonsterListMsg_EnemyIndex{:03}_page1", e)))
+        .map(|m| html!(<pre> {gen_multi_lang(m)} </pre>));
+    let explain2 = monster
+        .enemy_type
+        .and_then(|e| explains.get(&format!("HN_MonsterListMsg_EnemyIndex{:03}_page2", e)))
+        .map(|m| html!(<pre> {gen_multi_lang(m)} </pre>));
+
     let quest_list = html!(
         <section class="section">
         <h2 class="title">"Quests"</h2>
@@ -861,6 +878,11 @@ pub fn gen_monster(
                         }
                     }</h1>
                 </div>
+                <section class="section">
+                <h2 class="title">"Description"</h2>
+                { explain1 }
+                { explain2 }
+                </section>
                 <section class="section">
                 <h2 class="title">"Basic data"</h2>
                 <p>{ text!("Base HP: {}", monster.data_tune.base_hp_vital) }</p>
