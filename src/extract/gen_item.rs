@@ -120,7 +120,7 @@ fn gen_item_source_monster(
         <ul class="mh-list-item-in-out">
             {
                 em_types.into_iter().map(|em_type|html!(<li class="mh-list-item-in-out">{
-                    gen_monster_tag(pedia, em_type, false)
+                    gen_monster_tag(pedia, em_type, false, false)
                 }</li>))
             }
         </ul></div>))
@@ -437,9 +437,9 @@ pub fn gen_item(
                     {gen_multi_lang(item.name)}
                 </h1>
 
-                <section class="section"><p>
+                <section class="section"><pre>
                     {gen_multi_lang(item.explain)}
-                </p></section>
+                </pre></section>
 
                 <section class="section">
                 <h2 class="title">"Basic data"</h2>
