@@ -689,6 +689,16 @@ rsz_bitflags! {
     }
 }
 
+// snow.quest.nHyakuryuQuest.Category
+rsz_enum! {
+    #[rsz(u8)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+    pub enum HyakuryuQuestCategory {
+        Normal = 0,
+        Nushi = 1,
+    }
+}
+
 rsz_struct! {
     #[rsz("snow.quest.HyakuryuQuestData",
         0x48e96a40 = 0
@@ -701,7 +711,7 @@ rsz_struct! {
         pub wave_data: [HyakuryuQuestDataWaveData; 3],
         pub quest_lv: QuestLevel,
         pub map_no: i32, // snow.QuestMapManager.MapNoType
-        pub category: u8, // snow.quest.nHyakuryuQuest.Category
+        pub category: HyakuryuQuestCategory,
         pub is_village: bool,
         pub base_time: u8,
         pub start_block_no: u8,
@@ -717,7 +727,8 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.quest.HyakuryuQuestDataTbl",
-        0x9b163063 = 0
+        0x9b163063 = 0,
+        0xB0022BC2 = 2,
     )]
     #[derive(Debug, Serialize)]
     pub struct HyakuryuQuestDataTbl {
@@ -725,5 +736,8 @@ rsz_struct! {
         pub data_list_310: Vec<HyakuryuQuestData>,
         pub data_list_320: Vec<HyakuryuQuestData>,
         pub data_list_350: Vec<HyakuryuQuestData>,
+        pub data_list_370: Versioned<Vec<HyakuryuQuestData>, 2, {u32::MAX}>,
+        pub data_list_380: Versioned<Vec<HyakuryuQuestData>, 2, {u32::MAX}>,
+        pub data_list_390: Versioned<Vec<HyakuryuQuestData>, 2, {u32::MAX}>,
     }
 }
