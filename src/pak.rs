@@ -103,6 +103,8 @@ impl<F: Read + Seek> PakReader<F> {
                         let power = base.modpow(&exponent, &modulus);
                         let key_vec = power.to_bytes_le();
                         if key_vec.len() > 32 {
+                            eprintln!(" base {}\n modulus {}\n exponent {}\n power {}\n flag {}\n", base, modulus, exponent, power, flag);
+
                             bail!("Key too long")
                         }
                         let mut key = [0; 32];
