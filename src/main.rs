@@ -1,6 +1,6 @@
 #![recursion_limit = "4096"]
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use minidump::*;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -34,6 +34,7 @@ mod user;
 mod uvs;
 
 use extract::sink::*;
+use file_ext::*;
 use gui::*;
 use mesh::*;
 use msg::*;
@@ -151,6 +152,9 @@ enum Mhrice {
         #[structopt(short, long)]
         pak: Vec<String>,
 
+        #[structopt(short, long)]
+        utf16: bool,
+
         pattern: String,
     },
 
@@ -258,6 +262,46 @@ enum Mhrice {
         dmp: String,
         #[structopt(short, long)]
         map: Option<String>,
+    },
+
+    DumpScn {
+        #[structopt(short, long)]
+        scn: String,
+    },
+
+    Scene {
+        #[structopt(short, long)]
+        pak: Vec<String>,
+        #[structopt(short, long)]
+        name: String,
+    },
+
+    TypeInfo {
+        #[structopt(short, long)]
+        dmp: String,
+
+        #[structopt(short, long)]
+        hash: String,
+
+        #[structopt(short, long)]
+        crc: String,
+    },
+
+    Map {
+        #[structopt(short, long)]
+        pak: Vec<String>,
+
+        #[structopt(short, long)]
+        name: String,
+
+        #[structopt(short, long)]
+        scale: String,
+
+        #[structopt(short, long)]
+        tex: String,
+
+        #[structopt(short, long)]
+        output: String,
     },
 }
 
@@ -367,6 +411,8 @@ fn gen_website_to_sink(pak: Vec<String>, sink: impl Sink) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
     let pedia = extract::gen_pedia(&mut pak)?;
     let pedia_ex = extract::gen_pedia_ex(&pedia)?;
+    sink.create("mhrice.json")?
+        .write_all(serde_json::to_string_pretty(&pedia)?.as_bytes())?;
     extract::gen_website(&pedia, &pedia_ex, &sink)?;
     extract::gen_resources(&mut pak, &sink.sub_sink("resources")?)?;
     sink.finalize()?;
@@ -431,57 +477,56 @@ fn read_tdb(tdb: String) -> Result<()> {
     Ok(())
 }
 
+struct MinidumpReader<'a> {
+    memory_list: &'a MinidumpMemory64List<'a>,
+    pos: u64,
+}
+
+impl<'a> MinidumpReader<'a> {
+    fn new(memory_list: &'a MinidumpMemory64List<'a>) -> Self {
+        MinidumpReader {
+            memory_list,
+            pos: 0,
+        }
+    }
+}
+
+impl<'a> Read for MinidumpReader<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut offset = 0;
+        while offset != buf.len() as u64 {
+            if let Some(block) = self.memory_list.memory_at_address(self.pos) {
+                let available = std::cmp::min(
+                    buf.len() as u64 - offset,
+                    block.base_address + block.size - self.pos,
+                );
+                buf[offset as usize..][..available as usize].copy_from_slice(
+                    &block.bytes[(self.pos - block.base_address) as usize..][..available as usize],
+                );
+                self.pos += available;
+                offset += available;
+            } else {
+                buf[offset as usize] = 0xCC;
+                self.pos += 1;
+                offset += 1;
+            }
+        }
+        Ok(buf.len())
+    }
+}
+
+impl<'a> Seek for MinidumpReader<'a> {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        match pos {
+            SeekFrom::Start(s) => self.pos = s,
+            SeekFrom::End(e) => self.pos = e as u64,
+            SeekFrom::Current(c) => self.pos = (self.pos as i64 + c) as u64,
+        }
+        Ok(self.pos)
+    }
+}
+
 fn read_dmp_tdb(dmp: String, map: Option<String>) -> Result<()> {
-    struct MinidumpReader<'a> {
-        memory_list: &'a MinidumpMemory64List<'a>,
-        pos: u64,
-    }
-
-    impl<'a> MinidumpReader<'a> {
-        fn new(memory_list: &'a MinidumpMemory64List<'a>) -> Self {
-            MinidumpReader {
-                memory_list,
-                pos: 0,
-            }
-        }
-    }
-
-    impl<'a> Read for MinidumpReader<'a> {
-        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            let mut offset = 0;
-            while offset != buf.len() as u64 {
-                if let Some(block) = self.memory_list.memory_at_address(self.pos) {
-                    let available = std::cmp::min(
-                        buf.len() as u64 - offset,
-                        block.base_address + block.size - self.pos,
-                    );
-                    buf[offset as usize..][..available as usize].copy_from_slice(
-                        &block.bytes[(self.pos - block.base_address) as usize..]
-                            [..available as usize],
-                    );
-                    self.pos += available;
-                    offset += available;
-                } else {
-                    buf[offset as usize] = 0xCC;
-                    self.pos += 1;
-                    offset += 1;
-                }
-            }
-            Ok(buf.len())
-        }
-    }
-
-    impl<'a> Seek for MinidumpReader<'a> {
-        fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-            match pos {
-                SeekFrom::Start(s) => self.pos = s,
-                SeekFrom::End(e) => self.pos = e as u64,
-                SeekFrom::Current(c) => self.pos = (self.pos as i64 + c) as u64,
-            }
-            Ok(self.pos)
-        }
-    }
-
     let dmp = Minidump::read_path(dmp).map_err(|e| anyhow!(e))?;
     let memory = dmp
         .get_stream::<MinidumpMemory64List>()
@@ -499,6 +544,61 @@ fn read_dmp_tdb(dmp: String, map: Option<String>) -> Result<()> {
 
             break;
         }
+    }
+
+    Ok(())
+}
+
+fn type_info(dmp: String, hash: String, crc: String) -> Result<()> {
+    let hash = u32::from_str_radix(&hash, 16)?;
+    let crc = u32::from_str_radix(&crc, 16)?;
+    let dmp = Minidump::read_path(dmp).map_err(|e| anyhow!(e))?;
+    let memory = dmp
+        .get_stream::<MinidumpMemory64List>()
+        .map_err(|e| anyhow!(e))?;
+
+    let mut address = 0;
+    'outer: for block in memory.iter() {
+        let mut offset = 0;
+        loop {
+            if offset + 0x2C > block.bytes.len() {
+                break;
+            }
+            let read_hash = u32::from_le_bytes(block.bytes[offset..][..4].try_into().unwrap());
+            if read_hash == hash {
+                let read_crc =
+                    u32::from_le_bytes(block.bytes[offset + 0x28..][..4].try_into().unwrap());
+                if read_crc == crc {
+                    address = block.base_address + u64::try_from(offset - 8)?;
+                    break 'outer;
+                }
+            }
+            offset += 4;
+        }
+    }
+
+    if address == 0 {
+        bail!("Not found")
+    }
+
+    println!("Found at 0x{address:016X}");
+
+    while address != 0 {
+        println!("----------------------------------------");
+        let mut memory = MinidumpReader::new(&memory);
+        memory.seek(SeekFrom::Start(address + 0x20))?;
+        let name_address = memory.read_u64()?;
+        memory.seek(SeekFrom::Start(name_address))?;
+        let name = memory.read_u8str()?;
+        println!("name: {name}");
+        memory.seek(SeekFrom::Start(address + 0x50))?;
+        let fields_offset = memory.read_u64()?;
+        memory.seek(SeekFrom::Start(fields_offset + 0x28))?;
+        let deserializer = memory.read_u64()?;
+        println!("Deserializer: 0x{deserializer:016X}");
+
+        memory.seek(SeekFrom::Start(address + 0x38))?;
+        address = memory.read_u64()?;
     }
 
     Ok(())
@@ -615,9 +715,18 @@ fn scan_uvs(pak: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-fn grep(pak: Vec<String>, pattern: String) -> Result<()> {
+fn grep(pak: Vec<String>, utf16: bool, mut pattern: String) -> Result<()> {
     use regex::bytes::*;
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
+    if utf16 {
+        pattern = pattern
+            .encode_utf16()
+            .map(|u| {
+                let b = u.to_le_bytes();
+                format!("\\x{:02X}\\x{:02X}", b[0], b[1])
+            })
+            .fold("".to_string(), |a, b| a + &b);
+    }
     println!("Searching for patterns \"{}\"", &pattern);
     let re = RegexBuilder::new(&pattern).unicode(false).build()?;
     for i in pak.all_file_indexs() {
@@ -858,6 +967,124 @@ fn read_user(user: String) -> Result<()> {
     Ok(())
 }
 
+fn dump_scn(scn: String) -> Result<()> {
+    let scn = Scn::new(File::open(scn)?)?;
+    scn.dump();
+
+    Ok(())
+}
+
+fn scene_print_object(object: &GameObject, level: usize) {
+    let ident_unit = 2;
+    let ident = level * ident_unit;
+    let padding = "";
+    println!("{padding:ident$}Object {{");
+
+    let next_level = level + 1;
+    let next_ident = next_level * ident_unit;
+
+    if let Some(prefab) = &object.prefab {
+        println!("{padding:next_ident$}prefab = {prefab}");
+    }
+
+    let data = &object.object;
+    println!("{padding:next_ident$}data = {data:?}");
+
+    for component in &object.components {
+        println!("{padding:next_ident$}+ {component:?}");
+    }
+
+    println!("{padding:next_ident$}Children = {{");
+    for child in &object.children {
+        scene_print_object(child, next_level + 1);
+    }
+    println!("{padding:next_ident$}}}");
+
+    println!("{padding:ident$}}}");
+}
+
+fn scene_print_folder(folder: &Folder, level: usize) {
+    let ident_unit = 2;
+    let ident = level * ident_unit;
+    let padding = "";
+    println!("{padding:ident$}Folder {{");
+
+    let next_level = level + 1;
+    let next_ident = next_level * ident_unit;
+
+    let data = &folder.folder;
+    println!("{padding:next_ident$}data = {data:?}");
+
+    println!("{padding:next_ident$}Children = {{");
+    for child in &folder.children {
+        scene_print_object(child, next_level + 1);
+    }
+    println!("{padding:next_ident$}}}");
+
+    if let Some(subscene) = &folder.subscene {
+        match subscene {
+            Ok(subscene) => scene_print_scene(subscene, next_level),
+            Err(e) => println!("{padding:next_ident$}Scene = ! {e}"),
+        }
+    }
+
+    println!("{padding:ident$}}}");
+}
+
+fn scene_print_scene(scene: &Scene, level: usize) {
+    let ident_unit = 2;
+    let ident = level * ident_unit;
+    let padding = "";
+    println!("{padding:ident$}Scene {{");
+    let next_level = level + 1;
+    for object in &scene.objects {
+        scene_print_object(object, next_level)
+    }
+
+    for folder in &scene.folders {
+        scene_print_folder(folder, next_level)
+    }
+
+    println!("{padding:ident$}}}");
+}
+
+fn scene(pak: Vec<String>, name: String) -> Result<()> {
+    let mut pak = PakReader::new(open_pak_files(pak)?)?;
+    let scene = Scene::new(&mut pak, &name)?;
+    scene_print_scene(&scene, 0);
+    Ok(())
+}
+
+fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: String) -> Result<()> {
+    let mut pak = PakReader::new(open_pak_files(pak)?)?;
+    let scene = Scene::new(&mut pak, &name)?;
+    let scale: rsz::GuiMapScaleDefineData =
+        User::new(File::open(scale)?)?.rsz.deserialize_single()?;
+    let tex = Tex::new(File::open(tex)?)?;
+    let mut rgba = tex.to_rgba(0, 0)?;
+
+    scene.for_each_free_object(&mut |object: &GameObject| {
+        if let Ok(_pop) = object.get_component::<rsz::ItemPopBehavior>() {
+            let transform = object.get_component::<rsz::Transform>()?;
+            let x = (transform.position.x + scale.map_wide_min_pos) / scale.map_scale;
+            let y = (transform.position.z + scale.map_height_min_pos) / scale.map_scale;
+            let x = (x * rgba.width() as f32) as i32;
+            let y = (y * rgba.height() as f32) as i32;
+            if x < 0 || y < 0 || x >= rgba.width() as i32 || y >= rgba.height() as i32 {
+                return Ok(());
+            }
+            let pixel = rgba.pixel(x as u32, y as u32);
+            pixel.copy_from_slice(&[255, 0, 0, 255]);
+        }
+
+        Ok(())
+    })?;
+
+    rgba.save_png(File::create(output)?)?;
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     match Mhrice::from_args() {
         Mhrice::Dump { pak, name, output } => dump(pak, name, output),
@@ -874,7 +1101,11 @@ fn main() -> Result<()> {
         Mhrice::ReadMsg { msg } => read_msg(msg),
         Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
         Mhrice::GrepMsg { pak, pattern } => grep_msg(pak, pattern),
-        Mhrice::Grep { pak, pattern } => grep(pak, pattern),
+        Mhrice::Grep {
+            pak,
+            utf16,
+            pattern,
+        } => grep(pak, utf16, pattern),
         Mhrice::SearchPath { pak } => search_path(pak),
         Mhrice::DumpTree { pak, list, output } => dump_tree(pak, list, output),
         Mhrice::ScanMesh { pak } => scan_mesh(pak),
@@ -897,5 +1128,15 @@ fn main() -> Result<()> {
         }
         Mhrice::ReadUser { user } => read_user(user),
         Mhrice::ReadDmpTdb { dmp, map } => read_dmp_tdb(dmp, map),
+        Mhrice::DumpScn { scn } => dump_scn(scn),
+        Mhrice::Scene { pak, name } => scene(pak, name),
+        Mhrice::TypeInfo { dmp, hash, crc } => type_info(dmp, hash, crc),
+        Mhrice::Map {
+            pak,
+            name,
+            scale,
+            tex,
+            output,
+        } => map(pak, name, scale, tex, output),
     }
 }
