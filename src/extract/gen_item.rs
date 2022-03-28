@@ -1,11 +1,13 @@
 use super::gen_armor::*;
 use super::gen_hyakuryu_skill::*;
+use super::gen_map::*;
 use super::gen_monster::*;
 use super::gen_quest::*;
 use super::gen_skill::*;
 use super::gen_weapon::*;
 use super::gen_website::*;
 use super::pedia::*;
+use super::prepare_map::MapPopKind;
 use super::sink::*;
 use crate::rsz::*;
 use anyhow::Result;
@@ -116,7 +118,7 @@ fn gen_item_source_monster(
     em_types.sort_unstable();
     em_types.dedup();
     if !em_types.is_empty() {
-        Some(html!(<div><h3>"From monsters, an their quests: "</h3>
+        Some(html!(<div><h3>"From monsters, and their quests: "</h3>
         <ul class="mh-list-item-in-out">
             {
                 em_types.into_iter().map(|em_type|html!(<li class="mh-list-item-in-out">{
@@ -402,6 +404,60 @@ fn gen_item_usage_deco(item_id: ItemId, pedia_ex: &PediaEx) -> Option<Box<div<St
     }
 }
 
+fn gen_item_source_map(
+    item_id: ItemId,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let mut htmls = vec![];
+    for (&id, map) in &pedia.maps {
+        let mut found = false;
+        for pop in &map.pops {
+            match &pop.kind {
+                MapPopKind::Item { behavior, .. } => {
+                    if let Some(lot) = pedia_ex
+                        .item_pop
+                        .get(&(behavior.pop_id, id))
+                        .or_else(|| pedia_ex.item_pop.get(&(behavior.pop_id, -1)))
+                    {
+                        if lot.lower_id.contains(&item_id) || lot.upper_id.contains(&item_id) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                MapPopKind::FishingPoint { behavior } => {
+                    let spawn = behavior.fish_spawn_data.unwrap();
+                    let fishes = spawn
+                        .spawn_group_list_info_low
+                        .iter()
+                        .chain(spawn.spawn_group_list_info_high.iter())
+                        .flat_map(|f| f.fish_spawn_rate_list.iter());
+                    for fish in fishes {
+                        if get_fish_item_id(fish.fish_id) == Some(item_id) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+        if found {
+            htmls.push(html!(<li> {gen_map_label(id, pedia)} </li>));
+        }
+    }
+
+    if !htmls.is_empty() {
+        Some(html!(<div> <h3>"From maps: "</h3>
+            <ul class="mh-list-item-in-out">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
 pub fn gen_item(
     item: &Item,
     pedia: &Pedia,
@@ -486,6 +542,7 @@ pub fn gen_item(
                 <h2 class="title">"Where to get"</h2>
                 {gen_item_source_monster(item.param.id, pedia, pedia_ex)}
                 {gen_item_source_quest(item.param.id, pedia_ex)}
+                {gen_item_source_map(item.param.id, pedia, pedia_ex)}
                 {gen_item_source_weapon(item.param.id, pedia_ex)}
                 {gen_item_source_armor(item.param.id, pedia_ex)}
                 </section>

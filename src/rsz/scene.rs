@@ -2,6 +2,7 @@ use super::common::*;
 use super::*;
 use crate::rsz_enum;
 use crate::rsz_struct;
+use nalgebra_glm::*;
 use serde::*;
 
 rsz_struct! {
@@ -10,12 +11,12 @@ rsz_struct! {
     )]
     #[derive(Debug, Serialize)]
     pub struct Folder {
-        pub name: String,
-        pub tag: String,
+        pub name: Option<String>,
+        pub tag: Option<String>,
         pub update_self: bool,
         pub draw_self: bool,
         pub paolumu: bool,
-        pub path: String,
+        pub path: Option<String>,
     }
 }
 
@@ -25,8 +26,8 @@ rsz_struct! {
     )]
     #[derive(Debug, Serialize)]
     pub struct GameObject {
-        pub name: String,
-        pub tag: String,
+        pub name: Option<String>,
+        pub tag: Option<String>,
         pub update_self: bool, // 14
         pub draw_self: bool, // 15
         pub time_scale: f32,
@@ -39,10 +40,10 @@ rsz_struct! {
     )]
     #[derive(Debug, Serialize)]
     pub struct Transform {
-        pub position: ViaVec4,
-        pub rotation: ViaVec4,
-        pub scale: ViaVec4,
-        pub zinogre: String,
+        pub position: Vec4,
+        pub rotation: Vec4,
+        pub scale: Vec4,
+        pub zinogre: Option<String>,
         pub same_joints_constraint: bool,
         pub absolute_scaling: bool
     }
@@ -75,22 +76,12 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.hit.RSCAPIWrapper",
-        0x0c8d525e = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct RSCAPIWrapper {
-        pub enabled: bool,
-    }
-}
-
-rsz_struct! {
     #[rsz("via.physics.RequestSetCollider.RequestSetGroup",
         0x240da282 = 0
     )]
     #[derive(Debug, Serialize)]
     pub struct RequestSetGroup {
-        pub path: String
+        pub path: Option<String>
     }
 }
 
@@ -111,133 +102,6 @@ rsz_struct! {
     }
 }
 
-// snow.access.ObjectPopMarker.AccessableDigree.DirectionType
-rsz_enum! {
-    #[rsz(i32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
-    pub enum DirectionType {
-        Vertical = 0,
-        Horizontal = 1,
-        Undefined = -1,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.access.ObjectPopMarker.AccessableDigree",
-        0xa042b98d = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct AccessableDigree {
-        pub enable: bool,
-        pub direction: DirectionType,
-        pub start_degree: f32,
-        pub end_degree: f32,
-    }
-}
-
-// snow.access.ObjectPopSensor.DetectedInfo.RegisterRequirementType
-rsz_enum! {
-    #[rsz(i32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
-    pub enum RegisterRequirementType {
-        MarkerCoreSensorOutline = 0,
-        SensorCoreMarkerOutline = 1,
-    }
-}
-
-// snow.access.ObjectPopMarker
-rsz_struct! {
-    #[rsz()]
-    #[derive(Debug, Serialize)]
-    pub struct ObjectPopMarker {
-        pub enabled: bool,
-        pub category: i32, // snow.access.ObjectPopMarker.MarkerCategory
-        pub id: u32,
-        pub control_id: u32,
-        pub is_detectable: bool,
-        pub is_accessible: bool,
-        pub accessible_degree_list: Vec<AccessableDigree>,
-        pub register_requirement: RegisterRequirementType,
-        pub permit_exceptional_access: bool,
-        pub permit_exceptional_access2: bool,
-        pub action_pos: ViaVec3,
-        pub action_dir: ViaVec3,
-
-    }
-}
-
-// snow.access.NpcFacilityPopMarker.FlowType
-rsz_enum! {
-    #[rsz(u32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
-    pub enum FlowType {
-        Undefined = 0,
-        NpcOnly = 1,
-        NpcAndFacility = 2,
-        FacilityOnly = 3,
-        NpcAndFacilitySkipStart = 4,
-        NpcAndFacilitySkipBoth = 5,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.access.NpcFacilityPopMarker",
-        0x3ad748a3 = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct NpcFacilityPopMarker {
-        pub base: ObjectPopMarker,
-        pub access_flow: FlowType,
-        pub focus_camera_flag: bool,
-        pub camera_distance: f32,
-    }
-}
-
-// snow.stage.StageDef.CampType
-rsz_enum! {
-    #[rsz(i32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
-    pub enum CampType {
-        BaseCamp = 0,
-        SubCamp1 = 1,
-        SubCamp2 = 2,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.stage.props.TentBehavior",
-        0xee52e52d = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct TentBehavior {
-        pub enabled: bool,
-        pub camp_type: CampType,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.stage.pop.CampFindCheck",
-        0x44a3363f = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct CampFindCheck {
-        pub enabled: bool,
-        pub camp_type: CampType,
-        pub check_hight: f32,
-        pub check_radius: f32,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.access.SupplyBoxBehavior",
-        0x83471751 = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct SupplyBoxBehavior {
-        pub enabled: bool,
-    }
-}
-
 rsz_struct! {
     #[rsz("via.gui.GUI",
         0xcd10d77e = 0
@@ -245,7 +109,7 @@ rsz_struct! {
     #[derive(Debug, Serialize)]
     pub struct ViaGui {
         pub enabled: bool,
-        pub path: String,
+        pub path: Option<String>,
         pub play_speed: f32,
         pub segment: u32,
         pub soft_particle_dist_type: i32, // via.gui.SoftParticleDistType
@@ -257,31 +121,20 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.gui.GuiCommonNpcHeadMessage",
-        0xae15ae5b = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct GuiCommonNpcHeadMessage {
-        pub enabled: bool,
-        pub pos_data: ExternUser<()>, // snow.gui.userdata.GuiNpcHeadMessagePosData
-    }
-}
-
-rsz_struct! {
     #[rsz("via.render.MaterialParam",
         0xf4ce7894 = 0
     )]
     #[derive(Debug, Serialize)]
     pub struct MaterialParam {
-        v0: String,
-        v1: String,
+        v0: Option<String>,
+        v1: Option<String>,
         v2a: f32,
         v2b: f32,
         v2c: f32,
         v2d: f32,
-        v3: String,
+        v3: Option<String>,
         v4: u32,
-        v5: String,
+        v5: Option<String>,
     }
 }
 
@@ -330,8 +183,6 @@ rsz_struct! {
         draw_far_cascade_shadow_cast: bool, // 0x398 << 4
         lod_mode: i32, // 0x2f4 // via.render.LodMode
         lod_level: u32, // 0x2f8
-        #[serde(skip)]
-        aligner: Aligner<8>,
         lod_follow_target: Guid, // 0x300...
         enable_lod_effective_range: bool, // 0x310
         lod_effective_range_s: u32, // 0x314..
@@ -354,103 +205,21 @@ rsz_struct! {
 }
 
 rsz_struct! {
-    #[rsz("snow.stage.props.PopMaterialController",
-        0x2748d05a = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct PopMaterialController {
-        pub enabled: bool,
-        pub ctrl_setting_data: ExternUser<()>, // snow.stage.props.PopMaterialControlSettingData
-        pub blink_cycle_span: f32,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.access.PlayerInfluencePopMarker",
-        0x2b3d2c6c = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct PlayerInfluencePopMarker {
-        pub base: ObjectPopMarker,
-        pub test_bell_trigger: u32,
-        pub creeping_point_adjust_transform: ViaQuaternion,
-        pub map_floor_type: i32, // snow.stage.StageDef.MapFloorType
-
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.access.ItemPopBehavior",
-        0xdae0b08f = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct ItemPopBehavior {
-        pub enabled: bool,
-        pub pop_id: i32, // snow.stage.StageDef.SaisyuPopId
-        pub pop_icon: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconPatternNo
-        pub pop_icon_color: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor
-        pub pop_category: i32, // snow.access.ItemPopMarker.ItemPopCategory
-        pub map_floor_type: i32, // snow.stage.StageDef.MapFloorType
-        pub action_target_point_offset: ViaVec3,
-        pub one_time_only_flag: bool,
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.access.ItemPopVisualController",
-        0x89989dcf = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct ItemPopVisualController {
-        pub enabled: bool,
-        pub parts_no: i32,
-        pub dissolve_cluster_name: String,
-        pub dissolve_cluster_name_sub: String,
-        pub dissolve_time: f32,
-        pub dissolve_timer: f32,
-
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.stage.StageRestrictObserver",
-        0xe8f69abc = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct StageRestrictObserver {
-        pub enabled: bool,
-        pub restrict_type: i32, // snow.RistrictTargetType
-    }
-}
-
-rsz_struct! {
-    #[rsz("snow.stage.pop.RelicNoteUnlock",
-        0xf2852b01 = 0
-    )]
-    #[derive(Debug, Serialize)]
-    pub struct RelicNoteUnlock {
-        pub enabled: bool,
-        pub note_map_no: i32, // snow.QuestMapManager.MapNoType
-        pub relic_id: i32, // snow.stage.StageDef.RelicId
-    }
-}
-
-rsz_struct! {
     #[rsz("via.gui.Control",
         0x2cf3efdb = 0
     )]
     #[derive(Debug, Serialize)]
     pub struct GuiControl {
         // PlayObject
-        v0: String,
-        v1: String,
+        v0: Option<String>,
+        v1: Option<String>,
         v2: u8,
         v3: u8,
         v4: u16,
         // TransformObject
-        v5: ViaVec4,
-        v6: ViaVec4,
-        v7: ViaVec4,
+        v5: Vec4,
+        v6: Vec4,
+        v7: Vec4,
         v8: u8,
         v9: u32,
         v10: u32,
@@ -483,7 +252,7 @@ rsz_struct! {
         pub base: Flatten<GuiControl>,
         pub v21: u32,
         pub v22: f32,
-        pub v23: String,
+        pub v23: Option<String>,
     }
 }
 
@@ -493,6 +262,268 @@ rsz_struct! {
     )]#[derive(Debug, Serialize)]
     pub struct Prefab {
         pub v0: u8,
-        pub v1: String,
+        pub v1: Option<String>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.navigation.ObstacleFilterInfo",
+        0x727d8279 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct ObstacleFilterInfo {
+        pub v0: u8,
+        pub v1: Option<String>,
+        pub v2: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.navigation.ObstacleFilterSet",
+        0x3fc440e4 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct ObstacleFilterSet {
+        pub v0: Option<String>,
+        pub filters: Vec<ObstacleFilterInfo>
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.navigation.NavigationSurface",
+        0x2edbaa75 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct NavigationSurface {
+        // Navigation
+        pub v0: Option<String>,
+        pub v1: Vec4,
+        pub v2a: u64,
+        pub v2b: u64,
+        pub v3: u8,
+        pub v4: u8,
+        pub v5: u8,
+        pub v6: u32,
+        pub v7: u32,
+        pub v8: u8,
+        pub v9: u8,
+        pub v10: u8,
+        pub v11: u8,
+        pub v12: Vec<()>, //? 0xd0 getFilters via.navigation.FilterInfo
+        pub v13: Vec<()>,//? 0xe0 getFilterGroups via.navigation.FilterSet
+        pub v14: u32,
+        pub v15: u32,
+        pub v16: u32,
+        pub v17: u8,
+        pub v18: u8,
+        pub v19: u8,
+        pub v20: u32,
+        pub v21: u32,
+        pub v22: u32,
+        pub v23: u32,
+        pub v24: u32,
+        pub v25: u8,
+        pub v26: u8,
+        pub v27: u8,
+        pub v28: u32,
+        pub v29: u8,
+        pub v30: u32,
+        pub v31: u8,
+        pub v32: u8,
+        pub v33: u32,
+        pub v34: u32,
+        pub v35: u32,
+        pub v36: Vec<ObstacleFilterSet>, // 0xf8
+        pub v37: u32,
+
+        // NavigationSurface
+        pub v38: u32,
+        pub v39: u32,
+        pub v40: u32,
+        pub v41: u32,
+        pub v42: u8,
+        pub v43: u32,
+        pub v44: u32,
+        pub v45: u32,
+        pub v46: u32,
+        pub v47: u32,
+        pub v48: u32,
+        pub v49: u32,
+        pub v50: u32,
+        pub v51: u32,
+        pub v52: u8,
+        pub v53: u32,
+        pub v54: u8,
+        pub v55: u8,
+        pub v56: u8,
+        pub v57: u8,
+        pub v58: u32,
+        pub v59: u8,
+        pub v60: u8,
+        pub v61: u32,
+        pub v62: u8,
+        pub v63: u8,
+        pub v64: u32,
+        pub v65: u8,
+        pub v66: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.physics.MeshShape",
+        0x8fb90e73 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MeshShape {
+        pub v0: Zero, // this should be a sub object?
+        pub v1: Option<String>,
+        pub v2: Mat4x4
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.physics.FilterInfo",
+        0xfdca9c46 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct PhysicsFilterInfo {
+        pub v0: u32,
+        pub v1: u32,
+        pub v2: u32,
+        pub v3: u32,
+        pub v4: u32
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.physics.Collider",
+        0x1eba41d0 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct Collider {
+        pub v0: u8,
+        pub v1: u8,
+        pub v2: MeshShape,
+        pub v3: PhysicsFilterInfo,
+        pub v4: PhysicsUserData,
+        pub v5: Option<String>,
+        pub v6: Option<String>,
+        pub v7: Option<String>,
+        pub v8: Option<String>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.physics.Colliders",
+        0x41d1c09a = 0,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct Colliders {
+        pub v0: u8,
+        pub v1: u8,
+        pub v2: u32,
+        pub v3: Vec<String>,
+        pub v4: u8,
+        pub v5: Vec<Collider>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.motion.TreeLayer",
+        0x5f9047f4 = 0,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct TreeLayer {
+        pub v0: u32,
+        pub v1: u32,
+        pub v2: u8,
+        pub v3: Option<String>,
+        pub v4: u32,
+        pub v5: u32,
+        pub v6: u32,
+        pub v7: u32,
+        pub v8: u32,
+        pub v9: u8,
+        pub v10: u8,
+        pub v11: u8,
+        pub v12: u32,
+        pub v13: u32,
+        pub v14: u8,
+        pub v15: u8,
+        pub v16: u8,
+        pub v17: u8,
+        pub v18: u32,
+        pub v19: u32,
+        pub v20: u32,
+        pub v21: u32,
+        pub v22: u8,
+    }
+}
+
+// untested
+rsz_struct! {
+    #[rsz("via.motion.MotionBank",
+        0xebf452c8 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MotionBank {
+        v0: Option<String>,
+        v1: u32,
+        v2: u32,
+        v3: u32,
+    }
+}
+
+// untested
+rsz_struct! {
+    #[rsz("via.motion.DynamicMotionBank",
+        0xf0c2477a = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct DynamicMotionBank {
+        v0: u32,
+        v1: u8,
+        v2: u32,
+        v3: u8,
+        v4: u32,
+        v5: u8,
+        v6: u32,
+        v7: Option<String>,
+        v8: Option<String>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("via.motion.Motion",
+        0xb8e5e915 = 0
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct Motion {
+        pub v0: u8,
+        pub v1: u32,
+        pub v2: u32,
+        pub v3: u8,
+        pub v4: u8,
+
+        pub v5: u32,
+        pub v6: u8,
+        pub v7: u8,
+        pub v8: Option<String>,
+        pub v9: Option<String>,
+        pub v10: Option<String>,
+        pub v11: Option<String>,
+        pub v12: u32,
+        pub v13: u8,
+        pub v14: Vec<TreeLayer>, // 0x198 Layer
+        pub v15: Vec<MotionBank>, // 0x348
+        pub v16: Vec<DynamicMotionBank>, // 800 DynamicMotionBank
+        pub v17: u8,
+        pub v18: u32,
+        pub v19: u32,
+        pub v20: u8,
+        pub v21: u32,
+        pub v22: u32,
+        pub v23: u32,
+
     }
 }

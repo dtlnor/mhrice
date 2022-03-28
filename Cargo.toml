@@ -25,6 +25,7 @@ regex = "1.5"
 rayon = "1.5"
 bitflags = "1.2"
 nalgebra-glm = { version = "0.16", features = ["serde-serialize"]}
+nalgebra = "*"
 glium = "0.31"
 png = "0.17"
 ordered-float = "2.1"
@@ -33,7 +34,7 @@ compress = "0.2"
 astc-decode = "0.3"
 num-bigint = "0.4"
 base64 = "0.13"
-minidump = { git = "https://github.com/luser/rust-minidump.git" }
+minidump = "0.10"
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2"] }

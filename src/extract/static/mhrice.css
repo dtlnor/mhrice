@@ -333,3 +333,69 @@ ul.mh-rampage-em-list{
 li.mh-rampage-em-list {
     display: inline-block;
 }
+
+.mh-map-container {
+    overflow: scroll;
+    width: 100%;
+    height: min(80vh, 70vw);
+    border: solid;
+}
+
+.mh-map {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+}
+
+.mh-map-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.mh-map-pop {
+    position: absolute;
+    width: 2rem;
+    height: 2rem;
+    margin-left: -1rem;
+    margin-top: -1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.mh-map-pop.mh-hidden {
+    display: none;
+}
+
+.mh-map-pop:hover {
+    outline: 1px solid yellow;
+}
+
+.mh-map-select {
+    outline: 1px solid green;
+}
+
+.mh-wire-long-jump-icon {
+    width: 2rem;
+    height: 2rem;
+}
+
+.mh-icon-container {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+}
+
+.mh-main-camp {
+    width: 1.9375rem;
+    height: 2.0625rem;
+}
+
+.mh-sub-camp {
+    width: 1.9375rem;
+    height: 1.875rem;
+}

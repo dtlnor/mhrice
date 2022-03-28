@@ -1,6 +1,7 @@
 use super::gen_armor::*;
 use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
+use super::gen_map::*;
 use super::gen_monster::*;
 use super::gen_quest::*;
 use super::gen_skill::*;
@@ -129,6 +130,10 @@ pub fn navbar() -> Box<div<String>> {
                         <a class="navbar-item" href="/weapon/bow.html">"Bow"</a>
                     </div>
                     </div>
+
+                    <a class="navbar-item" href="/map.html">
+                        "Maps"
+                    </a>
 
                     <a class="navbar-item" href="/item.html">
                         "Items"
@@ -438,12 +443,21 @@ pub fn gen_monsters(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) -
                     pedia.small_monsters.iter().filter(|monster|monster.sub_id == 0) // sub small monsters are b0rked
                     .map(|monster| {
                         let icon_path = format!("/resources/ems{0:03}_{1:02}_icon.png", monster.id, monster.sub_id);
+
+                        let name = if let Some(enemy_type) = monster.enemy_type {
+                            let name_name = format!("EnemyIndex{:03}", enemy_type);
+                            pedia.monster_names.get_entry(&name_name).map_or(
+                                html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>),
+                                gen_multi_lang
+                            )
+                        } else {
+                            html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>)
+                        };
+
                         html!{<li class="mh-list-monster">
                             <a href={format!("/small-monster/{:03}_{:02}.html", monster.id, monster.sub_id)}>
                                 <img class="mh-list-monster-icon" src=icon_path />
-                                <div>{
-                                    text!("Small monster {:03}_{:02}", monster.id, monster.sub_id)
-                                }</div>
+                                <div>{ name }</div>
                             </a>
                         </li>}
                     })
@@ -573,6 +587,8 @@ pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) ->
     gen_items(pedia, pedia_ex, output)?;
     gen_item_list(pedia_ex, output)?;
     gen_weapons(pedia_ex, output)?;
+    gen_maps(pedia, pedia_ex, output)?;
+    gen_map_list(pedia, output)?;
     gen_about(output)?;
     gen_static(output)?;
     gen_part_color_css(output)?;

@@ -1,4 +1,5 @@
 use super::pedia::*;
+use super::prepare_map::*;
 use super::sink::*;
 use crate::gpu::*;
 use crate::gui::*;
@@ -20,6 +21,45 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::io::{Cursor, Read, Seek, Write};
 use std::ops::Deref;
+
+pub static ITEM_ICON_SPECIAL_COLOR: [i32; 7] = [93, 115, 121, 123, 178, 179, 189];
+
+// This map is hardcoded in the game code, unfortunatley
+// class snow.enemy.EnemyManager {.cctor}
+pub static EMS_ID_LIST: &[(u32, i32)] = &[
+    (0x1003, 0x2f),
+    (0x1503, 0x30),
+    (0x1007, 0x31),
+    (0x1008, 0x32),
+    (0x100d, 0x33),
+    (0x100e, 0x34),
+    (0x1010, 0x35),
+    (0x1013, 0x36),
+    (0x1019, 0x37),
+    (0x101a, 0x38),
+    (0x101b, 0x39),
+    (0x101d, 0x3a),
+    (0x1022, 0x3b),
+    (0x1023, 0x3c),
+    (0x1024, 0x3d),
+    (0x1026, 0x3e),
+    (0x1027, 0x3f),
+    (0x1028, 0x40),
+    (0x1029, 0x41),
+    (0x102a, 0x42),
+    (0x102b, 0x43),
+    (0x102c, 0x44),
+    (0x1031, 0x45),
+    (0x1033, 0x46),
+    (0x1533, 0x47),
+    (0x105a, 0x48),
+    (0x105b, 0x49),
+    (0x155b, 0x4a),
+    (0x105c, 0x4b),
+];
+
+pub static EMS_ID_MAP: Lazy<HashMap<u32, i32>> =
+    Lazy::new(|| EMS_ID_LIST.iter().cloned().collect());
 
 fn exactly_one<T>(mut iterator: impl Iterator<Item = T>) -> Result<T> {
     let next = iterator.next().context("No element found")?;
@@ -59,7 +99,7 @@ pub fn gen_collider_mapping(rcol: Rcol) -> Result<ColliderMapping> {
         }
         if let Some(data) = attachment.user_data.downcast::<EmHitDamageRsData>() {
             let entry = part_map.entry(data.parts_group.try_into()?).or_default();
-            entry.insert(data.base.name.clone());
+            entry.insert(data.name.clone());
             entry.insert(attachment.name);
             entry.insert(
                 rcol.collider_groups[attachment.collider_group_index]
@@ -76,7 +116,7 @@ pub fn gen_collider_mapping(rcol: Rcol) -> Result<ColliderMapping> {
             }
             if let Some(data) = collider.user_data.downcast::<EmHitDamageShapeData>() {
                 let entry = meat_map.entry(data.meat.try_into()?).or_default();
-                entry.insert(data.base.name.clone());
+                entry.insert(data.name.clone());
             }
         }
     }
@@ -156,6 +196,7 @@ pub fn gen_monsters(
                 boss_init_set_data
                     .as_ref()
                     .map(|b: &EnemyBossInitSetData| b.enemy_type)
+                    .or_else(|| EMS_ID_MAP.get(&(id + (sub_id << 8) + 0x1000)).cloned())
             };
 
             let rcol_path = collider_path_gen(id, sub_id);
@@ -490,6 +531,10 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         "data/Define/Player/Weapon/HyakuryuWeaponHyakuryuBuildupData.user",
     )?;
 
+    let maps = prepare_maps(pak)?;
+    let map_name = get_msg(pak, "Message/Common_Msg/Stage_Name.msg")?;
+    let item_pop_lot = get_user(pak, "data/Define/Stage/ItemPop/ItemPopLotTableData.user")?;
+
     Ok(Pedia {
         monsters,
         small_monsters,
@@ -573,6 +618,9 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         bow,
         horn_melody,
         hyakuryu_weapon_buildup,
+        maps,
+        map_name,
+        item_pop_lot,
     })
 }
 
@@ -740,6 +788,15 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
         .sub_image(302, 453, 24, 24)?
         .save_png(output.create("small_crown.png")?)?;
 
+    let map_icon = pak.find_file("gui/80_Texture/map/map_icon_IAM.tex")?;
+    let map_icon = Tex::new(Cursor::new(pak.read_file(map_icon)?))?.to_rgba(0, 0)?;
+    map_icon
+        .sub_image(0, 31, 31, 33)?
+        .save_png(output.create("main_camp.png")?)?;
+    map_icon
+        .sub_image(0, 64, 31, 30)?
+        .save_png(output.create("sub_camp.png")?)?;
+
     let item_icon_path = output.sub_sink("item")?;
     let item_icon_uvs = pak.find_file("gui/70_UVSequence/cmn_icon.uvs")?;
     let item_icon_uvs = Uvs::new(Cursor::new(pak.read_file(item_icon_uvs)?))?;
@@ -749,11 +806,15 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
     let item_icon = pak.find_file(&item_icon_uvs.textures[0].path)?;
     let item_icon = Tex::new(Cursor::new(pak.read_file(item_icon)?))?.to_rgba(0, 0)?;
     for (i, spriter) in item_icon_uvs.spriter_groups[0].spriters.iter().enumerate() {
-        let (item_icon_r, item_icon_a) = item_icon
-            .sub_image_f(spriter.p0, spriter.p1)?
-            .gen_double_mask();
-        item_icon_r.save_png(item_icon_path.create(&format!("{:03}.r.png", i))?)?;
-        item_icon_a.save_png(item_icon_path.create(&format!("{:03}.a.png", i))?)?;
+        let item_icon = item_icon.sub_image_f(spriter.p0, spriter.p1)?;
+
+        if ITEM_ICON_SPECIAL_COLOR.contains(&(i as i32)) {
+            item_icon.save_png(item_icon_path.create(&format!("{:03}.png", i))?)?;
+        } else {
+            let (item_icon_r, item_icon_a) = item_icon.gen_double_mask();
+            item_icon_r.save_png(item_icon_path.create(&format!("{:03}.r.png", i))?)?;
+            item_icon_a.save_png(item_icon_path.create(&format!("{:03}.a.png", i))?)?;
+        }
     }
 
     let item_addon_uvs = pak.find_file("gui/70_UVSequence/Item_addonicon.uvs")?;
@@ -843,6 +904,8 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
 
     let item_colors_path = output.create("rarity_color.css")?;
     gen_rarity_colors(pak, item_colors_path)?;
+
+    gen_map_resource(pak, output)?;
 
     Ok(())
 }
@@ -1843,6 +1906,25 @@ fn prepare_horn_melody(pedia: &Pedia) -> HashMap<i32, &'_ MsgEntry> {
     res
 }
 
+fn prepare_item_pop(
+    pedia: &Pedia,
+) -> Result<HashMap<(i32, i32), &'_ ItemPopLotTableUserDataParam>> {
+    let mut res = HashMap::new();
+    for param in &pedia.item_pop_lot.param {
+        if res
+            .insert((param.pop_id, param.field_type), param)
+            .is_some()
+        {
+            bail!(
+                "Multiple definition for item pop {} in map {}",
+                param.pop_id,
+                param.field_type
+            );
+        }
+    }
+    Ok(res)
+}
+
 pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
     let monster_order = pedia
         .monster_list
@@ -1898,5 +1980,6 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         horn_melody: prepare_horn_melody(pedia),
 
         monster_order,
+        item_pop: prepare_item_pop(pedia)?,
     })
 }
