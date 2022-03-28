@@ -5,6 +5,11 @@ var navbar_menu_active = false;
 
 var classes_to_hide = new Set();
 
+var cur_map_explain = "default";
+
+var map_scale = 100
+var map_layer = 0
+
 window.onload = function () {
     check_cookie();
     switchLanguage();
@@ -182,5 +187,100 @@ function onToggleNavbarMenu() {
     } else {
         document.getElementById("navbarBurger").classList.remove("is-active");
         document.getElementById("navbarMenu").classList.remove("is-active");
+    }
+}
+
+function onShowMapExplain(id) {
+    if (cur_map_explain !== null) {
+        document.getElementById("mh-map-explain-" + cur_map_explain).classList.add("mh-hidden");
+        if (cur_map_explain !== "default") {
+            document.getElementById("mh-map-icon-" + cur_map_explain).classList.remove("mh-map-select");
+        }
+    }
+    cur_map_explain = id;
+    document.getElementById("mh-map-explain-" + cur_map_explain).classList.remove("mh-hidden");
+    document.getElementById("mh-map-icon-" + cur_map_explain).classList.add("mh-map-select");
+}
+
+function updateMapScale() {
+    let map = document.getElementById("mh-map");
+    map.style.width = map_scale + "%";
+    map.style.paddingTop = map_scale + "%";
+}
+
+function scaleUpMap() {
+    if (map_scale >= 500) {
+        return
+    }
+
+    map_scale += 50;
+
+    document.getElementById("button-scale-down").disabled = false;
+    if (map_scale >= 500) {
+        document.getElementById("button-scale-up").disabled = true;
+    }
+
+    updateMapScale()
+}
+
+function scaleDownMap() {
+    if (map_scale <= 100) {
+        return
+    }
+
+    map_scale -= 50
+
+    document.getElementById("button-scale-up").disabled = false;
+    if (map_scale <= 100) {
+        document.getElementById("button-scale-down").disabled = true;
+    }
+
+    updateMapScale()
+}
+
+function switchMapLayer() {
+    let prev = document.getElementById("mh-map-layer-" + map_layer);
+    map_layer += 1;
+    let cur = document.getElementById("mh-map-layer-" + map_layer);
+    if (cur === null) {
+        map_layer = 0;
+        cur = document.getElementById("mh-map-layer-" + map_layer);
+    }
+    prev.classList.add("mh-hidden");
+    cur.classList.remove("mh-hidden");
+}
+
+var map_filter = new Map([
+    ["all", (pop) => true],
+    ["item", (pop) => pop.classList.contains("mh-map-tag-item")],
+    ["relic", (pop) => pop.classList.contains("mh-map-tag-relic")],
+    ["camp", (pop) => pop.classList.contains("mh-map-tag-camp")],
+    ["jump", (pop) => pop.classList.contains("mh-map-tag-jump")],
+    ["fish", (pop) => pop.classList.contains("mh-map-tag-fish")],
+]);
+
+var cur_map_filter = "all"
+
+function changeMapFilter(filter) {
+    let filter_fun = map_filter.get(filter);
+    for (const element of document.getElementsByClassName("mh-map-pop")) {
+        if (filter_fun(element)) {
+            element.classList.remove("mh-hidden");
+        } else {
+            element.classList.add("mh-hidden");
+        }
+    }
+
+    const filter_button_prefix = "mh-map-filter-";
+    let prev = document.getElementById(filter_button_prefix + cur_map_filter);
+    if (prev !== null) {
+        prev.classList.remove("is-primary")
+    }
+
+    cur_map_filter = filter;
+
+    let cur = document.getElementById(filter_button_prefix + cur_map_filter);
+    if (cur !== null) {
+        cur.classList.add("is-primary")
     }
 }

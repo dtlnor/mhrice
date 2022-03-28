@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ScnGameObject {
-    guid: [u8; 16],
+    guid: rsz::Guid,
     object_index: u32,
     parent_index: Option<u32>, // could be a game object or a folder
     component_count: u32,
@@ -66,6 +66,7 @@ impl Scn {
             .map(|_| {
                 let mut guid = [0; 16];
                 file.read_exact(&mut guid)?;
+                let guid = rsz::Guid { bytes: guid };
                 let object_index = file.read_u32()?;
                 let parent_index = scn_option(file.read_u32()?);
                 let component_count = file.read_u32()?;
@@ -244,14 +245,17 @@ impl Scn {
             }
             Err(e) => {
                 println!("Failed to serialize because {}", e);
-                for (i, root) in self.rsz.roots.iter().enumerate() {
-                    let type_descriptor = self.rsz.type_descriptors[*root as usize];
-                    let hash = (type_descriptor & 0xFFFFFFFF) as u32;
+                for (i, type_descriptor) in self.rsz.type_descriptors.iter().enumerate() {
+                    // let type_descriptor = self.rsz.type_descriptors[*root as usize];
+                    let hash = type_descriptor.hash;
                     let symbol = rsz::RSZ_TYPE_MAP
                         .get(&hash)
                         .map(|t| t.symbol)
                         .unwrap_or_default();
-                    println!(" [{}] - {:016X} - {}", i, type_descriptor, symbol)
+                    println!(
+                        " [{}] - {:08X}, {:08X} - {}",
+                        i, hash, type_descriptor.crc, symbol
+                    )
                 }
                 Result::<()>::Err(e).unwrap()
             }
@@ -384,7 +388,10 @@ impl Scene {
                 .context("folder data already taken")?
                 .downcast()
                 .context("Folder type mismatch")?;
-            let subscene = (!folder.path.is_empty()).then(|| Scene::new(pak, &folder.path));
+            let subscene = folder
+                .path
+                .as_ref()
+                .and_then(|p| (!p.is_empty()).then(|| Scene::new(pak, p)));
             let children = orphans.remove(&Some(f.folder_object_index)).map_or_else(
                 Vec::new,
                 |mut children: Vec<GameObject>| {
