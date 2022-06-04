@@ -1,5 +1,5 @@
 var cookie_consent = false;
-var language_index = 1;
+var language_code = "en";
 
 var navbar_menu_active = false;
 
@@ -38,10 +38,10 @@ function check_cookie() {
             cookie_consent = true;
         }
 
-        if (cookie_name === "language") {
-            language_index = parseInt(cookie_value)
-            if (!(Number.isInteger(language_index) && language_index >= 0 && language_index < 32)) {
-                language_index = 1;
+        if (cookie_name === "mh-language") {
+            language_code = cookie_value
+            if (!(supported_mh_lang.includes(language_code))) {
+                language_code = "en";
             }
         }
     }
@@ -141,28 +141,24 @@ function show_class(c) {
 
 function selectLanguage(language) {
     toc = null;
-    language_index = language;
+    language_code = language;
     switchLanguage();
     if (cookie_consent) {
-        document.cookie = "language=" + language_index + "; path=/";
+        document.cookie = "mh-language=" + language_code + "; path=/";
     }
 }
 
 function switchLanguage() {
-    for (var i = 0; i < 32; ++i) {
-        var c = "mh-lang-" + i;
-        if (i === language_index) {
-            show_class(c);
-        } else {
-            hide_class(c);
-        }
+    document.getElementById("mh-lang-style").innerHTML =
+        ".mh-lang:not([lang=\"" + language_code + "\"]) { display:none; }";
 
-        var c = "mh-lang-menu-" + i;
-        for (const element of document.getElementsByClassName(c)) {
-            if (i === language_index) {
-                element.classList.add("has-text-weight-bold");
+    for (const l of supported_mh_lang) {
+        let menu_option = document.getElementById("mh-lang-menu-" + l);
+        if (menu_option) {
+            if (l === language_code) {
+                menu_option.classList.add("has-text-weight-bold");
             } else {
-                element.classList.remove("has-text-weight-bold");
+                menu_option.classList.remove("has-text-weight-bold");
             }
         }
     }
@@ -288,6 +284,34 @@ function changeMapFilter(filter) {
     }
 }
 
+var cur_item_filter = "all";
+
+function changeItemFilter(filter) {
+    let style = document.getElementById("mh-item-list-style");
+    if (style) {
+        if (filter == "all") {
+            style.innerHTML = "";
+        } else {
+            style.innerHTML =
+                ".mh-item-filter-item:not([data-filter=\""
+                + filter + "\"]) { display:none; }";
+        }
+    }
+
+    const filter_button_prefix = "mh-item-filter-button-";
+    let prev = document.getElementById(filter_button_prefix + cur_map_filter);
+    if (prev !== null) {
+        prev.classList.remove("is-primary")
+    }
+
+    cur_map_filter = filter;
+
+    let cur = document.getElementById(filter_button_prefix + cur_map_filter);
+    if (cur !== null) {
+        cur.classList.add("is-primary")
+    }
+}
+
 function doSearch() {
     let text = document.getElementById("mh-search").value.trim();
     if (text.length === 0) {
@@ -368,7 +392,7 @@ function search() {
     }
 
     if (toc === null) {
-        fetch("/toc/" + language_index + ".json")
+        fetch("/toc/" + language_code + ".json")
             .then(response => response.json())
             .then(json => {
                 toc = json;
