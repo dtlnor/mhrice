@@ -158,10 +158,10 @@ impl<F: Read + Seek> PakReader<F> {
             path = &path[1..];
         }
         let dot = path.rfind('.').context("Path missing extension")?;
-        let suffix = *SUFFIX_MAP
+        let suffix = SUFFIX_MAP
             .get(&path[dot + 1..])
             .context("Unknown extension")?;
-        for suffix in suffix {
+        for suffix in suffix.iter().rev() {
             let full_path = format!("natives/STM/{}.{}", path, suffix);
             let full_path_ns = format!("natives/NSW/{}.{}", path, suffix);
             let full_path_x64 = format!("{}.x64", &full_path);
