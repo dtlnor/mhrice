@@ -65,6 +65,8 @@ Version list:
 2 = 3.9.0.0
 3 = 3.9.1.0
 
+42 = sunbreak demo (temporary)
+
 ****/
 
 #[derive(Debug)]
@@ -199,10 +201,12 @@ impl Rsz {
                     &buffer[0..read]
                 )
             })?;
-            let version = *type_info
-                .versions
-                .get(&crc)
-                .with_context(|| format!("Unknown type CRC {:08X} for type {:08X}", crc, hash))?;
+            let version = *type_info.versions.get(&crc).with_context(|| {
+                format!(
+                    "Unknown type CRC {:08X} for type {:08X} ({})",
+                    crc, hash, type_info.symbol
+                )
+            })?;
             let pos = cursor.tell().unwrap();
             let mut rsz_deserializer = RszDeserializer {
                 node_buf: &mut node_buf,
