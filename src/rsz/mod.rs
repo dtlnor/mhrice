@@ -49,7 +49,7 @@ use bitflags::*;
 use once_cell::sync::Lazy;
 use serde::*;
 use std::any::*;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::io::{Cursor, Read, Seek, SeekFrom};
@@ -64,6 +64,8 @@ Version list:
 1 = 3.6.1.1
 2 = 3.9.0.0
 3 = 3.9.1.0
+
+42 = sunbreak demo (temporary)
 
 ****/
 
@@ -199,10 +201,12 @@ impl Rsz {
                     &buffer[0..read]
                 )
             })?;
-            let version = *type_info
-                .versions
-                .get(&crc)
-                .with_context(|| format!("Unknown type CRC {:08X} for type {:08X}", crc, hash))?;
+            let version = *type_info.versions.get(&crc).with_context(|| {
+                format!(
+                    "Unknown type CRC {:08X} for type {:08X} ({})",
+                    crc, hash, type_info.symbol
+                )
+            })?;
             let pos = cursor.tell().unwrap();
             let mut rsz_deserializer = RszDeserializer {
                 node_buf: &mut node_buf,
@@ -257,19 +261,14 @@ impl Rsz {
         self.roots.len()
     }
 
-    pub fn verify_crc(&self) -> Result<()> {
+    pub fn verify_crc(&self, crc_mismatches: &mut BTreeMap<&str, u32>) {
         for td in &self.type_descriptors {
             if let Some(type_info) = RSZ_TYPE_MAP.get(&td.hash) {
                 if !type_info.versions.contains_key(&td.crc) {
-                    bail!(
-                        "Type {} has unregistered version CRC {:08X}",
-                        type_info.symbol,
-                        td.crc
-                    )
+                    crc_mismatches.insert(type_info.symbol, td.crc);
                 }
             }
         }
-        Ok(())
     }
 }
 
