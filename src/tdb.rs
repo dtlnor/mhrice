@@ -1669,9 +1669,9 @@ impl Tdb {
                 );
 
                 if field.constant_index != 0 {
-                    if field.constant_index_hi != 0 {
-                        print!("/*constant_index_hi:{}*/", field.constant_index_hi);
-                    }
+                    //if field.constant_index_hi != 0 {
+                    //    print!("/*constant_index_hi:{}*/", field.constant_index_hi);
+                    //}
                     
                     let field_type = symbols[field.type_instance_index].as_ref().unwrap();
 
