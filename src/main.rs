@@ -14,6 +14,7 @@ use std::sync::Mutex;
 
 mod align;
 mod bitfield;
+mod collada;
 mod extract;
 mod file_ext;
 mod gpu;
@@ -245,6 +246,16 @@ enum Mhrice {
         output: String,
     },
 
+    /// Convert a MESH file to a DAE (Collada) model file
+    DumpMeshDae {
+        /// Path to the MESH file
+        #[clap(short, long)]
+        mesh: String,
+        /// Output file
+        #[clap(short, long)]
+        output: String,
+    },
+
     /// Print information of a RCOL file
     DumpRcol {
         /// Path to the RCOL file
@@ -269,6 +280,9 @@ enum Mhrice {
         /// Output PNG file
         #[clap(short, long)]
         output: String,
+        /// Optional 4-character swizzle code. The default is "rgba"
+        #[clap(short, long, default_value = "rgba")]
+        swizzle: String,
     },
 
     /// Print information of a GUI file
@@ -903,7 +917,10 @@ fn dump_tree(pak: Vec<String>, list: String, output: String) -> Result<()> {
     let mut unvisited: std::collections::HashSet<_> = pak.all_file_indexs().into_iter().collect();
     for line in BufReader::new(list).lines() {
         let line = line?;
-        let path = line.split(" $ ").next().context("Empty line")?;
+        let mut path = line.split(" $ ").next().context("Empty line")?;
+        if let Some(new_path) = path.strip_prefix('@') {
+            path = new_path;
+        }
 
         for i18n_index in pak.find_file_i18n(path)? {
             let index = i18n_index.index;
@@ -912,7 +929,11 @@ fn dump_tree(pak: Vec<String>, list: String, output: String) -> Result<()> {
             } else {
                 format!("{}.{}", path, i18n_index.language)
             };
-            let path = PathBuf::from(&output).join(path_i18n);
+
+            let mut path = PathBuf::from(&output);
+            for component in path_i18n.split('/') {
+                path.push(component);
+            }
 
             std::fs::create_dir_all(path.parent().context("no parent")?)?;
             std::fs::write(path, &pak.read_file(index)?)?;
@@ -921,11 +942,27 @@ fn dump_tree(pak: Vec<String>, list: String, output: String) -> Result<()> {
     }
 
     for index in unvisited {
-        let path = PathBuf::from(&output)
-            .join("_unknown")
-            .join(index.short_string());
-        std::fs::create_dir_all(path.parent().context("no parent")?)?;
-        std::fs::write(path, &pak.read_file(index)?)?;
+        let data = pak.read_file(index)?;
+        let format = if let Some(magic) = data.get(0..4) {
+            let mut format = String::new();
+            for c in magic {
+                if c.is_ascii_alphanumeric() {
+                    format.push(*c as char);
+                } else {
+                    format += &format!("_{:02x}", c);
+                }
+            }
+            format
+        } else {
+            "short".to_owned()
+        };
+
+        let mut path = PathBuf::from(&output);
+        path.push("_unknown");
+        path.push(&format);
+        std::fs::create_dir_all(&path)?;
+        path.push(index.short_string());
+        std::fs::write(path, &data)?;
     }
 
     Ok(())
@@ -934,6 +971,12 @@ fn dump_tree(pak: Vec<String>, list: String, output: String) -> Result<()> {
 fn dump_mesh(mesh: String, output: String) -> Result<()> {
     let mesh = Mesh::new(File::open(mesh)?)?;
     mesh.dump(output)?;
+    Ok(())
+}
+
+fn dump_mesh_dae(mesh: String, output: String) -> Result<()> {
+    let mesh = Mesh::new(File::open(mesh)?)?;
+    mesh.dump_dae(output)?;
     Ok(())
 }
 
@@ -947,9 +990,9 @@ fn dump_rcol(rcol: String) -> Result<()> {
     Ok(())
 }
 
-fn dump_tex(tex: String, output: String) -> Result<()> {
+fn dump_tex(tex: String, output: String, swizzle: String) -> Result<()> {
     let tex = Tex::new(File::open(tex)?)?;
-    tex.save_png(0, 0, std::fs::File::create(&output)?)?;
+    tex.save_png_swizzle(0, 0, std::fs::File::create(&output)?, &swizzle)?;
     Ok(())
 }
 
@@ -1212,9 +1255,14 @@ fn main() -> Result<()> {
         Mhrice::ScanGui { pak } => scan_gui(pak),
         Mhrice::ScanUvs { pak } => scan_uvs(pak),
         Mhrice::DumpMesh { mesh, output } => dump_mesh(mesh, output),
+        Mhrice::DumpMeshDae { mesh, output } => dump_mesh_dae(mesh, output),
         Mhrice::DumpRcol { rcol } => dump_rcol(rcol),
         Mhrice::DumpMeat { mesh, rcol, output } => dump_meat(mesh, rcol, output),
-        Mhrice::DumpTex { tex, output } => dump_tex(tex, output),
+        Mhrice::DumpTex {
+            tex,
+            output,
+            swizzle,
+        } => dump_tex(tex, output, swizzle),
         Mhrice::DumpGui { gui } => dump_gui(gui),
         Mhrice::GenMeat { pak, index, output } => {
             gen_meat(pak, index, std::fs::File::create(output)?)
