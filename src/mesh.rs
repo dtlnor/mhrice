@@ -1,5 +1,6 @@
 use crate::file_ext::*;
 use anyhow::{bail, Context, Result};
+use half::f16;
 use nalgebra_glm::*;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -7,6 +8,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 #[derive(Clone)]
 pub struct Model {
+    pub name_index: u32,
     pub vertex_count: u32,
     pub index_buffer_start: u32,
     pub vertex_buffer_start: u32,
@@ -22,6 +24,7 @@ pub struct ModelLod {
     pub model_groups: Vec<ModelGroup>,
 }
 
+#[derive(Debug)]
 pub struct VertexLayout {
     pub usage: u16, // position, normal, uv, uv2, weight
     pub width: u16,
@@ -52,6 +55,7 @@ pub struct Bone {
 pub struct Mesh {
     pub main_model_lods: Vec<ModelLod>,
     pub aux_model_lods: Vec<ModelLod>,
+    pub model_names: Vec<String>,
     pub vertex_layouts: Vec<VertexLayout>,
     pub vertex_buffer: Vec<u8>,
     pub index_buffer: Vec<u8>,
@@ -88,13 +92,13 @@ impl Mesh {
         let c_offset = file.read_u64()?;
         let skeleton_offset = file.read_u64()?;
         let e_offset = file.read_u64()?;
-        let f_offset = file.read_u64()?;
+        let blend_shape_offset = file.read_u64()?;
         let g_offset = file.read_u64()?; // after string table
         let mesh_data_offset = file.read_u64()?; // after string table
         let i_offset = file.read_u64()?;
         let model_names_offset = file.read_u64()?; // lists to string table entry
         let bone_names_offset = file.read_u64()?; // lists to string table entry
-        let f_names_offset = file.read_u64()?; // lists to string table entry
+        let blend_shape_names_offset = file.read_u64()?; // lists to string table entry
         let string_table_offset = file.read_u64()?; // string table
 
         let mut model_lod_cache: HashMap<u64, ModelLod> = HashMap::new();
@@ -112,8 +116,8 @@ impl Mesh {
 
             let models = (0..model_count)
                 .map(|_| {
-                    let _j = file.read_u32()?;
-                    let face_count = file.read_u32()?;
+                    let name_index = file.read_u32()?;
+                    let vertex_count = file.read_u32()?;
                     let index_buffer_start = file.read_u32()?;
                     let vertex_buffer_start = file.read_u32()?;
 
@@ -121,7 +125,8 @@ impl Mesh {
                     let _ = file.read_u32()?;
 
                     Ok(Model {
-                        vertex_count: face_count,
+                        name_index,
+                        vertex_count,
                         index_buffer_start,
                         vertex_buffer_start,
                     })
@@ -203,6 +208,13 @@ impl Mesh {
             main_model_lods = vec![];
         }
 
+        /*if let Some(lod0) = main_model_lods.first() {
+            let expected_name_count = lod0.model_groups.len();
+            if usize::from(model_name_count) != expected_name_count {
+                bail!("Unexpected model name count {model_name_count}. Expected {expected_name_count}")
+            }
+        }*/
+
         let aux_model_lods = if aux_model_offset != 0 {
             file.seek_noop(aux_model_offset)?;
 
@@ -245,6 +257,19 @@ impl Mesh {
         } else {
             vec![]
         };
+
+        // verify that model name indices are all in-bound
+        for set in [&main_model_lods, &aux_model_lods] {
+            for lod in set {
+                for group in &lod.model_groups {
+                    for model in &group.models {
+                        if model.name_index >= u32::from(model_name_count) {
+                            bail!("model name index {} out of bound", model.name_index);
+                        }
+                    }
+                }
+            }
+        }
 
         if c_offset != 0 {
             file.seek_noop(c_offset)?;
@@ -388,11 +413,11 @@ impl Mesh {
             //..
         }
 
-        let mut f_name_count = 0;
-        if f_offset != 0 {
-            file.seek(SeekFrom::Start(f_offset))?;
-            //file.seek_assert_align_up(f_offset, 8)?;
-            let f_count = file.read_u8()?;
+        let mut blend_shape_name_count = 0;
+        if blend_shape_offset != 0 {
+            file.seek(SeekFrom::Start(blend_shape_offset))?;
+            //file.seek_assert_align_up(blend_shape_offset, 8)?;
+            let blend_shape_count = file.read_u8()?;
             file.read_u8()?;
             file.read_u8()?;
             file.read_u8()?;
@@ -404,7 +429,7 @@ impl Mesh {
                 file.read_u64()?;
             }
             file.seek_noop(fa_offset)?;
-            let fb_offsets = (0..f_count)
+            let fb_offsets = (0..blend_shape_count)
                 .map(|_| file.read_u64())
                 .collect::<Result<Vec<_>>>()?;
 
@@ -426,7 +451,7 @@ impl Mesh {
                     file.read_u64()?;
                     file.read_u16()?;
                     let name_count = file.read_u16()?;
-                    f_name_count += name_count;
+                    blend_shape_name_count += name_count;
                     file.read_u32()?;
                     file.seek_noop(n_offset)?;
                     file.read_u64()?;
@@ -445,7 +470,7 @@ impl Mesh {
             i_offset,
             model_names_offset,
             bone_names_offset,
-            f_names_offset,
+            blend_shape_names_offset,
             string_table_offset,
         ];
         let next_offset = *next_offsets.iter().find(|x| **x != 0).unwrap();
@@ -464,12 +489,14 @@ impl Mesh {
             file.read_exact(&mut i_buffer)?;
         }
 
-        if model_names_offset != 0 {
+        let model_names = if model_names_offset != 0 {
             file.seek_assert_align_up(model_names_offset, 16)?;
             (0..model_name_count)
                 .map(|_| file.read_u16())
-                .collect::<Result<Vec<_>>>()?;
-        }
+                .collect::<Result<Vec<_>>>()?
+        } else {
+            vec![]
+        };
 
         let bone_names = if bone_names_offset != 0 {
             file.seek_assert_align_up(bone_names_offset, 16)?;
@@ -480,14 +507,18 @@ impl Mesh {
             vec![]
         };
 
-        if f_names_offset != 0 {
-            file.seek_assert_align_up(f_names_offset, 16)?;
-            (0..f_name_count)
+        let blend_shape_names = if blend_shape_names_offset != 0 {
+            file.seek_assert_align_up(blend_shape_names_offset, 16)?;
+            (0..blend_shape_name_count)
                 .map(|_| file.read_u16())
-                .collect::<Result<Vec<_>>>()?;
-        }
+                .collect::<Result<Vec<_>>>()?
+        } else {
+            vec![]
+        };
 
-        if model_name_count as u32 + bone_count + f_name_count as u32 != string_count as u32 {
+        if model_name_count as u32 + bone_count + blend_shape_name_count as u32
+            != string_count as u32
+        {
             bail!("Strange count")
         }
 
@@ -513,6 +544,26 @@ impl Mesh {
             })
             .collect::<Result<Vec<_>>>()?;
 
+        let model_names = model_names
+            .into_iter()
+            .map(|name_index| {
+                Ok(strings
+                    .get(usize::try_from(name_index)?)
+                    .context("Model name out of bound")?
+                    .clone())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let _blend_shape_names = blend_shape_names
+            .into_iter()
+            .map(|name_index| {
+                Ok(strings
+                    .get(usize::try_from(name_index)?)
+                    .context("Blend shape name out of bound")?
+                    .clone())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         let bone_names = bone_names
             .into_iter()
             .enumerate()
@@ -520,7 +571,7 @@ impl Mesh {
                 Ok((
                     strings
                         .get(usize::try_from(name_index)?)
-                        .context("Name out of bound")?
+                        .context("Bone name out of bound")?
                         .clone(),
                     bone_index,
                 ))
@@ -605,6 +656,7 @@ impl Mesh {
         Ok(Mesh {
             aux_model_lods,
             main_model_lods,
+            model_names,
             vertex_layouts,
             vertex_buffer,
             index_buffer,
@@ -627,19 +679,19 @@ impl Mesh {
             .vertex_layouts
             .iter()
             .find(|layout| layout.usage == 1)
-            .context("No position data")?;
+            .context("No normal data")?;
 
         let texcoord = self
             .vertex_layouts
             .iter()
             .find(|layout| layout.usage == 2)
-            .context("No position data")?;
+            .context("No texcoord data")?;
 
         let vertex_count = (self.vertex_layouts[1].offset - self.vertex_layouts[0].offset)
             / self.vertex_layouts[0].width as u32;
 
         if position.width != 12 {
-            bail!("Unexpected width");
+            bail!("Unexpected width for position {}", position.width);
         }
 
         let mut buffer = &self.vertex_buffer[position.offset as usize..];
@@ -652,17 +704,37 @@ impl Mesh {
 
         let mut buffer = &self.vertex_buffer[normal.offset as usize..];
         for _ in 0..vertex_count {
-            let x = buffer.read_u8()? as f32 / 255.0;
-            let y = buffer.read_u8()? as f32 / 255.0;
-            let z = buffer.read_u8()? as f32 / 255.0;
-            let _ = buffer.read_u8()?;
-            writeln!(output, "vn {} {} {}", x, y, z)?;
+            if normal.width == 4 {
+                let x = buffer.read_i8()? as f32 / 128.0;
+                let y = buffer.read_i8()? as f32 / 128.0;
+                let z = buffer.read_i8()? as f32 / 128.0; // always 0?
+                let _ = buffer.read_u8()?;
+                writeln!(output, "vn {} {} {}", x, y, z)?;
+            } else if normal.width == 8 {
+                let x = buffer.read_i8()? as f32 / 128.0;
+                let y = buffer.read_i8()? as f32 / 128.0;
+                let z = buffer.read_i8()? as f32 / 128.0;
+                let _ = buffer.read_i8()? as f32 / 128.0; // always 0?
+
+                // These might be tangents
+                let _tx = buffer.read_i8()? as f32 / 128.0;
+                let _ty = buffer.read_i8()? as f32 / 128.0;
+                let _tz = buffer.read_i8()? as f32 / 128.0;
+                let _ = buffer.read_i8()? as f32 / 128.0; // always 1?
+                writeln!(output, "vn {} {} {} ", x, y, z,)?;
+            } else {
+                bail!("Unknown width for normal {}", normal.width)
+            }
+        }
+
+        if texcoord.width != 4 {
+            bail!("Unexpected width for texcoord {}", texcoord.width);
         }
 
         let mut buffer = &self.vertex_buffer[texcoord.offset as usize..];
         for _ in 0..vertex_count {
-            let u = half::f16::from_bits(buffer.read_u16()?);
-            let v = half::f16::from_bits(buffer.read_u16()?);
+            let u = f16::from_bits(buffer.read_u16()?);
+            let v = f16::from_bits(buffer.read_u16()?);
             writeln!(output, "vt {} {}", u, 1.0 - v.to_f32())?;
         }
 
@@ -701,5 +773,296 @@ impl Mesh {
         }*/
 
         Ok(())
+    }
+
+    pub fn dump_dae(&self, output: String) -> Result<()> {
+        use crate::collada::*;
+        use std::path::Path;
+
+        let mut geometries = vec![];
+        let mut visual_scene = VisualScene {
+            id: "scene".to_owned(),
+            nodes: vec![],
+        };
+        let lod = &self.main_model_lods[0];
+        for (group_i, group) in lod.model_groups.iter().enumerate() {
+            for (model_i, model) in group.models.iter().enumerate() {
+                if model.vertex_count == 0 {
+                    continue;
+                }
+                let model_name = &self.model_names[usize::try_from(model.name_index)?];
+                let model_id = format!("m{group_i}-{model_i}-{model_name}");
+
+                let index_buffer_start = usize::try_from(model.index_buffer_start * 2)?;
+                let index_buffer_end =
+                    index_buffer_start + usize::try_from(model.vertex_count * 2)?;
+                let index_buffer = self
+                    .index_buffer
+                    .get(index_buffer_start..index_buffer_end)
+                    .context("Index buffer out-of-bound")?;
+                let indices: Vec<u16> = index_buffer
+                    .chunks(2)
+                    .map(|c| u16::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
+                let index_bound = indices.iter().max().unwrap() + 1;
+
+                let mut sources = vec![];
+                let mut vertices_inputs = vec![];
+                let mut primitive_inputs = vec![SharedInput {
+                    semantic: "VERTEX".to_owned(),
+                    source: format!("#{model_id}-vertices"),
+                    offset: 0,
+                    set: None,
+                }];
+
+                for (layout_i, layout) in self.vertex_layouts.iter().enumerate() {
+                    let vertex_buffer_start = usize::try_from(
+                        layout.offset + model.vertex_buffer_start * (u32::from(layout.width)),
+                    )?;
+                    let vertex_buffer_end =
+                        vertex_buffer_start + usize::from(layout.width) * usize::from(index_bound);
+                    let data = self
+                        .vertex_buffer
+                        .get(vertex_buffer_start..vertex_buffer_end)
+                        .context("Vertex buffer out-of-bound")?;
+
+                    match layout.usage {
+                        0 => {
+                            if layout.width != 12 {
+                                bail!("Unexpected width for position {}", layout.width);
+                            }
+                            let array: Vec<f32> = data
+                                .chunks(4)
+                                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                                .collect();
+
+                            sources.push(Source {
+                                id: format!("{model_id}-layout{layout_i}"),
+                                array_element: ArrayElement::FloatArray {
+                                    id: format!("{model_id}-layout{layout_i}-array"),
+                                    array,
+                                },
+                                technique_common: TechniqueCommon {
+                                    elements: vec![TechniqueCommonElement::Accessor {
+                                        count: index_bound.into(),
+                                        source: format!("#{model_id}-layout{layout_i}-array"),
+                                        stride: 3,
+                                        params: vec![
+                                            Param {
+                                                name: "X".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                            Param {
+                                                name: "Y".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                            Param {
+                                                name: "Z".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                        ],
+                                    }],
+                                },
+                            });
+
+                            vertices_inputs.push(Input {
+                                semantic: "POSITION".to_owned(),
+                                source: format!("#{model_id}-layout{layout_i}"),
+                            });
+                        }
+
+                        1 => {
+                            if layout.width != 4 && layout.width != 8 {
+                                bail!("Unexpected width for normal {}", layout.width);
+                            }
+                            fn u8_to_f32(b: &u8) -> f32 {
+                                *b as i8 as f32 / 128.0
+                            }
+                            let array: Vec<f32> = data
+                                .chunks(layout.width.into())
+                                .flat_map(|c| &c[0..3])
+                                .map(u8_to_f32)
+                                .collect();
+                            sources.push(Source {
+                                id: format!("{model_id}-layout{layout_i}"),
+                                array_element: ArrayElement::FloatArray {
+                                    id: format!("{model_id}-layout{layout_i}-array"),
+                                    array,
+                                },
+                                technique_common: TechniqueCommon {
+                                    elements: vec![TechniqueCommonElement::Accessor {
+                                        count: index_bound.into(),
+                                        source: format!("#{model_id}-layout{layout_i}-array"),
+                                        stride: 3,
+                                        params: vec![
+                                            Param {
+                                                name: "X".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                            Param {
+                                                name: "Y".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                            Param {
+                                                name: "Z".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                        ],
+                                    }],
+                                },
+                            });
+
+                            primitive_inputs.push(SharedInput {
+                                semantic: "NORMAL".to_owned(),
+                                source: format!("#{model_id}-layout{layout_i}"),
+                                offset: 0,
+                                set: None,
+                            });
+
+                            if layout.width == 8 {
+                                let array: Vec<f32> = data
+                                    .chunks(layout.width.into())
+                                    .flat_map(|c| &c[4..7])
+                                    .map(u8_to_f32)
+                                    .collect();
+                                sources.push(Source {
+                                    id: format!("{model_id}-layout{layout_i}tangent"),
+                                    array_element: ArrayElement::FloatArray {
+                                        id: format!("{model_id}-layout{layout_i}tangent-array"),
+                                        array,
+                                    },
+                                    technique_common: TechniqueCommon {
+                                        elements: vec![TechniqueCommonElement::Accessor {
+                                            count: index_bound.into(),
+                                            source: format!(
+                                                "#{model_id}-layout{layout_i}tangent-array"
+                                            ),
+                                            stride: 3,
+                                            params: vec![
+                                                Param {
+                                                    name: "X".to_owned(),
+                                                    type_: "float".to_owned(),
+                                                },
+                                                Param {
+                                                    name: "Y".to_owned(),
+                                                    type_: "float".to_owned(),
+                                                },
+                                                Param {
+                                                    name: "Z".to_owned(),
+                                                    type_: "float".to_owned(),
+                                                },
+                                            ],
+                                        }],
+                                    },
+                                });
+
+                                primitive_inputs.push(SharedInput {
+                                    semantic: "TANGENT".to_owned(),
+                                    source: format!("#{model_id}-layout{layout_i}tangent"),
+                                    offset: 0,
+                                    set: None,
+                                });
+                            }
+                        }
+                        2 | 3 => {
+                            if layout.width != 4 {
+                                bail!("Unexpected width for texcoord {}", layout.width);
+                            }
+
+                            let array: Vec<f32> = data
+                                .chunks(2)
+                                .enumerate()
+                                .map(|(index, c)| {
+                                    let v = f16::from_le_bytes(c.try_into().unwrap()).to_f32();
+                                    if index % 2 == 0 {
+                                        v
+                                    } else {
+                                        1.0 - v
+                                    }
+                                })
+                                .collect();
+
+                            sources.push(Source {
+                                id: format!("{model_id}-layout{layout_i}"),
+                                array_element: ArrayElement::FloatArray {
+                                    id: format!("{model_id}-layout{layout_i}-array"),
+                                    array,
+                                },
+                                technique_common: TechniqueCommon {
+                                    elements: vec![TechniqueCommonElement::Accessor {
+                                        count: index_bound.into(),
+                                        source: format!("#{model_id}-layout{layout_i}-array"),
+                                        stride: 2,
+                                        params: vec![
+                                            Param {
+                                                name: "U".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                            Param {
+                                                name: "V".to_owned(),
+                                                type_: "float".to_owned(),
+                                            },
+                                        ],
+                                    }],
+                                },
+                            });
+
+                            primitive_inputs.push(SharedInput {
+                                semantic: "TEXCOORD".to_owned(),
+                                source: format!("#{model_id}-layout{layout_i}"),
+                                offset: 0,
+                                set: Some(if layout.usage == 2 { 0 } else { 1 }),
+                            });
+                        }
+                        _ => (),
+                    }
+                }
+
+                let vertices = Vertices {
+                    id: format!("{model_id}-vertices"),
+                    inputs: vertices_inputs,
+                };
+                let primitive_elements = vec![PrimitiveElements::Triangles {
+                    count: u32::try_from(indices.len() / 3)?,
+                    inputs: primitive_inputs,
+                    p: indices,
+                }];
+
+                let geometry = Geometry {
+                    id: model_id.clone(),
+                    geometric_element: GeometricElement::Mesh {
+                        sources,
+                        vertices,
+                        primitive_elements,
+                    },
+                };
+                geometries.push(geometry);
+
+                visual_scene.nodes.push(Node {
+                    id: format!("{model_id}-node"),
+                    instance_geometries: vec![InstanceGeometry {
+                        url: format!("#{model_id}"),
+                    }],
+                });
+            }
+        }
+
+        let library_geometries = Library::LibraryGeometries { geometries };
+        let library_visual_scenes = Library::LibraryVisualScenes {
+            visual_scenes: vec![visual_scene],
+        };
+
+        let collada = Collada {
+            asset: Asset {
+                created: "2022-06-19T15:05:15".to_owned(),
+                modified: "2022-06-19T15:05:15".to_owned(),
+            },
+            libraries: vec![library_geometries, library_visual_scenes],
+            scene: Scene {
+                instance_visual_scene: "#scene".to_owned(),
+            },
+        };
+
+        collada.save(Path::new(&output))
     }
 }
