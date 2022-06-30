@@ -618,11 +618,11 @@ impl Tdb {
         println!("attribute_list_count = {}", attribute_list_count);
         println!("data_attribute_list_count = {}", data_attribute_list_count);
         println!("q_count = {}", q_count);
-
-        if file.read_u32()? != 0 {
-            bail!("Expected 0");
-        }
         */
+        //if file.read_u32()? != 0 {
+        //    bail!("Expected 0");
+        //}
+        //
 
         let app_entry = file.read_u32()?; //appEntry
         let string_table_len = file.read_u32()?;
@@ -647,6 +647,30 @@ impl Tdb {
         let heap_offset = file.read_u64()? - base_address;
         let q_offset = file.read_u64()? - base_address;
         let _ = file.read_u64()?;
+
+        /*
+        eprintln!("app_entry = {}", app_entry);
+        eprintln!("string_table_len = {}", string_table_len);
+        eprintln!("heap_len = {}", heap_len);
+        eprintln!("assembly_offset = {}", assembly_offset);
+        eprintln!("type_instance_offset = {}", type_instance_offset);
+        eprintln!("type_offset = {}", type_offset);
+        eprintln!("method_membership_offset = {}", method_membership_offset);
+        eprintln!("method_offset = {}", method_offset);
+        eprintln!("field_membership_offset = {}", field_membership_offset);
+        eprintln!("field_offset = {}", field_offset);
+        eprintln!("property_membership_offset = {}", property_membership_offset);
+        eprintln!("property_offset = {}", property_offset);
+        eprintln!("event_offset = {}", event_offset);
+        eprintln!("param_offset = {}", param_offset);
+        eprintln!("attribute_offset = {}", attribute_offset);
+        eprintln!("constant_offset = {}", constant_offset);
+        eprintln!("attribute_list_offset = {}", attribute_list_offset);
+        eprintln!("data_attribute_list_offset = {}", data_attribute_list_offset);
+        eprintln!("string_table_offset = {}", string_table_offset);
+        eprintln!("heap_offset = {}", heap_offset);
+        eprintln!("q_offset = {}", q_offset);
+        */
 
         struct Assembly {
             name_offset: u32,
@@ -692,6 +716,7 @@ impl Tdb {
             dearrayize_type_instance_index: usize,
             type_index: usize,
             special_type_id: u64,
+            type_size: u32,
             b: u32,
             interface_list_offset: usize,
             method_membership_start_index: usize,
@@ -705,6 +730,8 @@ impl Tdb {
             property_membership_start_index: usize,
             property_count: usize,
             default_ctor_method_membership_index: usize,
+            native_type_ptr: u64,
+            managed_vtable_ptr: u64,
         }
         file.seek_assert_align_up(type_instance_offset, 16)?;
         let type_instances = (0..type_instance_count)
@@ -724,8 +751,8 @@ impl Tdb {
                 ) = file.read_u64()?.bit_split((18, 18, 18, 10));
 
                 let flags = file.read_u32()?; //type_flags
-                let x = file.read_u32()?; //size {zero when its not runtime}
-                if x != 0 {
+                let type_size = file.read_u32()?; //size {zero when its not runtime}
+                if type_size != 0 {
                     // bail!("Expected 0: {}", index);
                 }
                 let hash = file.read_u32()?; 
@@ -742,12 +769,12 @@ impl Tdb {
                 let interface_list_offset = file.read_u32()?;
                 let template_argument_list_offset = file.read_u32()?;
 
-                let x = file.read_u64()?; //type {zero when its not runtime}
-                if x != 0 {
+                let native_type_ptr = file.read_u64()?; //nativetype {zero when its not runtime}
+                if native_type_ptr != 0 {
                     //bail!("Expected 0: {}", index);
                 }
-                let x = file.read_u64()?; //managed_vt {zero when its not runtime}
-                if x != 0 {
+                let managed_vtable_ptr = file.read_u64()?; //managed_vt {zero when its not runtime}
+                if managed_vtable_ptr != 0 {
                     //bail!("Expected 0: {}", index);
                 }
                 Ok(TypeInstance {
@@ -759,6 +786,7 @@ impl Tdb {
                     dearrayize_type_instance_index: dearrayize_type_instance_index.try_into()?,
                     type_index: type_index.try_into()?,
                     special_type_id,
+                    type_size,
                     b, //vt byte pool?
                     interface_list_offset: interface_list_offset.try_into()?,
                     method_membership_start_index: method_membership_start_index.try_into()?,
@@ -773,6 +801,8 @@ impl Tdb {
                     property_membership_start_index: property_membership_start_index.try_into()?,
                     default_ctor_method_membership_index: default_ctor_method_membership_index
                         .try_into()?,
+                    native_type_ptr,
+                    managed_vtable_ptr,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -1555,6 +1585,10 @@ impl Tdb {
             println!(
                 "    // staticFieldSize={}, interfaceId={}, nativeVTableCount={}, attribute_list_index={}, vtableCount={}",
                 ty.static_field_size, ty.interface_id, ty.native_vtable_count, ty.attribute_list_index, ty.vtable_count
+            );
+            println!(
+                "    // type_size={}, native_type_ptr={}, managed_vtable_ptr={}",
+                type_instance.type_size, type_instance.native_type_ptr, type_instance.managed_vtable_ptr
             );
 
             println!();
