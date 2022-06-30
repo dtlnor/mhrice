@@ -567,10 +567,13 @@ fn display_param_attributes(attributes: ParamAttribute) -> String {
     s
 }
 
-pub struct Tdb {}
-
 #[allow(unused_variables, dead_code)]
-pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) -> Result<Tdb> {
+pub fn print<F: Read + Seek>(
+    mut file: F,
+    base_address: u64,
+    map: Option<String>,
+    options: crate::TdbOptions,
+) -> Result<()> {
     if &file.read_magic()? != b"TDB\0" {
         bail!("Wrong magic for TDB file");
     }
@@ -595,12 +598,10 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
     let param_count = file.read_u32()?;
     let attribute_count = file.read_u32()?;
     let constant_count = file.read_u32()?;
-    let (attribute_list_count, data_attribute_list_count) =
-        file.read_u32()?.bit_split((16, 16));
+    let (attribute_list_count, data_attribute_list_count) = file.read_u32()?.bit_split((16, 16));
     let q_count = file.read_u32()?;
     let assembly_count = file.read_u32()?;
 
-    let dev_entry = file.read_u32()?;
     /*
     println!("type_instance_count = {}", type_instance_count);
     println!("method_membership_count = {}", method_membership_count);
@@ -618,12 +619,12 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
     println!("data_attribute_list_count = {}", data_attribute_list_count);
     println!("q_count = {}", q_count);
     */
-    //if file.read_u32()? != 0 {
-    //    bail!("Expected 0");
-    //}
-    //
 
-    let app_entry = file.read_u32()?; //appEntry
+    if file.read_u32()? != 0 { //dev_entry
+        //bail!("Expected 0");
+    }
+
+    let app_entry = file.read_u32()?;
     let string_table_len = file.read_u32()?;
     let heap_len = file.read_u32()?;
 
@@ -1208,8 +1209,7 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
             let (template_type_instance_index, targ_count) =
                 template_argument_list.read_u32()?.bit_split((18, 14));
 
-            let template_type_instance_index: usize =
-                template_type_instance_index.try_into()?;
+            let template_type_instance_index: usize = template_type_instance_index.try_into()?;
             if template_type_instance_index != index {
                 let mut targs = vec![];
                 for _ in 0..targ_count {
@@ -1231,6 +1231,7 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
                 full_name += &targs.join(",");
                 full_name += ">";
             }
+            print!(",");
         }
 
         symbols[index] = Some(full_name.clone());
@@ -1474,7 +1475,6 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
                 let field_type_instance = &type_instances[type_instance_index];
                 let len = types[field_type_instance.type_index].len;
                 let value = &heap[offset..][..len];
-
                 match len {
                     1 => print!(" = 0x{:02X}", value[0]),
                     2 => print!(" = 0x{:04X}", u16::from_le_bytes(value.try_into().unwrap())),
@@ -1505,8 +1505,27 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
         let ty = types
             .get(type_instance.type_index)
             .context("Type index out of bound")?;
+
         println!("/// $Type_Instance[{}]", i);
         let full_name = &symbols[i].as_ref().unwrap();
+
+        #[allow(clippy::collapsible_if)]
+        if options.no_compound {
+            if type_instance.dearrayize_type_instance_index != 0
+                || full_name.contains('!')
+                || full_name.contains('<')
+            {
+                continue;
+            }
+        }
+
+        #[allow(clippy::collapsible_if)]
+        if options.no_system {
+            if full_name.starts_with("System.") {
+                continue;
+            }
+        }
+
         let calc_hash = hash_as_utf8(full_name);
         if i != 0 && calc_hash != type_instance.hash {
             bail!("Mismatched hash for TI[{}]", i)
@@ -1516,8 +1535,9 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
             print_attributes(attribute_lists[ty.attribute_list_index], false)?;
             println!();
         }
-        print!("{}", display_type_flag(type_instance.flags));
-
+        if !options.no_type_flag {
+            print!("{}", display_type_flag(type_instance.flags));
+        }
         println!(
             "{}: {}",
             full_name,
@@ -1552,8 +1572,7 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
         println!("    // Special(systemTypeId) = {}", type_instance.special_type_id);
 
         if type_instance.template_argument_list_offset != 0 {
-            let mut template_argument_list =
-                &heap[type_instance.template_argument_list_offset..];
+            let mut template_argument_list = &heap[type_instance.template_argument_list_offset..];
             let (template_type_instance_id, targ_count) =
                 template_argument_list.read_u32()?.bit_split((18, 14));
             let template_type_instance_id: usize = template_type_instance_id.try_into()?;
@@ -1566,7 +1585,7 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
                     let flag = template_argument_list.read_u32()?;
                     let name_offset = template_argument_list.read_u32()?;
                     println!(
-                        "    // param {}, 0x{:08X}",
+                        "     // param {}, 0x{:08X}",
                         read_string(name_offset)?,
                         flag
                     );
@@ -1658,7 +1677,7 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
                 println!(",");
             }
 
-            let address = if method_membership.address != 0 {
+            let address = if !options.no_runtime && method_membership.address != 0 {
                 function_map
                     .entry(method_membership.address)
                     .or_default()
@@ -1771,5 +1790,5 @@ pub fn new<F: Read + Seek>(mut file: F, base_address: u64, map: Option<String>) 
         }
     }
 
-    Ok(Tdb {})
+    Ok(())
 }
