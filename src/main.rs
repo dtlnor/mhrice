@@ -43,7 +43,6 @@ use pak::*;
 use pfb::*;
 use rcol::*;
 use scn::*;
-use tdb::*;
 use tex::*;
 use user::*;
 use uvs::*;
@@ -53,7 +52,7 @@ pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
-const TDB_ANCHOR: &[u8] = b"TDB\0\x46\0\0\0";
+const TDB_ANCHOR: &[u8] = b"TDB\0\x47\0\0\0";
 
 pub static CONFIG: Lazy<HashMap<String, String>> = Lazy::new(|| {
     let mut config = HashMap::new();
@@ -84,6 +83,25 @@ pub fn get_config(key: &str) -> Option<String> {
         return Some(value);
     }
     CONFIG.get(key).map(|s| s.to_string())
+}
+
+#[derive(clap::Parser)]
+pub struct TdbOptions {
+    /// Don't output runtime addresses
+    #[clap(long)]
+    pub no_runtime: bool,
+
+    /// Remove classes in System namespace
+    #[clap(long)]
+    pub no_system: bool,
+
+    /// Remove template instantiation and array
+    #[clap(long)]
+    pub no_compound: bool,
+
+    /// Remove type flags
+    #[clap(long)]
+    pub no_type_flag: bool,
 }
 
 #[derive(clap::Parser)]
@@ -148,6 +166,9 @@ enum Mhrice {
         /// Path to a TDB file, or a binary that contains one
         #[clap(short, long)]
         tdb: String,
+
+        #[clap(flatten)]
+        options: TdbOptions,
     },
 
     /// Print messages from a MSG file
@@ -188,11 +209,16 @@ enum Mhrice {
         pattern: String,
     },
 
-    /// Scan the PAK file and print all potential sub-file names
+    /// Scan the PAK file as well as optionally full minidump samples
+    /// and print all potential sub-file names
     SearchPath {
         /// Path to the PAK file
         #[clap(short, long)]
         pak: Vec<String>,
+
+        /// Path to the full minidump files
+        #[clap(short, long)]
+        dmp: Vec<String>,
     },
 
     /// Dump all sub-files from the PAK file
@@ -344,6 +370,9 @@ enum Mhrice {
         /// Specify this to skip search the entire minidump
         #[clap(short, long)]
         address: Option<String>,
+
+        #[clap(flatten)]
+        options: TdbOptions,
     },
 
     /// Print information of a SCN file
@@ -571,7 +600,7 @@ impl<F: Seek> Seek for OffsetFile<F> {
     }
 }
 
-fn read_tdb(tdb: String) -> Result<()> {
+fn read_tdb(tdb: String, options: TdbOptions) -> Result<()> {
     let mut file = BufReader::new(File::open(tdb)?);
     let offset = loop {
         let mut magic = vec![0; TDB_ANCHOR.len()];
@@ -583,7 +612,7 @@ fn read_tdb(tdb: String) -> Result<()> {
         }
     };
 
-    let _ = Tdb::new(OffsetFile::new(file, offset)?, 0, None)?;
+    tdb::print(OffsetFile::new(file, offset)?, 0, None, options)?;
     Ok(())
 }
 
@@ -636,11 +665,17 @@ impl<'a> Seek for MinidumpReader<'a> {
     }
 }
 
-fn read_dmp_tdb(dmp: String, map: Option<String>, address: Option<String>) -> Result<()> {
+fn read_dmp_tdb(
+    dmp: String,
+    map: Option<String>,
+    address: Option<String>,
+    options: TdbOptions,
+) -> Result<()> {
     let dmp = Minidump::read_path(dmp).map_err(|e| anyhow!(e))?;
     let memory = dmp
         .get_stream::<MinidumpMemory64List>()
-        .map_err(|e| anyhow!(e))?;
+        .map_err(|e| anyhow!(e))
+        .context("No full dump memory found")?;
 
     if let Some(address) = address {
         let base = if let Some(hex) = address.strip_prefix("0x") {
@@ -650,7 +685,7 @@ fn read_dmp_tdb(dmp: String, map: Option<String>, address: Option<String>) -> Re
         };
         let file = OffsetFile::new(MinidumpReader::new(&memory), base)?;
 
-        let _ = Tdb::new(file, base, map)?;
+        tdb::print(file, base, map, options)?;
 
         return Ok(());
     }
@@ -665,7 +700,7 @@ fn read_dmp_tdb(dmp: String, map: Option<String>, address: Option<String>) -> Re
             eprintln!("Found at address 0x{base:016X}");
             let file = OffsetFile::new(MinidumpReader::new(&memory), base)?;
 
-            let _ = Tdb::new(file, base, map)?;
+            tdb::print(file, base, map, options)?;
 
             break;
         }
@@ -850,59 +885,127 @@ fn grep(pak: Vec<String>, utf16: bool, mut pattern: String) -> Result<()> {
     Ok(())
 }
 
-fn search_path(pak: Vec<String>) -> Result<()> {
+fn search_path(pak: Vec<String>, dmp: Vec<String>) -> Result<()> {
     let pak = Mutex::new(PakReader::new(open_pak_files(pak)?)?);
     let indexs = pak.lock().unwrap().all_file_indexs();
     let counter = std::sync::atomic::AtomicU32::new(0);
-    let paths: std::collections::BTreeMap<String, Vec<I18nPakFileIndex>> = indexs
-        .into_par_iter()
-        .map(|index| {
-            let file = pak.lock().unwrap().read_file(index)?;
-            let mut paths = vec![];
-            for &suffix in suffix::SUFFIX_MAP.keys() {
-                let mut full_suffix = vec![0; (suffix.len() + 2) * 2];
-                full_suffix[0] = b'.';
-                for (i, &c) in suffix.as_bytes().iter().enumerate() {
-                    full_suffix[i * 2 + 2] = c;
-                }
-                for (suffix_pos, window) in file.windows(full_suffix.len()).enumerate() {
-                    if window != full_suffix {
-                        continue;
-                    }
-                    let end = suffix_pos + full_suffix.len() - 2;
-                    let mut begin = suffix_pos;
-                    loop {
-                        if begin < 2 {
-                            break;
-                        }
-                        let earlier = begin - 2;
-                        if !file[earlier].is_ascii_graphic() && file[earlier] != b' ' {
-                            break;
-                        }
-                        if file[earlier + 1] != 0 {
-                            break;
-                        }
 
-                        begin = earlier;
+    let mut paths: Vec<(String, Vec<I18nPakFileIndex>)> = vec![];
+
+    fn accept_char(c: u8) -> bool {
+        if c == b' ' {
+            return true;
+        }
+        if !c.is_ascii_graphic() {
+            return false;
+        }
+        if br###""*\:<>?*|"###.contains(&c) {
+            return false;
+        }
+        true
+    }
+
+    let search_memory = |memory: &[u8]| {
+        let mut paths = vec![];
+        for &suffix in suffix::SUFFIX_MAP.keys() {
+            let mut full_suffix = vec![0; (suffix.len() + 2) * 2];
+            full_suffix[0] = b'.';
+            for (i, &c) in suffix.as_bytes().iter().enumerate() {
+                full_suffix[i * 2 + 2] = c;
+            }
+            for (suffix_pos, window) in memory.windows(full_suffix.len()).enumerate() {
+                if window != full_suffix {
+                    continue;
+                }
+                let end = suffix_pos + full_suffix.len() - 2;
+                let mut begin = suffix_pos;
+                loop {
+                    if begin < 2 {
+                        break;
                     }
-                    let mut path = String::new();
-                    for pos in (begin..end).step_by(2) {
-                        path.push(char::from(file[pos]));
+                    let earlier = begin - 2;
+                    if !accept_char(memory[earlier]) {
+                        break;
                     }
-                    let index = pak.lock().unwrap().find_file_i18n(&path)?;
-                    paths.push((path, index));
+                    if memory[earlier + 1] != 0 {
+                        break;
+                    }
+
+                    begin = earlier;
+                }
+                let mut path = String::new();
+                for pos in (begin..end).step_by(2) {
+                    path.push(char::from(memory[pos]));
+                }
+                let index = pak.lock().unwrap().find_file_i18n(&path)?;
+                paths.push((path, index));
+            }
+        }
+
+        let counter_prev = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if counter_prev % 100 == 0 {
+            eprintln!("Found {} paths so far", counter_prev)
+        }
+
+        Ok(paths)
+    };
+
+    for dmp in dmp {
+        eprintln!("Scanning {dmp}..");
+
+        let dmp = Minidump::read_path(dmp).map_err(|e| anyhow!(e))?;
+        let memory = dmp
+            .get_stream::<MinidumpMemory64List>()
+            .map_err(|e| anyhow!(e))
+            .context("No full dump memory found")?;
+
+        let mut memory: Vec<_> = memory.iter().collect();
+        // merge memory blocks
+        memory.sort_by_key(|memory| memory.base_address);
+        use std::borrow::*;
+        struct Block<'a> {
+            base: u64,
+            len: u64,
+            data: Cow<'a, [u8]>,
+        }
+
+        let mut memory_blocks: Vec<Block> = vec![];
+        for piece in memory {
+            if let Some(prev) = memory_blocks.last_mut() {
+                if prev.base + prev.len == piece.base_address {
+                    prev.data.to_mut().extend(piece.bytes);
+                    prev.len += piece.size;
+                    continue;
                 }
             }
+            memory_blocks.push(Block {
+                base: piece.base_address,
+                len: piece.size,
+                data: Cow::Borrowed(piece.bytes),
+            })
+        }
 
-            let counter_prev = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            if counter_prev % 100 == 0 {
-                eprintln!("{}", counter_prev)
-            }
+        paths.par_extend(
+            memory_blocks
+                .par_iter()
+                .map(|memory| search_memory(&memory.data))
+                .flat_map_iter(|paths: Result<_>| paths.unwrap()),
+        );
+    }
 
-            Ok(paths)
-        })
-        .flat_map_iter(|paths: Result<_>| paths.unwrap())
-        .collect();
+    eprintln!("Scanning all PAK files..");
+    paths.par_extend(
+        indexs
+            .into_par_iter()
+            .map(|index| {
+                let file = pak.lock().unwrap().read_file(index)?;
+                search_memory(&file)
+            })
+            .flat_map_iter(|paths: Result<_>| paths.unwrap()),
+    );
+
+    paths.sort_by(|(p, _), (q, _)| p.cmp(q));
+    paths.dedup_by(|(p, _), (q, _)| p == q);
 
     for (path, index) in paths {
         println!("{} $ {:?}", path, index);
@@ -1239,7 +1342,7 @@ fn main() -> Result<()> {
         Mhrice::ScanRsz { pak } => scan_rsz(pak),
         Mhrice::GenJson { pak } => gen_json(pak),
         Mhrice::GenWebsite { pak, output } => gen_website(pak, output),
-        Mhrice::ReadTdb { tdb } => read_tdb(tdb),
+        Mhrice::ReadTdb { tdb, options } => read_tdb(tdb, options),
         Mhrice::ReadMsg { msg } => read_msg(msg),
         Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
         Mhrice::GrepMsg { pak, pattern } => grep_msg(pak, pattern),
@@ -1248,7 +1351,7 @@ fn main() -> Result<()> {
             utf16,
             pattern,
         } => grep(pak, utf16, pattern),
-        Mhrice::SearchPath { pak } => search_path(pak),
+        Mhrice::SearchPath { pak, dmp } => search_path(pak, dmp),
         Mhrice::DumpTree { pak, list, output } => dump_tree(pak, list, output),
         Mhrice::ScanMesh { pak } => scan_mesh(pak),
         Mhrice::ScanTex { pak } => scan_tex(pak),
@@ -1273,7 +1376,12 @@ fn main() -> Result<()> {
             Ok(())
         }
         Mhrice::ReadUser { user } => read_user(user),
-        Mhrice::ReadDmpTdb { dmp, map, address } => read_dmp_tdb(dmp, map, address),
+        Mhrice::ReadDmpTdb {
+            dmp,
+            map,
+            address,
+            options,
+        } => read_dmp_tdb(dmp, map, address, options),
         Mhrice::DumpScn { scn } => dump_scn(scn),
         Mhrice::Scene { pak, name } => scene(pak, name),
         Mhrice::TypeInfo { dmp, hash, crc } => type_info(dmp, hash, crc),
