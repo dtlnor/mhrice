@@ -567,6 +567,49 @@ fn display_param_attributes(attributes: ParamAttribute) -> String {
     s
 }
 
+/*
+fn print_bytes(b: &[u8]) {
+    for b in b {
+        print!("{:02x} ", b);
+    }
+    println!()
+}
+
+fn analyze_bits<F: Read + Seek>(mut file: F, offset: u64, count: u32, item_byte_len: usize) {
+    println!();
+    println!("========Analyzing {offset}===========");
+    file.seek_assert_align_up(offset, 16).unwrap();
+    let mut counter = vec![0; item_byte_len * 8];
+    for _ in 0..count {
+        let mut buf = vec![0; item_byte_len];
+        file.read_exact(&mut buf).unwrap();
+        for i in 0..item_byte_len * 8 {
+            if (buf[i / 8] >> (i % 8)) & 1 != 0 {
+                counter[i] += 1;
+            }
+        }
+    }
+
+    for (i, c) in counter.into_iter().enumerate() {
+        if i % 64 == 0 {
+            println!();
+        } else if i % 8 == 0 {
+            print!("  ");
+        }
+
+        let mut freq = ((c as f32 / count as f32) * 100.0).round() as u32;
+        if freq > 99 {
+            freq = 99;
+        }
+        if freq == 0 && c > 1 {
+            freq = 1;
+        }
+        print!("{freq:02} ");
+    }
+    println!()
+}
+*/
+
 #[allow(unused_variables, dead_code)]
 pub fn print<F: Read + Seek>(
     mut file: F,
@@ -578,7 +621,7 @@ pub fn print<F: Read + Seek>(
         bail!("Wrong magic for TDB file");
     }
 
-    if file.read_u32()? != 0x46 {
+    if file.read_u32()? != 0x47 {
         bail!("Wrong version for TDB file");
     }
 
@@ -628,6 +671,31 @@ pub fn print<F: Read + Seek>(
     let string_table_len = file.read_u32()?;
     let heap_len = file.read_u32()?;
 
+    println!("// type_instance_count = {}", type_instance_count);
+    println!("// method_membership_count = {}", method_membership_count);
+    println!("// field_membership_count = {}", field_membership_count);
+    println!("// type_count = {}", type_count);
+    println!("// field_count = {}", field_count);
+    println!("// method_count = {}", method_count);
+    println!("// property_count = {}", property_count);
+    println!(
+        "// property_membership_count = {}",
+        property_membership_count
+    );
+    println!("// event_count = {}", event_count);
+    println!("// param_count = {}", param_count);
+    println!("// attribute_count = {}", attribute_count);
+    println!("// constant_count = {}", constant_count);
+    println!("// attribute_list_count = {}", attribute_list_count);
+    println!(
+        "// data_attribute_list_count = {}",
+        data_attribute_list_count
+    );
+    println!("// q_count = {}", q_count);
+    println!("// assembly_count = {}", assembly_count);
+    println!("// string_table_len = {}", string_table_len);
+    println!("// heap_len = {}", heap_len);
+
     let assembly_offset = file.read_u64()? - base_address;
     let type_instance_offset = file.read_u64()? - base_address;
     let type_offset = file.read_u64()? - base_address;
@@ -648,29 +716,23 @@ pub fn print<F: Read + Seek>(
     let q_offset = file.read_u64()? - base_address;
     let _ = file.read_u64()?;
 
-    /*
-    eprintln!("app_entry = {}", app_entry);
-    eprintln!("string_table_len = {}", string_table_len);
-    eprintln!("heap_len = {}", heap_len);
-    eprintln!("assembly_offset = {}", assembly_offset);
-    eprintln!("type_instance_offset = {}", type_instance_offset);
-    eprintln!("type_offset = {}", type_offset);
-    eprintln!("method_membership_offset = {}", method_membership_offset);
-    eprintln!("method_offset = {}", method_offset);
-    eprintln!("field_membership_offset = {}", field_membership_offset);
-    eprintln!("field_offset = {}", field_offset);
-    eprintln!("property_membership_offset = {}", property_membership_offset);
-    eprintln!("property_offset = {}", property_offset);
-    eprintln!("event_offset = {}", event_offset);
-    eprintln!("param_offset = {}", param_offset);
-    eprintln!("attribute_offset = {}", attribute_offset);
-    eprintln!("constant_offset = {}", constant_offset);
-    eprintln!("attribute_list_offset = {}", attribute_list_offset);
-    eprintln!("data_attribute_list_offset = {}", data_attribute_list_offset);
-    eprintln!("string_table_offset = {}", string_table_offset);
-    eprintln!("heap_offset = {}", heap_offset);
-    eprintln!("q_offset = {}", q_offset);
-    */
+    println!("// type_instance_offset = {type_instance_offset}");
+    println!("// type_offset = {type_offset}");
+    println!("// method_membership_offset = {method_membership_offset}");
+    println!("// method_offset = {method_offset}");
+    println!("// field_membership_offset = {field_membership_offset}");
+    println!("// field_offset = {field_offset}");
+    println!("// property_membership_offset = {property_membership_offset}");
+    println!("// property_offset = {property_offset}");
+    println!("// event_offset = {event_offset}");
+    println!("// param_offset = {param_offset}");
+    println!("// attribute_offset = {attribute_offset}");
+    println!("// constant_offset = {constant_offset}");
+    println!("// attribute_list_offset = {attribute_list_offset}");
+    println!("// data_attribute_list_offset = {data_attribute_list_offset}");
+    println!("// string_table_offset = {string_table_offset}");
+    println!("// heap_offset = {heap_offset}");
+    println!("// q_offset = {q_offset}");
 
     struct Assembly {
         name_offset: u32,
@@ -707,40 +769,47 @@ pub fn print<F: Read + Seek>(
         })
         .collect::<Result<Vec<_>>>()?;
 
+    #[derive(Debug)]
     struct TypeInstance {
         base_type_instance_index: usize,
         parent_type_instance_index: usize,
-        underlying_type: u64,
-        object_type: u64,
-        arrayize_type_instance_index: usize, 
+        // a3
+        arrayize_type_instance_index: usize,
         dearrayize_type_instance_index: usize,
         type_index: usize,
         special_type_id: u64,
-        type_size: u32,
-        b: u32,
-        interface_list_offset: usize,
+
+        hash: u32,
+
+        ctor_method_membership_index: usize,
         method_membership_start_index: usize,
         field_membership_start_index: usize,
-        template_argument_list_offset: usize,
-        hash: u32,
-        crc32: u32,
-        flags: TypeFlag,
-        event_start_index: usize,
-        event_count: usize,
-        property_membership_start_index: usize,
+
         property_count: usize,
-        default_ctor_method_membership_index: usize,
-        native_type_ptr: u64,
-        managed_vtable_ptr: u64,
+        property_membership_start_index: usize,
+        d2_into_heap: usize,
+        d3: u64,
+        array_rank: u64,
+
+        interface_list_offset: usize,
+        template_argument_list_offset: usize,
+        e2: u64,
     }
     file.seek_assert_align_up(type_instance_offset, 16)?;
     let type_instances = (0..type_instance_count)
         .map(|i| {
-            let (index, base_type_instance_index, parent_type_instance_index, underlying_type, object_type) =
-                file.read_u64()?.bit_split((18, 18, 18, 7, 3));
+            let (index, base_type_instance_index, parent_type_instance_index, a3) =
+                file.read_u64()?.bit_split((19, 19, 19, 7));
 
             if index != u64::from(i) {
                 bail!("Unexpected index");
+            }
+
+            if base_type_instance_index >= type_instance_count.into() {
+                bail!("base_type_instance_index out of bound")
+            }
+            if parent_type_instance_index >= type_instance_count.into() {
+                bail!("parent_type_instance_index out of bound")
             }
 
             let (
@@ -748,61 +817,85 @@ pub fn print<F: Read + Seek>(
                 dearrayize_type_instance_index,
                 type_index,
                 special_type_id,
-            ) = file.read_u64()?.bit_split((18, 18, 18, 10));
+            ) = file.read_u64()?.bit_split((19, 19, 18, 8));
 
-            let flags = file.read_u32()?; //type_flags
-            let type_size = file.read_u32()?; //size {zero when its not runtime}
-            if type_size != 0 {
-                // bail!("Expected 0: {}", index);
+            if arrayize_type_instance_index >= type_instance_count.into() {
+                bail!("arrayize_type_instance_index out of bound")
             }
-            let hash = file.read_u32()?; 
-            let crc32 = file.read_u32()?;
-
-            let default_ctor_method_membership_index = file.read_u32()?;
-            let b = file.read_u32()?; //vt
-            let method_membership_start_index = file.read_u32()?;
-            let field_membership_start_index = file.read_u32()?;
-
-            let (property_count, property_membership_start_index) =
-                file.read_u32()?.bit_split((12, 20));
-            let (event_count, event_start_index) = file.read_u32()?.bit_split((12, 20));
-            let interface_list_offset = file.read_u32()?;
-            let template_argument_list_offset = file.read_u32()?;
-
-            let native_type_ptr = file.read_u64()?; //nativetype {zero when its not runtime}
-            if native_type_ptr != 0 {
-                //bail!("Expected 0: {}", index);
+            if dearrayize_type_instance_index >= type_instance_count.into() {
+                bail!("dearrayize_type_instance_index out of bound")
             }
-            let managed_vtable_ptr = file.read_u64()?; //managed_vt {zero when its not runtime}
-            if managed_vtable_ptr != 0 {
-                //bail!("Expected 0: {}", index);
+
+            if type_index >= type_count.into() {
+                bail!("type_index out of bound")
             }
+
+            let flag = file.read_u32()?;
+            let _ = file.read_u32()?;
+            let hash = file.read_u32()?;
+            let crc = file.read_u32()?;
+
+            let (
+                ctor_method_membership_index,
+                method_membership_start_index,
+                field_membership_start_index,
+            ) = file.read_u64()?.bit_split((22, 22, 20));
+
+            if ctor_method_membership_index >= method_membership_count.into() {
+                bail!("ctor_method_membership_index out of bound")
+            }
+
+            if method_membership_start_index >= method_membership_count.into() {
+                bail!("method_membership_start_index out of bound")
+            }
+
+            if field_membership_start_index >= field_membership_count.into() {
+                bail!("field_membership_start_index out of bound")
+            }
+
+            let (property_count, property_membership_start_index, d2_into_heap, d3, array_rank) =
+                file.read_u64()?.bit_split((12, 20, 26, 3, 3));
+            if property_membership_start_index >= property_membership_count.into() {
+                bail!("property_membership_index out of bound")
+            }
+
+            let (interface_list_offset, template_argument_list_offset, e2) =
+                file.read_u64()?.bit_split((26, 26, 12));
+
+            if template_argument_list_offset >= heap_len.into() {
+                bail!("template_argument_list_offset out of bound")
+            }
+
+            if interface_list_offset >= heap_len.into() {
+                bail!("interface_list_offset out of bound")
+            }
+
+            let _ = file.read_u64()?;
+            let _ = file.read_u64()?;
+
             Ok(TypeInstance {
                 base_type_instance_index: base_type_instance_index.try_into()?,
                 parent_type_instance_index: parent_type_instance_index.try_into()?,
-                underlying_type, //new //base tyoe of <T>
-                object_type, //new
                 arrayize_type_instance_index: arrayize_type_instance_index.try_into()?,
                 dearrayize_type_instance_index: dearrayize_type_instance_index.try_into()?,
                 type_index: type_index.try_into()?,
                 special_type_id,
-                type_size,
-                b, //vt byte pool?
-                interface_list_offset: interface_list_offset.try_into()?,
+
+                hash,
+
+                ctor_method_membership_index: ctor_method_membership_index.try_into()?,
                 method_membership_start_index: method_membership_start_index.try_into()?,
                 field_membership_start_index: field_membership_start_index.try_into()?,
-                template_argument_list_offset: template_argument_list_offset.try_into()?,
-                hash,
-                crc32,
-                flags: TypeFlag::from_bits(flags).context("Unknown type flag")?,
-                event_start_index: event_start_index.try_into()?,
-                event_count: event_count.try_into()?,
+
                 property_count: property_count.try_into()?,
                 property_membership_start_index: property_membership_start_index.try_into()?,
-                default_ctor_method_membership_index: default_ctor_method_membership_index
-                    .try_into()?,
-                native_type_ptr,
-                managed_vtable_ptr,
+                d2_into_heap: d2_into_heap.try_into()?,
+                d3,
+                array_rank,
+
+                interface_list_offset: interface_list_offset.try_into()?,
+                template_argument_list_offset: template_argument_list_offset.try_into()?,
+                e2,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -811,14 +904,26 @@ pub fn print<F: Read + Seek>(
         type_instance_index: usize,
         method_index: usize,
         param_list_offset: usize,
-        address: u64,
+        address: u32,
     }
     file.seek_assert_align_up(method_membership_offset, 16)?;
     let method_memberships = (0..method_membership_count)
         .map(|_| {
-            let (type_instance_index, method_index, param_list_offset) =
-                file.read_u64()?.bit_split((18, 20, 26));
-            let address = file.read_u64()?;
+            let (type_instance_index, param_list_offset_lo) = file.read_u32()?.bit_split((19, 13));
+            let (method_index, param_list_offset_hi) = file.read_u32()?.bit_split((19, 13));
+            let address = file.read_u32()?;
+            let param_list_offset = param_list_offset_lo | (param_list_offset_hi << 13);
+
+            if type_instance_index >= type_instance_count {
+                bail!("type_instance_index out of bound");
+            }
+            if method_index >= method_count {
+                bail!("method index out of bound");
+            }
+            if param_list_offset >= heap_len {
+                bail!("param_list_offset out of bound")
+            }
+
             Ok(MethodMembership {
                 type_instance_index: type_instance_index.try_into()?,
                 method_index: method_index.try_into()?,
@@ -829,42 +934,65 @@ pub fn print<F: Read + Seek>(
         .collect::<Result<Vec<_>>>()?;
 
     struct FieldMembership {
-        type_instance_index: usize,
+        parent_type_instance_index: usize,
+        field_type_instance_index: usize,
         field_index: usize,
-        position: u64,
+        constant_index_hi: u32,
+        attribute_hi: FieldAttribute,
     }
     file.seek_assert_align_up(field_membership_offset, 16)?;
     let field_memberships = (0..field_membership_count)
         .map(|_| {
-            let (type_instance_index, field_index, position) =
-                file.read_u64()?.bit_split((18, 20, 26));
+            let (
+                parent_type_instance_index,
+                field_index,
+                field_type_instance_index,
+                constant_index_hi,
+                attribute_hi,
+            ) = file.read_u64()?.bit_split((19, 19, 19, 6, 1));
+
+            if parent_type_instance_index >= type_instance_count.into() {
+                bail!("parent_type_instance_index out of bound");
+            }
+
+            if field_index >= field_count.into() {
+                bail!("field_index out of bound");
+            }
+
+            if field_type_instance_index >= type_instance_count.into() {
+                bail!("field_type_instance_index out of bound");
+            }
+
             Ok(FieldMembership {
-                type_instance_index: type_instance_index.try_into()?,
+                parent_type_instance_index: parent_type_instance_index.try_into()?,
                 field_index: field_index.try_into()?,
-                position,
+                field_type_instance_index: field_type_instance_index.try_into()?,
+                constant_index_hi: constant_index_hi.try_into()?,
+                attribute_hi: FieldAttribute::from_bits((attribute_hi << 15).try_into()?)
+                    .context("Unknown field attr")?,
             })
         })
         .collect::<Result<Vec<_>>>()?;
 
+    #[derive(Debug)]
     struct Type {
         name_offset: u32,
         namespace_offset: u32,
         len: usize,
-        static_field_size: u32,
+        static_len: u32,
 
-        assembly_index: u8,
-        array_dimension: u8,
+        //assembly_index: u8,
+        // array_dimension: u8,
         method_count: usize,
 
         field_count: usize,
-
-        interface_id: i16,
-        native_vtable_count: u16,
+        //n4: u16,
+        // n5: u16,
         attribute_list_index: usize,
-        vtable_count: u16,
+        // n7: u16,
 
-        flag_a: u64,
-        flag_b: u64,
+        // flag_a: u64,
+        //flag_b: u64,
     }
 
     file.seek_assert_align_up(type_offset, 16)?;
@@ -873,34 +1001,25 @@ pub fn print<F: Read + Seek>(
             let name_offset = file.read_u32()?;
             let namespace_offset = file.read_u32()?;
             let len = file.read_u32()?;
-            let static_field_size = file.read_u32()?;
+            let static_len = file.read_u32()?;
 
-            let assembly_index = file.read_u8()?;
-            let array_dimension = file.read_u8()?;
+            let (attribute_list_index, a, field_count, b) =
+                file.read_u64()?.bit_split((17, 16, 24, 7));
             let method_count = file.read_u16()?;
-            let field_count = file.read_u32()?;
-            let interface_id = file.read_i16()?;
-            let native_vtable_count = file.read_u16()?;
-            let attribute_list_index = file.read_u16()?;
-            let vtable_count = file.read_u16()?;
+            let _ = file.read_u16()?;
+            let _ = file.read_u16()?;
+            let _ = file.read_u16()?;
 
-            let flag_a = file.read_u64()?;
-            let flag_b = file.read_u64()?;
+            let _ = file.read_u64()?;
+            let _ = file.read_u64()?;
             Ok(Type {
                 name_offset,
                 namespace_offset,
                 len: len.try_into()?,
-                static_field_size,
-                assembly_index,
-                array_dimension,
+                static_len,
                 method_count: method_count.try_into()?,
                 field_count: field_count.try_into()?,
-                interface_id,
-                native_vtable_count,
                 attribute_list_index: attribute_list_index.try_into()?,
-                vtable_count,
-                flag_a,
-                flag_b,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -935,26 +1054,32 @@ pub fn print<F: Read + Seek>(
     struct Field {
         attribute_list_index: usize,
         attributes: FieldAttribute,
-        type_instance_index: usize,
-        constant_index: usize,
-        constant_index_hi: u32,
+        constant_index_lm: u32,
         name_offset: u32,
     }
     file.seek_assert_align_up(field_offset, 16)?;
     let fields = (0..field_count)
         .map(|_| {
-            let attribute_list_index = file.read_u16()?;
-            let attributes = file.read_u16()?; //flags
-            let (type_instance_index, constant_index_lo) = file.read_u32()?.bit_split((18, 14));
-            let (name_offset, constant_index_hi) = file.read_u32()?.bit_split((30, 2));
-            let constant_index = (constant_index_hi << 14) | constant_index_lo;
+            let (attribute_list_index, attributes) = file.read_u32()?.bit_split((17, 15));
+            let (position, constant_index_low) = file.read_u32()?.bit_split((26, 6));
+            let (name_offset, constant_index_mid) = file.read_u32()?.bit_split((28, 4));
+
+            if attribute_list_index >= data_attribute_list_count {
+                bail!("attribute_list_index out of bound")
+            }
+
+            if name_offset >= string_table_len {
+                bail!("name_offset out of bound")
+            }
+
+            let constant_index_lm = constant_index_low | (constant_index_mid << 6);
+            let attributes = attributes as u16; //?
+
             Ok(Field {
                 attribute_list_index: attribute_list_index.try_into()?,
                 attributes: FieldAttribute::from_bits(attributes)
                     .context("Unknown field attribute")?,
-                type_instance_index: type_instance_index.try_into()?,
-                constant_index: constant_index.try_into()?,
-                constant_index_hi,
+                constant_index_lm,
                 name_offset,
             })
         })
@@ -1050,7 +1175,24 @@ pub fn print<F: Read + Seek>(
             let attribute_list_index = file.read_u16()?;
             let default_const_index = file.read_u16()?;
             let (name_offset, modifier) = file.read_u32()?.bit_split((30, 2));
-            let (type_instance_index, attribute) = file.read_u32()?.bit_split((18, 14));
+            let (type_instance_index, attribute) = file.read_u32()?.bit_split((19, 13));
+
+            if u32::from(attribute_list_index) >= attribute_list_count {
+                bail!("attribute_list_index out of bound")
+            }
+
+            if u32::from(default_const_index) >= constant_count {
+                bail!("defualt_const_index out of bound")
+            }
+
+            if name_offset >= string_table_len {
+                bail!("name out of bound")
+            }
+
+            if type_instance_index >= type_instance_count {
+                bail!("type_instance_index out of bound")
+            }
+
             Ok(Param {
                 attribute_list_index: attribute_list_index.try_into()?,
                 default_const_index: default_const_index.try_into()?,
@@ -1160,7 +1302,7 @@ pub fn print<F: Read + Seek>(
             .context(format!("Build dearrayize symbol for {}", index))?;
 
             let mut suffix = "[".to_string();
-            for _ in 1..ty.array_dimension {
+            for _ in 1..ti.array_rank {
                 suffix += ","
             }
             suffix += "]";
@@ -1206,8 +1348,9 @@ pub fn print<F: Read + Seek>(
 
         if ti.template_argument_list_offset != 0 {
             let mut template_argument_list = &heap[ti.template_argument_list_offset..];
+
             let (template_type_instance_index, targ_count) =
-                template_argument_list.read_u32()?.bit_split((18, 14));
+                template_argument_list.read_u32()?.bit_split((19, 13));
 
             let template_type_instance_index: usize = template_type_instance_index.try_into()?;
             if template_type_instance_index != index {
@@ -1495,7 +1638,7 @@ pub fn print<F: Read + Seek>(
         Ok(())
     };
 
-    let mut function_map: BTreeMap<u64, Vec<String>> = BTreeMap::new();
+    let mut function_map: BTreeMap<u32, Vec<String>> = BTreeMap::new();
 
     let mut order: Vec<_> = (0..type_instances.len()).collect();
     order.sort_by_key(|&i| symbols[i].as_ref().unwrap());
@@ -1527,17 +1670,14 @@ pub fn print<F: Read + Seek>(
         }
 
         let calc_hash = hash_as_utf8(full_name);
-        if i != 0 && calc_hash != type_instance.hash {
-            bail!("Mismatched hash for TI[{}]", i)
-        }
-        println!("/// [MMH3(UTF8), CRC]: {:08X} {:08X}", calc_hash, type_instance.crc32); //mmh3utf8
+        println!("/// % {:08X}", type_instance.hash);
         if ty.attribute_list_index != 0 {
             print_attributes(attribute_lists[ty.attribute_list_index], false)?;
             println!();
         }
-        if !options.no_type_flag {
-            print!("{}", display_type_flag(type_instance.flags));
-        }
+        /*if !options.no_type_flag {
+            println!("{}", display_type_flags(type_instance.flags));
+        }*/
         println!(
             "{}: {}",
             full_name,
@@ -1547,11 +1687,15 @@ pub fn print<F: Read + Seek>(
         );
         let is_enum = (symbols[type_instance.base_type_instance_index].as_ref().unwrap()).eq_ignore_ascii_case("System.Enum");
 
+        if i != 0 && calc_hash != type_instance.hash {
+            bail!("Mismatched hash for TI[{}]", i)
+        }
+
         let mut interface_list = &heap[type_instance.interface_list_offset..];
         let interface_count = interface_list.read_u32()?;
         for _ in 0..interface_count {
             let (interface_type_instance_id, interface_vtable_slot_start) =
-                interface_list.read_u32()?.bit_split((18, 14));
+                interface_list.read_u32()?.bit_split((19, 13));
             let interface_type_instance_id: usize = interface_type_instance_id.try_into()?;
             println!(
                 "    ,{} /* ^{} */",
@@ -1561,7 +1705,6 @@ pub fn print<F: Read + Seek>(
         }
 
         println!("{{");
-
         if type_instance.dearrayize_type_instance_index != 0 || full_name.contains('!') {
             println!("    // Omitted ");
             println!("}}");
@@ -1574,7 +1717,7 @@ pub fn print<F: Read + Seek>(
         if type_instance.template_argument_list_offset != 0 {
             let mut template_argument_list = &heap[type_instance.template_argument_list_offset..];
             let (template_type_instance_id, targ_count) =
-                template_argument_list.read_u32()?.bit_split((18, 14));
+                template_argument_list.read_u32()?.bit_split((19, 13));
             let template_type_instance_id: usize = template_type_instance_id.try_into()?;
             println!(
                 "    // Template = {}",
@@ -1600,15 +1743,15 @@ pub fn print<F: Read + Seek>(
 
         println!("    // fieldSize: {}", ty.len);
 
-        println!(
-            "    // staticFieldSize={}, interfaceId={}, nativeVTableCount={}, attribute_list_index={}, vtableCount={}",
-            ty.static_field_size, ty.interface_id, ty.native_vtable_count, ty.attribute_list_index, ty.vtable_count
-        );
-        println!(
-            "    // type_size={}, native_type_ptr={}, managed_vtable_ptr={}",
-            type_instance.type_size, type_instance.native_type_ptr, type_instance.managed_vtable_ptr
-        );
-
+        //println!(
+        //    "    // staticFieldSize={}, interfaceId={}, nativeVTableCount={}, attribute_list_index={}, vtableCount={}",
+        //    ty.static_field_size, ty.interface_id, ty.native_vtable_count, ty.attribute_list_index, ty.vtable_count
+        //);
+        //println!(
+        //    "    // type_size={}, native_type_ptr={}, managed_vtable_ptr={}",
+        //    type_instance.type_size, type_instance.native_type_ptr, type_instance.managed_vtable_ptr
+        //);
+//
         println!();
         println!("    /*** Method ***/");
         println!();
@@ -1682,7 +1825,7 @@ pub fn print<F: Read + Seek>(
                     .entry(method_membership.address)
                     .or_default()
                     .push(format!("{}.{}", full_name, method_name));
-                format!(" = 0x{:016X}", method_membership.address)
+                format!(" = 0x{:08X}", method_membership.address)
             } else {
                 "".to_string()
             };
@@ -1693,13 +1836,14 @@ pub fn print<F: Read + Seek>(
         println!();
         println!("    /*** Field ***/");
         println!();
+
         for j in 0..ty.field_count {
             let field_membership_index = type_instance.field_membership_start_index + j;
             let field_membership = field_memberships
                 .get(field_membership_index)
                 .context("Field membership index out of bound")?;
-            if field_membership.type_instance_index != i {
-                bail!("field_membership.type_instance_index mismatch")
+            if field_membership.parent_type_instance_index != i {
+                bail!("field_membership.parent_type_instance_index mismatch")
             }
 
             let field = fields
@@ -1712,25 +1856,33 @@ pub fn print<F: Read + Seek>(
                 println!();
             }
 
+            let attributes = field.attributes | field_membership.attribute_hi;
+
             print!(
                 "    {} {} {}",
-                display_field_attributes(field.attributes),
-                &symbols[field.type_instance_index].as_ref().unwrap(),
+                display_field_attributes(attributes),
+                &symbols[field_membership.field_type_instance_index]
+                    .as_ref()
+                    .unwrap(),
                 read_string(field.name_offset)?
             );
 
-            if field.constant_index != 0 {
+            let constant_index = usize::try_from(
+                field.constant_index_lm | (field_membership.constant_index_hi << 10),
+            )?;
+
+            if constant_index != 0 {
                 //if field.constant_index_hi != 0 {
                 //    print!("/*constant_index_hi:{}*/", field.constant_index_hi);
                 //}
                 
-                let field_type = symbols[field.type_instance_index].as_ref().unwrap();
+                let field_type = symbols[field_membership.field_type_instance_index].as_ref().unwrap();
 
                 if is_enum{
-                    print_constant(field.constant_index, field.type_instance_index)?;
+                    print_constant(constant_index, field_membership.field_type_instance_index)?;
                 }else{
-                    print_constant(field.constant_index, field.type_instance_index)?;
-                    print_constant_optional_text(field.constant_index, field.type_instance_index, field_type)?;
+                    print_constant(constant_index, field_membership.field_type_instance_index)?;
+                    print_constant_optional_text(constant_index, field_membership.field_type_instance_index, field_type)?;
                 }
             }
 
@@ -1740,10 +1892,16 @@ pub fn print<F: Read + Seek>(
         println!();
         println!("    /*** Event ***/");
         println!();
-        for j in 0..type_instance.event_count {
+        // Where is this?
+        /*for j in 0..type_instance.event_count {
             let event = &events[type_instance.event_start_index + j];
             println!("    public event {};", read_string(event.name_offset)?);
-        }
+        }*/
+
+        // Is this events?
+        /*if type_instance.d2_into_heap != 0 {
+            println!("$#$ {:?}", &heap[type_instance.d2_into_heap..][..16]);
+        }*/
 
         println!();
         println!("    /*** Property ***/");
