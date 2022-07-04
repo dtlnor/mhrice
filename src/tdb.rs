@@ -229,7 +229,7 @@ fn display_param_modifier(param_modifier: u32, return_pos: bool) -> String {
     format!("[{}{}]", return_pos, tag)
 }
 
-fn display_type_flag(flags: TypeFlag) -> String {
+fn display_type_flags(flags: TypeFlag) -> String {
     let mut s = String::new();    
     //https://docs.microsoft.com/en-us/dotnet/api/system.reflection.typeattributes?view=net-6.0
 
@@ -1672,7 +1672,7 @@ pub fn print<F: Read + Seek>(
             println!();
         }
         if !options.no_type_flag {
-            println!("{}", display_type_flags(type_instance.flags));
+            print!("{}", display_type_flags(type_instance.flags));
         }
         println!(
             "{}: {}",
@@ -1868,10 +1868,7 @@ pub fn print<F: Read + Seek>(
             )?;
 
             if constant_index != 0 {
-                //if field.constant_index_hi != 0 {
-                //    print!("/*constant_index_hi:{}*/", field.constant_index_hi);
-                //}
-                
+                                
                 let field_type = symbols[field_membership.field_type_instance_index].as_ref().unwrap();
 
                 if is_enum{
