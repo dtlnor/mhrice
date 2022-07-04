@@ -289,7 +289,26 @@ impl<F: Read + Seek> PakReader<F> {
                 }
                 Ok(decoded)
             }
-            _ => bail!("Unsupported format: {}", format),
+            _ => {
+                if (format & 1) == 1{
+                    let mut decompressed = Vec::new();
+                    flate::Decoder::new(&data[..]).read_to_end(&mut decompressed)?;
+                    if u64::try_from(decompressed.len()).unwrap() != len {
+                        bail!("Expected size {}, actual size {}", len, decompressed.len());
+                    }
+                    Ok(decompressed)
+
+                }else if (format & 2) == 2{
+                    let decoded = zstd::decode_all(&data[..])?;
+                    if u64::try_from(decoded.len()).unwrap() != len {
+                        bail!("Expected size {}, actual size {}", len, decoded.len());
+                    }
+                    Ok(decoded)
+
+                }else{
+                    bail!("Unsupported format: {}", format);
+                }
+            }
         }
     }
 
