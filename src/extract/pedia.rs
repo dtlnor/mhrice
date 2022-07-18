@@ -17,6 +17,7 @@ pub struct Monster {
     pub id: u32,
     pub sub_id: u32,
     pub enemy_type: Option<i32>,
+    pub em_type: EmTypes,
     pub data_base: EnemyDataBase,
     pub data_tune: EnemyDataTune,
     pub meat_data: EnemyMeatData,
@@ -25,8 +26,8 @@ pub struct Monster {
     pub parts_break_data: EnemyPartsBreakData,
     pub boss_init_set_data: Option<EnemyBossInitSetData>,
     pub collider_mapping: ColliderMapping,
-    //pub drop_item: EnemyDropItemInfoData,
-    //pub parts_break_reward: Option<EnemyPartsBreakRewardData>,
+    pub drop_item: EnemyDropItemInfoData,
+    pub parts_break_reward: Option<EnemyPartsBreakRewardData>,
 }
 
 #[derive(Debug, Serialize)]
@@ -38,6 +39,8 @@ pub struct WeaponList<BaseData> {
     pub tree: WeaponUpdateTreeUserData,
     pub name: Msg,
     pub explain: Msg,
+    pub name_mr: Msg,
+    pub explain_mr: Msg,
 }
 
 #[derive(Debug, Serialize)]
@@ -47,30 +50,42 @@ pub struct Pedia {
     pub monster_names: Msg,
     pub monster_aliases: Msg,
     pub monster_explains: Msg,
+    pub monster_names_mr: Msg,
+    pub monster_aliases_mr: Msg,
+    pub monster_explains_mr: Msg,
     pub condition_preset: EnemyConditionPresetData,
-    //pub monster_list: MonsterListBossData,
+    pub monster_list: MonsterListBossData,
     pub hunter_note_msg: Msg,
-    /*pub monster_lot: MonsterLotTableUserData,
+    pub hunter_note_msg_mr: Msg,
+    pub monster_lot: MonsterLotTableUserDataLrHr,
+    pub monster_lot_mr: MonsterLotTableUserDataMr,
     pub parts_type: PartsTypeTextUserData,
-    pub normal_quest_data: BaseNormalQuestData,
-    pub normal_quest_data_for_enemy: BaseNormalQuestDataForEnemy,
+    pub normal_quest_data: BaseNormalQuestDataLrHr,
+    pub normal_quest_data_mr: BaseNormalQuestDataMr,
+    pub normal_quest_data_for_enemy: BaseNormalQuestDataForEnemyLrHr,
+    pub normal_quest_data_for_enemy_mr: BaseNormalQuestDataForEnemyMr,
     pub dl_quest_data: DlNormalQuestData,
     pub dl_quest_data_for_enemy: DlNormalQuestDataForEnemy,
     pub difficulty_rate: SystemDifficultyRateData,
     pub random_scale: EnemyBossRandomScaleData,
     pub size_list: EnemySizeListData,
     pub discover_em_set_data: DiscoverEmSetData,
-    pub quest_data_for_reward: QuestDataForRewardUserData,
-    pub reward_id_lot_table: RewardIdLotTableUserData,
+    pub quest_data_for_reward: QuestDataForRewardUserDataLrHr,
+    pub quest_data_for_reward_mr: QuestDataForRewardUserDataMr,
+    pub reward_id_lot_table: RewardIdLotTableUserDataLrHr,
+    pub reward_id_lot_table_mr: RewardIdLotTableUserDataMr,
     pub main_target_reward_lot_num: MainTargetRewardLotNumDefineUserData,
     pub fixed_hyakuryu_quest: HyakuryuQuestDataTbl,
     pub quest_hall_msg: Msg,
+    pub quest_hall_msg_mr: Msg,
+    pub quest_hall_msg_mr2: Msg,
     pub quest_village_msg: Msg,
+    pub quest_village_msg_mr: Msg,
     pub quest_tutorial_msg: Msg,
     pub quest_arena_msg: Msg,
     pub quest_dlc_msg: Msg,
 
-    pub armor: ArmorBaseUserData,
+    /*pub armor: ArmorBaseUserData,
     pub armor_series: ArmorSeriesUserData,
     pub armor_product: ArmorProductUserData,
     pub overwear: PlOverwearBaseUserData,
@@ -108,12 +123,14 @@ pub struct Pedia {
     pub alchemy_second_skill_lot: SecondSkillLotRateTableUserData,
     pub alchemy_skill_grade_lot: SkillGradeLotRateTableUserData,
     pub alchemy_slot_num: SlotNumTableUserData,
-    pub alchemy_slot_worth: SlotWorthTableUserData,
-
+    pub alchemy_slot_worth: SlotWorthTableUserData,*/
     pub items: ItemUserData,
     pub items_name_msg: Msg,
     pub items_explain_msg: Msg,
+    pub items_name_msg_mr: Msg,
+    pub items_explain_msg_mr: Msg,
     pub material_category_msg: Msg,
+    pub material_category_msg_mr: Msg,
 
     pub great_sword: WeaponList<GreatSwordBaseUserData>,
     pub short_sword: WeaponList<ShortSwordBaseUserData>,
@@ -130,10 +147,9 @@ pub struct Pedia {
     pub heavy_bowgun: WeaponList<HeavyBowgunBaseUserData>,
     pub bow: WeaponList<BowBaseUserData>,
 
-    pub horn_melody: Msg,
+    // pub horn_melody: Msg,
     pub hyakuryu_weapon_buildup: HyakuryuWeaponHyakuryuBuildupUserData,
-
-    pub maps: BTreeMap<i32, GameMap>,
+    /*pub maps: BTreeMap<i32, GameMap>,
     pub map_name: Msg,
     pub item_pop_lot: ItemPopLotTableUserData,
 
@@ -239,7 +255,7 @@ pub struct Weapon<'a, Param> {
     pub change: Option<&'a WeaponChangeUserDataParam>,
     pub process: Option<&'a WeaponProcessUserDataParam>,
     pub name: &'a MsgEntry,
-    pub explain: &'a MsgEntry,
+    pub explain: Option<&'a MsgEntry>,
     pub children: Vec<WeaponId>,
     pub parent: Option<WeaponId>,
     pub hyakuryu_weapon_buildup: BTreeMap<i32, &'a HyakuryuWeaponHyakuryuBuildupUserDataParam>,
@@ -273,16 +289,25 @@ pub struct OtEquipSeries<'a> {
     pub chest: Option<OtArmor<'a>>,
 }
 
+#[derive(Debug)]
+pub struct MonsterEx<'a> {
+    pub name: Option<&'a MsgEntry>,
+    pub alias: Option<&'a MsgEntry>,
+    pub explain1: Option<&'a MsgEntry>,
+    pub explain2: Option<&'a MsgEntry>,
+}
+
 pub struct PediaEx<'a> {
-    /*pub sizes: HashMap<EmTypes, &'a SizeInfo>,
+    pub monsters: HashMap<EmTypes, MonsterEx<'a>>,
+    pub sizes: HashMap<EmTypes, &'a SizeInfo>,
     pub size_dists: HashMap<i32, &'a [ScaleAndRateData]>,
     pub quests: Vec<Quest<'a>>,
     pub discoveries: HashMap<EmTypes, &'a DiscoverEmSetDataParam>,
-    pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
+    /*pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
     pub hyakuryu_skills: BTreeMap<PlHyakuryuSkillId, HyakuryuSkill<'a>>,
     pub armors: Vec<ArmorSeries<'a>>,*/
-    pub meat_names: HashMap<MeatKey, &'a MsgEntry>,
-    /*
+    pub meat_names: HashMap<MeatKey, Vec<&'a MsgEntry>>,
+
     pub items: BTreeMap<ItemId, Item<'a>>,
     pub material_categories: HashMap<MaterialCategory, &'a MsgEntry>,
     pub monster_lot: HashMap<(EmTypes, QuestRank), &'a MonsterLotTableUserDataParam>,
@@ -303,10 +328,9 @@ pub struct PediaEx<'a> {
     pub heavy_bowgun: WeaponTree<'a, HeavyBowgunBaseUserDataParam>,
     pub bow: WeaponTree<'a, BowBaseUserDataParam>,
 
-    pub horn_melody: HashMap<i32, &'a MsgEntry>,*/
+    //pub horn_melody: HashMap<i32, &'a MsgEntry>,
     pub monster_order: HashMap<EmTypes, usize>,
     /*pub item_pop: HashMap<(/*pop_id*/ i32, /*map*/ i32), &'a ItemPopLotTableUserDataParam>,
 
     pub ot_equip: BTreeMap<OtEquipSeriesId, OtEquipSeries<'a>>,*/
-    pub marker: std::marker::PhantomData<&'a ()>,
 }

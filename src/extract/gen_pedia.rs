@@ -13,6 +13,7 @@ use crate::tex::*;
 use crate::user::User;
 use crate::uvs::*;
 use anyhow::{bail, ensure, Context, Result};
+use nalgebra::coordinates::X;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
@@ -205,15 +206,18 @@ pub fn gen_monsters(
                 Rcol::new(Cursor::new(pak.read_file(rcol_index)?), true).context(rcol_path)?;
             let collider_mapping = gen_collider_mapping(rcol)?;
 
-            // let drop_item = sub_file(pak, &main_pfb).context("drop_item")?;
-            //let parts_break_reward = is_large
-            //    .then(|| sub_file(pak, &main_pfb).context("parts_break_reward"))
-            //     .transpose()?;
+            let drop_item = sub_file(pak, &main_pfb).context("drop_item")?;
+            let parts_break_reward = is_large
+                .then(|| sub_file(pak, &main_pfb).context("parts_break_reward"))
+                .transpose()?;
+
+            let em_type = if is_large { EmTypes::Em } else { EmTypes::Ems }(id | (sub_id << 8));
 
             monsters.push(Monster {
                 id,
                 sub_id,
                 enemy_type,
+                em_type,
                 data_base,
                 data_tune,
                 meat_data,
@@ -222,8 +226,8 @@ pub fn gen_monsters(
                 parts_break_data,
                 boss_init_set_data,
                 collider_mapping,
-                //drop_item,
-                //parts_break_reward,
+                drop_item,
+                parts_break_reward,
             })
         }
     }
@@ -299,6 +303,20 @@ fn get_weapon_list<BaseData: 'static>(
                 weapon_class
             ),
         )?,
+        name_mr: get_msg(
+            pak,
+            &format!(
+                "data/Define/Player/Weapon/{0}/{0}_Name_MR.msg",
+                weapon_class
+            ),
+        )?,
+        explain_mr: get_msg(
+            pak,
+            &format!(
+                "data/Define/Player/Weapon/{0}/{0}_Explain_MR.msg",
+                weapon_class
+            ),
+        )?,
     })
 }
 
@@ -352,18 +370,26 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let monster_aliases = get_msg(pak, "Message/Tag/Tag_EM_Name_Alias.msg")?;
     let monster_explains = get_msg(pak, "Message/HunterNote/HN_MonsterListMsg.msg")?;
 
+    let monster_names_mr = get_msg(pak, "Message/Tag_MR/Tag_EM_Name_MR.msg")?;
+    let monster_aliases_mr = get_msg(pak, "Message/Tag_MR/Tag_EM_Name_Alias_MR.msg")?;
+    let monster_explains_mr = get_msg(pak, "Message/HunterNote_MR/HN_MonsterListMsg_MR.msg")?;
+
     let condition_preset: EnemyConditionPresetData = get_singleton(pak)?;
     condition_preset.verify()?;
 
     let hunter_note_msg = get_msg(pak, "Message/HunterNote/HN_Hunternote_Menu.msg")?;
+    let hunter_note_msg_mr = get_msg(pak, "Message/HunterNote_MR/HN_Hunternote_Menu_MR.msg")?;
 
-    /*let quest_hall_msg = get_msg(pak, "Message/Quest/QuestData_Hall.msg")?;
+    let quest_hall_msg = get_msg(pak, "Message/Quest/QuestData_Hall.msg")?;
+    let quest_hall_msg_mr = get_msg(pak, "Message/Quest/QuestData_Hall_MR.msg")?;
+    let quest_hall_msg_mr2 = get_msg(pak, "Message/Quest/QuestData_Hall2_MR.msg")?;
     let quest_village_msg = get_msg(pak, "Message/Quest/QuestData_Village.msg")?;
+    let quest_village_msg_mr = get_msg(pak, "Message/Quest/QuestData_Village_MR.msg")?;
     let quest_tutorial_msg = get_msg(pak, "Message/Quest/QuestData_Tutorial.msg")?;
     let quest_arena_msg = get_msg(pak, "Message/Quest/QuestData_Arena.msg")?;
     let quest_dlc_msg = get_msg(pak, "Message/Quest/QuestData_Dlc.msg")?;
 
-    let armor_head_name_msg = get_msg(pak, "data/Define/Player/Armor/Head/A_Head_Name.msg")?;
+    /*let armor_head_name_msg = get_msg(pak, "data/Define/Player/Armor/Head/A_Head_Name.msg")?;
     let armor_chest_name_msg = get_msg(pak, "data/Define/Player/Armor/Chest/A_Chest_Name.msg")?;
     let armor_arm_name_msg = get_msg(pak, "data/Define/Player/Armor/Arm/A_Arm_Name.msg")?;
     let armor_waist_name_msg = get_msg(pak, "data/Define/Player/Armor/Waist/A_Waist_Name.msg")?;
@@ -403,16 +429,28 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let decorations_name_msg = get_msg(
         pak,
         "data/Define/Player/Equip/Decorations/Decorations_Name.msg",
-    )?;
+    )?;*/
 
     let items_name_msg = get_msg(pak, "data/System/ContentsIdSystem/Item/Normal/ItemName.msg")?;
     let items_explain_msg = get_msg(
         pak,
         "data/System/ContentsIdSystem/Item/Normal/ItemExplain.msg",
     )?;
+    let items_name_msg_mr = get_msg(
+        pak,
+        "data/System/ContentsIdSystem/Item/Normal/ItemName_MR.msg",
+    )?;
+    let items_explain_msg_mr = get_msg(
+        pak,
+        "data/System/ContentsIdSystem/Item/Normal/ItemExplain_MR.msg",
+    )?;
     let material_category_msg = get_msg(
         pak,
         "data/System/ContentsIdSystem/Common/ItemCategoryType_Name.msg",
+    )?;
+    let material_category_msg_mr = get_msg(
+        pak,
+        "data/System/ContentsIdSystem/Common/ItemCategoryType_Name_MR.msg",
     )?;
 
     let great_sword = get_weapon_list(pak, "GreatSword")?;
@@ -430,7 +468,7 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let heavy_bowgun = get_weapon_list(pak, "HeavyBowgun")?;
     let bow = get_weapon_list(pak, "Bow")?;
 
-    let horn_melody = get_msg(pak, "data/Define/Player/Weapon/Horn/Horn_UniqueParam.msg")?;
+    /*let horn_melody = get_msg(pak, "data/Define/Player/Weapon/Horn/Horn_UniqueParam.msg")?;
 
     let maps = prepare_maps(pak)?;
     let map_name = get_msg(pak, "Message/Common_Msg/Stage_Name.msg")?;
@@ -492,13 +530,21 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         monster_names,
         monster_aliases,
         monster_explains,
+        monster_names_mr,
+        monster_aliases_mr,
+        monster_explains_mr,
         condition_preset,
-        //monster_list: get_singleton(pak)?,
+        monster_list: get_singleton(pak)?,
         hunter_note_msg,
-        /*monster_lot: get_singleton(pak)?,
+        hunter_note_msg_mr,
+        material_category_msg_mr,
+        monster_lot: get_singleton(pak)?,
+        monster_lot_mr: get_singleton(pak)?,
         parts_type: get_singleton(pak)?,
         normal_quest_data: get_singleton(pak)?,
+        normal_quest_data_mr: get_singleton(pak)?,
         normal_quest_data_for_enemy: get_singleton(pak)?,
+        normal_quest_data_for_enemy_mr: get_singleton(pak)?,
         dl_quest_data: get_singleton(pak)?,
         dl_quest_data_for_enemy: get_singleton(pak)?,
         difficulty_rate: get_singleton(pak)?,
@@ -506,15 +552,20 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         size_list: get_singleton(pak)?,
         discover_em_set_data: get_singleton(pak)?,
         quest_data_for_reward: get_singleton(pak)?,
+        quest_data_for_reward_mr: get_singleton(pak)?,
         reward_id_lot_table: get_singleton(pak)?,
+        reward_id_lot_table_mr: get_singleton(pak)?,
         main_target_reward_lot_num: get_singleton(pak)?,
         fixed_hyakuryu_quest: get_singleton(pak)?,
         quest_hall_msg,
+        quest_hall_msg_mr,
+        quest_hall_msg_mr2,
         quest_village_msg,
+        quest_village_msg_mr,
         quest_tutorial_msg,
         quest_arena_msg,
         quest_dlc_msg,
-        armor: get_singleton(pak)?,
+        /*armor: get_singleton(pak)?,
         armor_series: get_singleton(pak)?,
         armor_product: get_singleton(pak)?,
         overwear: get_singleton(pak)?,
@@ -548,10 +599,12 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         alchemy_second_skill_lot: get_singleton(pak)?,
         alchemy_skill_grade_lot: get_singleton(pak)?,
         alchemy_slot_num: get_singleton(pak)?,
-        alchemy_slot_worth: get_singleton(pak)?,
+        alchemy_slot_worth: get_singleton(pak)?,*/
         items: get_singleton(pak)?,
         items_name_msg,
         items_explain_msg,
+        items_name_msg_mr,
+        items_explain_msg_mr,
         material_category_msg,
         great_sword,
         short_sword,
@@ -567,9 +620,9 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         light_bowgun,
         heavy_bowgun,
         bow,
-        horn_melody,
+        //horn_melody,
         hyakuryu_weapon_buildup: get_singleton(pak)?,
-        maps,
+        /*maps,
         map_name,
         item_pop_lot: get_singleton(pak)?,
         airou_armor: get_singleton(pak)?,
@@ -632,6 +685,23 @@ fn gen_monster_hitzones(
         .map(|(index, sub_id, mesh, collider)| {
             let mesh = Mesh::new(Cursor::new(mesh))?;
             let mut collider = Rcol::new(Cursor::new(collider), true)?;
+
+            // pre-check a glitchy thing
+            for attachment in &collider.group_attachments {
+                if let Some(data) = attachment.user_data.downcast_ref::<EmHitDamageRsData>() {
+                    if data.base.is_none() {
+                        eprintln!(
+                            "Found glitch collider '{}' for em{}_{}",
+                            data.name, index, sub_id
+                        );
+                    }
+                }
+            }
+
+            if collider.get_special_ammo_filter() != 0 {
+                eprintln!("Found special ammo collider for em{}_{}", index, sub_id);
+            }
+
             let meat_path = output.create(&meat_file_name_gen(index, sub_id))?;
             let parts_group_path = output.create(&parts_group_file_name_gen(index, sub_id))?;
             collider.apply_skeleton(&mesh)?;
@@ -751,7 +821,6 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
         }
     }
 
-    /*
     let guild_card = pak.find_file("gui/80_Texture/GuildCard_IAM.tex")?;
     let guild_card = Tex::new(Cursor::new(pak.read_file(guild_card)?))?.to_rgba(0, 0)?;
 
@@ -763,46 +832,55 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
         .sub_image(302, 453, 24, 24)?
         .save_png(output.create("small_crown.png")?)?;
 
-    let map_icon = pak.find_file("gui/80_Texture/map/map_icon_IAM.tex")?;
+    /*let map_icon = pak.find_file("gui/80_Texture/map/map_icon_IAM.tex")?;
     let map_icon = Tex::new(Cursor::new(pak.read_file(map_icon)?))?.to_rgba(0, 0)?;
     map_icon
         .sub_image(0, 31, 31, 33)?
         .save_png(output.create("main_camp.png")?)?;
     map_icon
         .sub_image(0, 64, 31, 30)?
-        .save_png(output.create("sub_camp.png")?)?;
+        .save_png(output.create("sub_camp.png")?)?;*/
 
     let item_icon_path = output.sub_sink("item")?;
-    let item_icon_uvs = pak.find_file("gui/70_UVSequence/cmn_icon.uvs")?;
-    let item_icon_uvs = Uvs::new(Cursor::new(pak.read_file(item_icon_uvs)?))?;
-    if item_icon_uvs.textures.len() != 1 || item_icon_uvs.spriter_groups.len() != 1 {
-        bail!("Broken cmn_icon.uvs");
-    }
-    let item_icon = pak.find_file(&item_icon_uvs.textures[0].path)?;
-    let item_icon = Tex::new(Cursor::new(pak.read_file(item_icon)?))?.to_rgba(0, 0)?;
-    for (i, spriter) in item_icon_uvs.spriter_groups[0].spriters.iter().enumerate() {
-        let item_icon = item_icon.sub_image_f(spriter.p0, spriter.p1)?;
 
-        if ITEM_ICON_SPECIAL_COLOR.contains(&(i as i32)) {
-            item_icon.save_png(item_icon_path.create(&format!("{:03}.png", i))?)?;
-        } else {
-            let (item_icon_r, item_icon_a) = item_icon.gen_double_mask();
-            item_icon_r.save_png(item_icon_path.create(&format!("{:03}.r.png", i))?)?;
-            item_icon_a.save_png(item_icon_path.create(&format!("{:03}.a.png", i))?)?;
+    let item_icon_files = [
+        ("gui/70_UVSequence/cmn_icon.uvs", 0),
+        ("gui/70_UVSequence/cmn_icon_MR.uvs", 200),
+    ];
+
+    for (file, offset) in item_icon_files {
+        let item_icon_uvs = pak.find_file(file)?;
+        let item_icon_uvs = Uvs::new(Cursor::new(pak.read_file(item_icon_uvs)?))?;
+        if item_icon_uvs.textures.len() != 1 || item_icon_uvs.spriter_groups.len() != 1 {
+            bail!("Broken {file}");
         }
-    }
+        let item_icon = pak.find_file(&item_icon_uvs.textures[0].path)?;
+        let item_icon = Tex::new(Cursor::new(pak.read_file(item_icon)?))?.to_rgba(0, 0)?;
+        for (i, spriter) in item_icon_uvs.spriter_groups[0].spriters.iter().enumerate() {
+            let i = i + offset;
+            let item_icon = item_icon.sub_image_f(spriter.p0, spriter.p1)?;
 
-    let item_addon_uvs = pak.find_file("gui/70_UVSequence/Item_addonicon.uvs")?;
-    let item_addon_uvs = Uvs::new(Cursor::new(pak.read_file(item_addon_uvs)?))?;
-    if item_addon_uvs.textures.len() != 1 || item_addon_uvs.spriter_groups.len() != 1 {
-        bail!("Broken item_addon.uvs");
-    }
-    let item_addon = pak.find_file(&item_addon_uvs.textures[0].path)?;
-    let item_addon = Tex::new(Cursor::new(pak.read_file(item_addon)?))?.to_rgba(0, 0)?;
-    for (i, spriter) in item_addon_uvs.spriter_groups[0].spriters.iter().enumerate() {
-        item_addon
-            .sub_image_f(spriter.p0, spriter.p1)?
-            .save_png(output.create(&format!("item_addon_{}.png", i))?)?;
+            if ITEM_ICON_SPECIAL_COLOR.contains(&(i as i32)) {
+                item_icon.save_png(item_icon_path.create(&format!("{:03}.png", i))?)?;
+            } else {
+                let (item_icon_r, item_icon_a) = item_icon.gen_double_mask();
+                item_icon_r.save_png(item_icon_path.create(&format!("{:03}.r.png", i))?)?;
+                item_icon_a.save_png(item_icon_path.create(&format!("{:03}.a.png", i))?)?;
+            }
+        }
+
+        let item_addon_uvs = pak.find_file("gui/70_UVSequence/Item_addonicon.uvs")?;
+        let item_addon_uvs = Uvs::new(Cursor::new(pak.read_file(item_addon_uvs)?))?;
+        if item_addon_uvs.textures.len() != 1 || item_addon_uvs.spriter_groups.len() != 1 {
+            bail!("Broken item_addon.uvs");
+        }
+        let item_addon = pak.find_file(&item_addon_uvs.textures[0].path)?;
+        let item_addon = Tex::new(Cursor::new(pak.read_file(item_addon)?))?.to_rgba(0, 0)?;
+        for (i, spriter) in item_addon_uvs.spriter_groups[0].spriters.iter().enumerate() {
+            item_addon
+                .sub_image_f(spriter.p0, spriter.p1)?
+                .save_png(output.create(&format!("item_addon_{}.png", i))?)?;
+        }
     }
 
     let message_window_uvs = pak.find_file("gui/70_UVSequence/message_window.uvs")?;
@@ -868,11 +946,31 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
     }
     let common = pak.find_file(&common_uvs.textures[0].path)?;
     let common = Tex::new(Cursor::new(pak.read_file(common)?))?.to_rgba(0, 0)?;
-    for (i, spriter) in common_uvs.spriter_groups[0].spriters.iter().enumerate() {
+    for (i, spriter) in common_uvs.spriter_groups[0]
+        .spriters
+        .iter()
+        .enumerate()
+        .take(3)
+    {
         common
             .sub_image_f(spriter.p0, spriter.p1)?
             .save_png(output.create(&format!("slot_{}.png", i))?)?;
     }
+
+    let common_uvs = pak.find_file("gui/70_UVSequence/Slot_Icon_MR.uvs")?;
+    let common_uvs = Uvs::new(Cursor::new(pak.read_file(common_uvs)?))?;
+    if common_uvs.textures.len() != 1 || common_uvs.spriter_groups.len() != 1 {
+        bail!("Broken Slot_Icon_MR.uvs");
+    }
+    let common = pak.find_file(&common_uvs.textures[0].path)?;
+    let common = Tex::new(Cursor::new(pak.read_file(common)?))?.to_rgba(0, 0)?;
+    let spriter = common_uvs.spriter_groups[0]
+        .spriters
+        .get(1)
+        .context("Broken Slot_Icon_MR.uvs: no 4-slot")?;
+    common
+        .sub_image_f(spriter.p0, spriter.p1)?
+        .save_png(output.create("slot_3.png")?)?;
 
     let item_colors_path = output.create("item_color.css")?;
     gen_item_colors(pak, item_colors_path)?;
@@ -880,8 +978,7 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
     let item_colors_path = output.create("rarity_color.css")?;
     gen_rarity_colors(pak, item_colors_path)?;
 
-    gen_map_resource(pak, output)?;
-    */
+    //gen_map_resource(pak, output)?;
 
     Ok(())
 }
@@ -907,7 +1004,8 @@ fn gen_gui_colors(
         if !(0.0..=1.0).contains(&value) {
             bail!("Bad color value");
         }
-        Ok((value * 255.0).round() as u8)
+        // linear RGB to sRGB
+        Ok((value.powf(1.0 / 2.2) * 255.0).round() as u8)
     }
 
     for clips in &item_icon_color.clips {
@@ -915,17 +1013,29 @@ fn gen_gui_colors(
             continue;
         }
         let id: u32 = clips.name[prefix.len()..].parse()?;
-        if clips.variable_values.len() != 3 {
-            bail!("Unexpected variable values len");
+        if clips.variable_values.len() != 3 && clips.variable_values.len() != 7 {
+            bail!(
+                "Unexpected variable values len {} for {}",
+                clips.variable_values.len(),
+                clips.name
+            );
         }
-        let r = color_tran(clips.variable_values[0].value)?;
-        let g = color_tran(clips.variable_values[1].value)?;
-        let b = color_tran(clips.variable_values[2].value)?;
+
+        // Alternative color? the only difference happened in item color 6.
+        // The second one looks correct
+        let offset = if clips.variable_values.len() == 7 {
+            4
+        } else {
+            0
+        };
+        let r = color_tran(clips.variable_values[offset].value)?;
+        let g = color_tran(clips.variable_values[offset + 1].value)?;
+        let b = color_tran(clips.variable_values[offset + 2].value)?;
 
         writeln!(
             file,
             ".{}{} {{background-color: #{:02X}{:02X}{:02X}}}",
-            css_prefix, id, r, g, b
+            css_prefix, id, r, g, b,
         )?;
     }
 
@@ -984,9 +1094,15 @@ fn hash_map_unique<T, K: Eq + std::hash::Hash + std::fmt::Debug, V>(
     Ok(result)
 }
 
-/*
 fn prepare_size_map(size_data: &EnemySizeListData) -> Result<HashMap<EmTypes, &SizeInfo>> {
-    hash_map_unique(&size_data.size_info_list, |e| (e.em_type, e), false)
+    hash_map_unique(
+        size_data
+            .size_info_list
+            .iter()
+            .filter(|e| e.em_type != EmTypes::Em(0)),
+        |e| (e.em_type, e),
+        false,
+    )
 }
 
 fn prepare_size_dist_map(
@@ -1016,9 +1132,12 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .entries
         .iter()
         .chain(&pedia.quest_village_msg.entries)
+        .chain(&pedia.quest_village_msg_mr.entries)
         .chain(&pedia.quest_tutorial_msg.entries)
         .chain(&pedia.quest_arena_msg.entries)
-        .chain(&pedia.quest_dlc_msg.entries);
+        .chain(&pedia.quest_dlc_msg.entries)
+        .chain(&pedia.quest_hall_msg_mr.entries)
+        .chain(&pedia.quest_hall_msg_mr2.entries);
 
     let mut all_msg = hash_map_unique(all_msg, |e| (&e.name, e), false)?;
 
@@ -1026,18 +1145,29 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .normal_quest_data_for_enemy
         .param
         .iter()
-        .chain(&pedia.dl_quest_data_for_enemy.param);
+        .chain(&pedia.dl_quest_data_for_enemy.param)
+        .chain(&pedia.normal_quest_data_for_enemy_mr.param)
+        .filter(|e| e.quest_no != 0);
 
     let mut enemy_params = hash_map_unique(enemy_params, |param| (param.quest_no, param), false)?;
 
     let mut reward_params = hash_map_unique(
-        &pedia.quest_data_for_reward.param,
+        pedia
+            .quest_data_for_reward
+            .param
+            .iter()
+            .chain(&pedia.quest_data_for_reward_mr.param)
+            .filter(|e| e.quest_numer != 0),
         |param| (param.quest_numer, param),
         false,
     )?;
 
     let reward_lot = hash_map_unique(
-        &pedia.reward_id_lot_table.param,
+        pedia
+            .reward_id_lot_table
+            .param
+            .iter()
+            .chain(&pedia.reward_id_lot_table_mr.param),
         |param| (param.id, param),
         false,
     )?;
@@ -1049,30 +1179,9 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .chain(pedia.fixed_hyakuryu_quest.data_list_310.iter())
         .chain(pedia.fixed_hyakuryu_quest.data_list_320.iter())
         .chain(pedia.fixed_hyakuryu_quest.data_list_350.iter())
-        .chain(
-            pedia
-                .fixed_hyakuryu_quest
-                .data_list_370
-                .0
-                .iter()
-                .flat_map(|i| i.iter()),
-        )
-        .chain(
-            pedia
-                .fixed_hyakuryu_quest
-                .data_list_380
-                .0
-                .iter()
-                .flat_map(|i| i.iter()),
-        )
-        .chain(
-            pedia
-                .fixed_hyakuryu_quest
-                .data_list_390
-                .0
-                .iter()
-                .flat_map(|i| i.iter()),
-        );
+        .chain(pedia.fixed_hyakuryu_quest.data_list_370.iter())
+        .chain(pedia.fixed_hyakuryu_quest.data_list_380.iter())
+        .chain(pedia.fixed_hyakuryu_quest.data_list_390.iter());
 
     let mut hyakuryus = hash_map_unique(
         hyakuryu_list,
@@ -1086,6 +1195,14 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .iter()
         .filter(|param| param.quest_no != 0)
         .map(|param| (param, false))
+        .chain(
+            pedia
+                .normal_quest_data_mr
+                .param
+                .iter()
+                .filter(|param| param.quest_no != 0)
+                .map(|param| (param, false)),
+        )
         .chain(
             pedia
                 .dl_quest_data
@@ -1194,18 +1311,6 @@ fn prepare_discoveries(pedia: &Pedia) -> Result<HashMap<EmTypes, &DiscoverEmSetD
         if discovery.em_type == EmTypes::Em(0) {
             continue;
         }
-        ensure!(discovery.param.route_no.len() == 5);
-        ensure!(discovery.param.init_set_name.len() == 5);
-        ensure!(discovery.param.sub_type.len() == 3);
-        ensure!(discovery.param.vital_tbl.len() == 3);
-        ensure!(discovery.param.attack_tbl.len() == 3);
-        ensure!(discovery.param.parts_tbl.len() == 3);
-        ensure!(discovery.param.other_tbl.len() == 3);
-        ensure!(discovery.param.stamina_tbl.len() == 3);
-        ensure!(discovery.param.scale.len() == 3);
-        ensure!(discovery.param.scale_tbl.len() == 3);
-        ensure!(discovery.param.difficulty.len() == 3);
-        ensure!(discovery.param.boss_multi.len() == 3);
 
         if result.insert(discovery.em_type, discovery).is_some() {
             bail!("Duplicated discovery data for {:?}", discovery.em_type)
@@ -1215,6 +1320,7 @@ fn prepare_discoveries(pedia: &Pedia) -> Result<HashMap<EmTypes, &DiscoverEmSetD
     Ok(result)
 }
 
+/*
 fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> {
     let mut result = BTreeMap::new();
 
@@ -1519,12 +1625,12 @@ fn prepare_armors(pedia: &Pedia) -> Result<Vec<ArmorSeries<'_>>> {
     Ok(series_map.into_iter().map(|(_, v)| v).collect())
 }*/
 
-fn prepare_meat_names(pedia: &Pedia) -> Result<HashMap<MeatKey, &MsgEntry>> {
+fn prepare_meat_names(pedia: &Pedia) -> Result<HashMap<MeatKey, Vec<&MsgEntry>>> {
     let msg_map: HashMap<_, _> = pedia.hunter_note_msg.get_name_map();
 
-    let mut result = HashMap::new();
+    let mut result: HashMap<MeatKey, Vec<&MsgEntry>> = HashMap::new();
 
-    /*for boss_monster in &pedia.monster_list.data_list {
+    for boss_monster in &pedia.monster_list.data_list {
         for part_data in &boss_monster.part_table_data {
             let part = part_data.em_meat.try_into()?;
             let phase = part_data.em_meat_group_index.try_into()?;
@@ -1540,28 +1646,27 @@ fn prepare_meat_names(pedia: &Pedia) -> Result<HashMap<MeatKey, &MsgEntry>> {
             )) {
                 name
             } else {
+                // TODO: MR name
+                eprintln!(
+                    "Part text not found for {:?}-{part}-{phase}. part ID {}",
+                    boss_monster.em_type, part_data.part
+                );
                 continue;
             };
 
-            if result.insert(key, name).is_some() {
-                bail!(
-                    "Duplicate definition for meat {:?}-{}-{}",
-                    boss_monster.em_type,
-                    part,
-                    phase
-                );
-            }
+            result.entry(key).or_default().push(name);
         }
-    }*/
+    }
 
     Ok(result)
 }
 
-/*
 fn prepare_items<'a>(pedia: &'a Pedia) -> Result<BTreeMap<ItemId, Item<'a>>> {
     let mut result: BTreeMap<ItemId, Item<'a>> = BTreeMap::new();
-    let mut name_map: HashMap<_, _> = pedia.items_name_msg.get_name_map();
-    let mut explain_map: HashMap<_, _> = pedia.items_explain_msg.get_name_map();
+    let name_map: HashMap<_, _> = pedia.items_name_msg.get_name_map();
+    let explain_map: HashMap<_, _> = pedia.items_explain_msg.get_name_map();
+    let name_map_mr: HashMap<_, _> = pedia.items_name_msg_mr.get_name_map();
+    let explain_map_mr: HashMap<_, _> = pedia.items_explain_msg_mr.get_name_map();
     for param in &pedia.items.param {
         if let Some(existing) = result.get_mut(&param.id) {
             eprintln!("Duplicate definition for item {:?}", param.id);
@@ -1569,21 +1674,28 @@ fn prepare_items<'a>(pedia: &'a Pedia) -> Result<BTreeMap<ItemId, Item<'a>>> {
             continue;
         }
 
-        let (name_tag, explain_tag) = match param.id {
+        let (name_tag, explain_tag, name_tag_mr, explain_tag_mr) = match param.id {
             ItemId::Normal(id) => (
                 format!("I_{:04}_Name", id & 0xFFFF),
                 format!("I_{:04}_Explain", id & 0xFFFF),
+                format!("I_{:04}_Name_MR", id & 0xFFFF),
+                format!("I_{:04}_Explain_MR", id & 0xFFFF),
             ),
             _ => bail!("Unexpected item type"),
         };
 
-        let name = name_map
-            .remove(&name_tag)
+        let name = *name_map_mr
+            .get(&name_tag_mr)
+            .or_else(|| name_map_mr.get(&name_tag))
+            .or_else(|| name_map.get(&name_tag))
             .with_context(|| format!("Name not found for item {:?}", param.id))?;
 
-        let explain = explain_map
-            .remove(&explain_tag)
+        let explain = *explain_map_mr
+            .get(&explain_tag_mr)
+            .or_else(|| explain_map_mr.get(&explain_tag))
+            .or_else(|| explain_map.get(&explain_tag))
             .with_context(|| format!("Explain not found for item {:?}", param.id))?;
+
         let item = Item {
             name,
             explain,
@@ -1610,18 +1722,18 @@ fn prepare_material_categories(pedia: &Pedia) -> HashMap<MaterialCategory, &MsgE
         .material_category_msg
         .entries
         .iter()
+        .chain(pedia.material_category_msg_mr.entries.iter())
         .filter_map(|entry| {
             if !entry.name.starts_with(PREFIX) {
                 return None;
             }
-
             Some((
-                MaterialCategory(entry.name[PREFIX.len()..].parse().ok()?),
+                MaterialCategory::from_msg_id(entry.name[PREFIX.len()..].parse().ok()?),
                 entry,
             ))
         })
         .chain(std::iter::once((
-            MaterialCategory(86),
+            MaterialCategory::ArmorSphere,
             &*AMMOR_SPHERE_CATEGORY_MSG,
         )))
         .collect()
@@ -1670,6 +1782,8 @@ where
 
     let mut name_map = weapon_list.name.get_name_map();
     let mut explain_map = weapon_list.explain.get_name_map();
+    let mut name_map_mr = weapon_list.name_mr.get_name_map();
+    let mut explain_map_mr = weapon_list.explain_mr.get_name_map();
 
     let mut weapons = BTreeMap::new();
     for param in &*weapon_list.base_data {
@@ -1681,8 +1795,16 @@ where
             bail!("Multiple definition for weapon {:?}", param.to_base().id)
         }
         let tag = id.to_tag();
-        let name = name_map.remove(&format!("W_{}_Name", tag)).unwrap();
-        let explain = explain_map.remove(&format!("W_{}_Explain", tag)).unwrap();
+        let name_tag = format!("W_{}_Name", tag);
+        let explain_tag = format!("W_{}_Explain", tag);
+
+        let name = name_map
+            .remove(&name_tag)
+            .or_else(|| name_map_mr.remove(&name_tag))
+            .with_context(|| format!("Weapon name for {tag} not found"))?;
+        let explain = explain_map
+            .remove(&explain_tag)
+            .or_else(|| explain_map_mr.remove(&explain_tag));
 
         let weapon = Weapon {
             param,
@@ -1699,15 +1821,15 @@ where
     }
 
     if !product_map.is_empty() {
-        bail!("Left over product data: {:?}", product_map)
+        eprintln!("Left over product data: {:?}", product_map)
     }
 
     if !process_map.is_empty() {
-        bail!("Left over process data: {:?}", process_map)
+        eprintln!("Left over process data: {:?}", process_map)
     }
 
     if !change_map.is_empty() {
-        bail!("Left over change data: {:?}", change_map)
+        eprintln!("Left over change data: {:?}", change_map)
     }
 
     let mut tree_map = HashMap::new();
@@ -1783,7 +1905,10 @@ where
             let next = if let Some(next) = tree_map.get(&(t, i)) {
                 next
             } else {
-                eprintln!("Unknown children at {:?}, {}", t, i);
+                eprintln!(
+                    "Unknown children at {:?}, {}, for weapon {:?}",
+                    t, i, node.weapon_id
+                );
                 continue;
             };
             if next.prev_weapon_type != node.tree_type || next.prev_weapon_index != node.index {
@@ -1809,12 +1934,14 @@ where
 fn prepare_monster_lot(
     pedia: &Pedia,
 ) -> Result<HashMap<(EmTypes, QuestRank), &MonsterLotTableUserDataParam>> {
+    let iter = pedia
+        .monster_lot
+        .param
+        .iter()
+        .chain(pedia.monster_lot_mr.param.iter());
+
     hash_map_unique(
-        pedia
-            .monster_lot
-            .param
-            .iter()
-            .filter(|lot| lot.em_types != EmTypes::Em(0)),
+        iter.filter(|lot| lot.em_types != EmTypes::Em(0)),
         |lot| ((lot.em_types, lot.quest_rank), lot),
         false,
     )
@@ -1824,14 +1951,18 @@ fn prepare_parts_dictionary(
     pedia: &Pedia,
 ) -> Result<HashMap<(EmTypes, BrokenPartsTypes), &MsgEntry>> {
     let msgs: HashMap<_, _> = pedia.hunter_note_msg.get_guid_map();
+    let msgs_mr: HashMap<_, _> = pedia.hunter_note_msg_mr.get_guid_map();
 
     let mut result = HashMap::new();
 
     for part in &pedia.parts_type.params {
         for info in &part.text_infos {
-            let msg = *msgs.get(&info.text_for_monster_list).with_context(|| {
-                format!("Cannot found part text for {:?}", part.broken_parts_types)
-            })?;
+            let msg = *msgs
+                .get(&info.text_for_monster_list)
+                .or_else(|| msgs_mr.get(&info.text_for_monster_list))
+                .with_context(|| {
+                    format!("Cannot found part text for {:?}", part.broken_parts_types)
+                })?;
             for &em in &info.enemy_type_list {
                 if em == EmTypes::Em(0) {
                     continue;
@@ -1849,7 +1980,7 @@ fn prepare_parts_dictionary(
     Ok(result)
 }
 
-fn prepare_horn_melody(pedia: &Pedia) -> HashMap<i32, &'_ MsgEntry> {
+/*fn prepare_horn_melody(pedia: &Pedia) -> HashMap<i32, &'_ MsgEntry> {
     let mut res = HashMap::new();
     let map = pedia.horn_melody.get_name_map();
     for id in 0..999 {
@@ -2072,17 +2203,77 @@ fn prepeare_ot_equip(pedia: &Pedia) -> Result<BTreeMap<OtEquipSeriesId, OtEquipS
 }
 */
 
-pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
-    let monster_order = HashMap::new();
-    /*pedia
-    .monster_list
-    .data_list
-    .iter()
-    .enumerate()
-    .map(|(i, monster)| (monster.em_type, i))
-    .collect();*/
+fn prepare_monsters<'a>(pedia: &'a Pedia) -> Result<HashMap<EmTypes, MonsterEx<'a>>> {
+    let mut result = HashMap::new();
 
-    /*
+    let names = pedia.monster_names.get_name_map();
+    let names_mr = pedia.monster_names_mr.get_name_map();
+    let aliases = pedia.monster_aliases.get_name_map();
+    let aliases_mr = pedia.monster_aliases_mr.get_name_map();
+    let explains = pedia.monster_explains.get_name_map();
+    let explains_mr = pedia.monster_explains_mr.get_name_map();
+
+    let monsters = pedia.monsters.iter().chain(&pedia.small_monsters);
+    for monster in monsters {
+        let entry = if let Some(index) = monster.enemy_type {
+            let name = names
+                .get(&format!("EnemyIndex{index:03}"))
+                .copied()
+                .or_else(|| names_mr.get(&format!("EnemyIndex{index:03}_MR")).copied());
+
+            let alias_name = format!("Alias_EnemyIndex{index:03}");
+            let alias = aliases
+                .get(&alias_name)
+                .copied()
+                .or_else(|| aliases_mr.get(&alias_name).copied());
+
+            let explain1 = explains
+                .get(&format!("HN_MonsterListMsg_EnemyIndex{index:03}_page1"))
+                .copied()
+                .or_else(|| {
+                    explains_mr
+                        .get(&format!("HN_MonsterListMsg_EnemyIndex{index:03}_MR_page1"))
+                        .copied()
+                });
+
+            let explain2 = explains
+                .get(&format!("HN_MonsterListMsg_EnemyIndex{index:03}_page2"))
+                .copied()
+                .or_else(|| {
+                    explains_mr
+                        .get(&format!("HN_MonsterListMsg_EnemyIndex{index:03}_MR_page2"))
+                        .copied()
+                });
+
+            MonsterEx {
+                name,
+                alias,
+                explain1,
+                explain2,
+            }
+        } else {
+            MonsterEx {
+                name: None,
+                alias: None,
+                explain1: None,
+                explain2: None,
+            }
+        };
+        result.insert(monster.em_type, entry);
+    }
+
+    Ok(result)
+}
+
+pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
+    let monster_order = pedia
+        .monster_list
+        .data_list
+        .iter()
+        .enumerate()
+        .map(|(i, monster)| (monster.em_type, i))
+        .collect();
+
     let mut hyakuryu_weapon_map: HashMap<
         WeaponId,
         BTreeMap<i32, &HyakuryuWeaponHyakuryuBuildupUserDataParam>,
@@ -2096,18 +2287,19 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
                 param.slot_type
             );
         }
-    }*/
+    }
 
     Ok(PediaEx {
-        /* sizes: prepare_size_map(&pedia.size_list)?,
+        monsters: prepare_monsters(pedia)?,
+        sizes: prepare_size_map(&pedia.size_list)?,
         size_dists: prepare_size_dist_map(&pedia.random_scale)?,
         quests: prepare_quests(pedia)?,
         discoveries: prepare_discoveries(pedia)?,
-        skills: prepare_skills(pedia)?,
-        hyakuryu_skills: prepare_hyakuryu_skills(pedia)?,
-        armors: prepare_armors(pedia)?, */
+        //skills: prepare_skills(pedia)?,
+        //hyakuryu_skills: prepare_hyakuryu_skills(pedia)?,
+        //armors: prepare_armors(pedia)?,
         meat_names: prepare_meat_names(pedia)?,
-        /*items: prepare_items(pedia)?,
+        items: prepare_items(pedia)?,
         material_categories: prepare_material_categories(pedia),
         monster_lot: prepare_monster_lot(pedia)?,
         parts_dictionary: prepare_parts_dictionary(pedia)?,
@@ -2126,10 +2318,9 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         light_bowgun: prepare_weapon(&pedia.light_bowgun, &mut hyakuryu_weapon_map)?,
         heavy_bowgun: prepare_weapon(&pedia.heavy_bowgun, &mut hyakuryu_weapon_map)?,
         bow: prepare_weapon(&pedia.bow, &mut hyakuryu_weapon_map)?,
-        horn_melody: prepare_horn_melody(pedia), */
+        // horn_melody: prepare_horn_melody(pedia),
         monster_order,
         /*item_pop: prepare_item_pop(pedia)?,
         ot_equip: prepeare_ot_equip(pedia)?,*/
-        marker: std::marker::PhantomData,
     })
 }
