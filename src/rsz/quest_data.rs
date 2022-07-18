@@ -19,6 +19,7 @@ rsz_bitflags! {
         const SPECIAL  = 0x00000080;
         const HYAKURYU = 0x00000100;
         const TRAINING = 0x00000200;
+        const KYOUSEI  = 0x00000400;
     }
 }
 
@@ -84,6 +85,7 @@ rsz_enum! {
         Village = 0,
         Low = 1,
         High = 2,
+        Master = 3,
     }
 }
 
@@ -108,6 +110,20 @@ rsz_enum! {
         H50 = 13,
         H90 = 14,
         H100 = 15,
+        M1 = 16,
+        M2 = 17,
+        M3 = 18,
+        M4 = 19,
+        M5 = 20,
+        M6 = 21,
+        M10 = 22,
+        M20 = 23,
+        M30 = 24,
+        M40 = 25,
+        M50 = 26,
+        M60 = 27,
+        M100 = 28,
+        Only1 = 29,
     }
 }
 
@@ -165,6 +181,8 @@ rsz_enum! {
         HpEmx2 = 13,
         InitRandom = 14,
         SwapRandom = 15,
+        FsmControl = 16,
+        EntryTime = 17,
     }
 }
 
@@ -211,6 +229,7 @@ rsz_enum! {
         C05 = 5,
         C06 = 6,
         C07 = 7,
+        Sp01 = 8,
     }
 }
 
@@ -257,11 +276,12 @@ impl Ord for EmTypes {
 
 rsz_struct! {
     #[rsz("snow.quest.NormalQuestData.Param",
-        0xe51737b2 = 0,
+        0x708b71d8 = 10_00_02,
     )]
     #[derive(Debug, Serialize)]
     pub struct NormalQuestDataParam {
         pub quest_no: i32,
+        pub dbg_name: String,
         pub quest_type: QuestType,
         pub quest_level: QuestLevel,
         pub enemy_level: EnemyLevel,
@@ -292,15 +312,18 @@ rsz_struct! {
         pub rem_rank_point: u32,
         pub supply_tbl: u32,
         pub icon: Vec<i32>, // TODO: snow.gui.SnowGuiCommonUtility.Icon.EnemyIconFrameForQuestOrder
+        pub is_from_npc: bool,
         pub is_tutorial: bool,
-        pub fence_default_active: bool,
         pub fence_active_sec: u16,
+        pub fence_default_active: bool,
         pub fence_default_wait_sec: u16,
         pub fence_reload_sec: u16,
         pub is_use_pillar: Vec<bool>,
-        pub auto_match_hr: u16,
         pub battle_bgm_type: BattleBgmType,
         pub clear_bgm_type: ClearBgmType,
+        pub auto_match_hr: u16,
+        pub dbg_client:String,
+        pub dbg_content: String,
     }
 }
 
@@ -343,7 +366,10 @@ rsz_struct! {
 
 rsz_with_singleton! {
     #[path("Quest/QuestData/NormalQuestData.user")]
-    pub struct BaseNormalQuestData(NormalQuestData);
+    pub struct BaseNormalQuestDataLrHr(NormalQuestData);
+
+    #[path("Quest/QuestData/NormalQuestData_MR.user")]
+    pub struct BaseNormalQuestDataMr(NormalQuestData);
 
     #[path("Quest/QuestData/DlQuestData.user")]
     pub struct DlNormalQuestData(NormalQuestData);
@@ -399,28 +425,69 @@ rsz_enum! {
     }
 }
 
-rsz_struct! {
-    #[rsz()]
-    #[derive(Debug, Serialize, Clone)]
-    pub struct SharedEnemyParam { // non-TDB type
-        pub route_no: Vec<u8>,
-        pub init_set_name: Vec<String>,
-        pub sub_type: Vec<u8>,
-        pub vital_tbl: Vec<u8>,
-        pub attack_tbl: Vec<u8>,
-        pub parts_tbl: Vec<u8>,
-        pub other_tbl: Vec<u8>,
-        pub stamina_tbl: Vec<u8>,
-        pub scale: Vec<u8>,
-        pub scale_tbl: Vec<i32>, // snow.enemy.EnemyDef.BossScaleTblType
-        pub difficulty: Vec<NandoYuragi>,
-        pub boss_multi: Vec<u8>,
+// snow.enemy.EnemyDef.EnemyIndividualType
+rsz_enum! {
+    #[rsz(i32)]
+    #[derive(Debug, Serialize, Clone, Copy)]
+    pub enum EnemyIndividualType {
+        Normal = 0,
+        Mystery = 1,
     }
+}
+
+pub trait EnemyParam {
+    fn sub_type(&self, i: usize) -> Option<u8>;
+    fn vital_tbl(&self, i: usize) -> Option<u16>;
+    fn attack_tbl(&self, i: usize) -> Option<u16>;
+    fn parts_tbl(&self, i: usize) -> Option<u16>;
+    fn other_tbl(&self, i: usize) -> Option<u16>;
+    fn stamina_tbl(&self, i: usize) -> Option<u8>;
+    fn scale(&self, i: usize) -> Option<u8>;
+    fn scale_tbl(&self, i: usize) -> Option<i32>;
+    fn difficulty(&self, i: usize) -> Option<NandoYuragi>;
+    fn boss_multi(&self, i: usize) -> Option<u8>;
+}
+
+macro_rules! impl_enemy_param {
+    ($t:ty) => {
+        impl EnemyParam for $t {
+            fn sub_type(&self, i: usize) -> Option<u8> {
+                self.sub_type.get(i).copied()
+            }
+            fn vital_tbl(&self, i: usize) -> Option<u16> {
+                self.vital_tbl.get(i).copied().map(Into::into)
+            }
+            fn attack_tbl(&self, i: usize) -> Option<u16> {
+                self.attack_tbl.get(i).copied().map(Into::into)
+            }
+            fn parts_tbl(&self, i: usize) -> Option<u16> {
+                self.parts_tbl.get(i).copied().map(Into::into)
+            }
+            fn other_tbl(&self, i: usize) -> Option<u16> {
+                self.other_tbl.get(i).copied().map(Into::into)
+            }
+            fn stamina_tbl(&self, i: usize) -> Option<u8> {
+                self.stamina_tbl.get(i).copied()
+            }
+            fn scale(&self, i: usize) -> Option<u8> {
+                self.scale.get(i).copied()
+            }
+            fn scale_tbl(&self, i: usize) -> Option<i32> {
+                self.scale_tbl.get(i).copied()
+            }
+            fn difficulty(&self, i: usize) -> Option<NandoYuragi> {
+                self.difficulty.get(i).copied()
+            }
+            fn boss_multi(&self, i: usize) -> Option<u8> {
+                self.boss_multi.get(i).copied()
+            }
+        }
+    };
 }
 
 rsz_struct! {
     #[rsz("snow.quest.NormalQuestDataForEnemy.Param",
-        0x705fc847 = 0
+        0x7E1E92C8 = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct NormalQuestDataForEnemyParam {
@@ -431,17 +498,23 @@ rsz_struct! {
         pub zako_parts: u8,
         pub zako_other: u8,
         pub zako_multi: u8,
-        pub param: SharedEnemyParam,
+        pub route_no: Vec<u8>,
+        pub init_set_name: Vec<String>,
+        pub individual_type: Vec<EnemyIndividualType>,
+        pub sub_type: Vec<u8>,
+        pub vital_tbl: Vec<u16>,
+        pub attack_tbl: Vec<u16>,
+        pub parts_tbl: Vec<u16>,
+        pub other_tbl: Vec<u16>,
+        pub stamina_tbl: Vec<u8>,
+        pub scale: Vec<u8>,
+        pub scale_tbl: Vec<i32>, // snow.enemy.EnemyDef.BossScaleTblType
+        pub difficulty: Vec<NandoYuragi>,
+        pub boss_multi: Vec<u8>,
     }
 }
 
-rsz_with_singleton! {
-    #[path("Quest/QuestData/NormalQuestDataForEnemy.user")]
-    pub struct BaseNormalQuestDataForEnemy(NormalQuestDataForEnemy);
-
-    #[path("Quest/QuestData/DlQuestDataForEnemy.user")]
-    pub struct DlNormalQuestDataForEnemy(NormalQuestDataForEnemy);
-}
+impl_enemy_param!(NormalQuestDataForEnemyParam);
 
 rsz_struct! {
     #[rsz("snow.quest.NormalQuestDataForEnemy",
@@ -452,6 +525,17 @@ rsz_struct! {
     pub struct NormalQuestDataForEnemy {
         pub param: Vec<NormalQuestDataForEnemyParam>,
     }
+}
+
+rsz_with_singleton! {
+    #[path("Quest/QuestData/NormalQuestDataForEnemy.user")]
+    pub struct BaseNormalQuestDataForEnemyLrHr(NormalQuestDataForEnemy);
+
+    #[path("Quest/QuestData/NormalQuestDataForEnemy_MR.user")]
+    pub struct BaseNormalQuestDataForEnemyMr(NormalQuestDataForEnemy);
+
+    #[path("Quest/QuestData/DlQuestDataForEnemy.user")]
+    pub struct DlNormalQuestDataForEnemy(NormalQuestDataForEnemy);
 }
 
 rsz_struct! {
@@ -476,17 +560,18 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.enemy.SystemDifficultyRateData.PartsRateTableData",
-        0x2d825942 = 0
+        0x0c501c3d = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct PartsRateTableData {
         pub parts_vital_rate: f32,
+        pub mystery_core_vital_rate: f32
     }
 }
 
 rsz_struct! {
     #[rsz("snow.enemy.SystemDifficultyRateData.OtherRateTableData",
-        0x6a5bdfc8 = 0
+        0x334ea69a = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct OtherRateTableData {
@@ -495,7 +580,15 @@ rsz_struct! {
         pub damage_element_rate_b: f32,
         pub stun_rate: f32,
         pub tired_rate: f32,
+        pub paralyze_rate: f32,
+        pub sleep_rate: f32,
         pub marionette_rate: f32,
+        pub damage_element_first_rate_a: f32,
+        pub damage_element_first_rate_b: f32,
+        pub stun_first_rate: f32,
+        pub tired_first_rate: f32,
+        pub paralyze_first_rate: f32,
+        pub sleep_first_rate: f32,
     }
 }
 
@@ -513,18 +606,18 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.enemy.SystemDifficultyRateData.MultiRateTableData",
-        0x5f51c7d9 = 0
+        0xe9130b0b = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct MultiRateTableData {
-        pub multi_data_list: [MultiData; 12],
+        pub multi_data_list: [MultiData; 13],
     }
 }
 
 rsz_struct! {
     #[rsz("snow.enemy.SystemDifficultyRateData",
         path = "enemy/user_data/system_difficulty_rate_data.user",
-        0xed679ca7 = 0
+        0xC776EEC0 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct SystemDifficultyRateData {
@@ -549,7 +642,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.enemy.EnemyBossRandomScaleData.RandomScaleTableData",
-        0x63c935dc = 0
+        0xB0D72295 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct RandomScaleTableData {
@@ -571,7 +664,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.enemy.SystemEnemySizeListData.SizeInfo",
-        0x5d3dd8e1 = 0
+        0xB66C1F4D = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct SizeInfo {
@@ -597,7 +690,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.quest.DiscoverEmSetData.Param",
-        0x9f570ffb = 0
+        0xa9f8ec2d = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct DiscoverEmSetDataParam {
@@ -605,10 +698,24 @@ rsz_struct! {
         pub cond_village: VillageProgress,
         pub cond_low: i32, // snow.progress.HallProgress
         pub cond_high: i32, // snow.progress.HallProgress
-        pub map_flag: [bool; 5],
-        pub param: SharedEnemyParam,
+        pub cond_master: i32, // snow.progress.MasterRankProgress
+        pub map_flag: [bool; 7],
+        pub route_no: [u8; 7],
+        pub init_set_name: [String; 7],
+        pub sub_type: [u8; 4],
+        pub vital_tbl: [u8; 4],
+        pub attack_tbl: [u8; 4],
+        pub parts_tbl: [u8; 4],
+        pub other_tbl: [u8; 4],
+        pub stamina_tbl: [u8; 4],
+        pub scale: [u8; 4],
+        pub scale_tbl:[i32; 4], // snow.enemy.EnemyDef.BossScaleTblType
+        pub difficulty: [NandoYuragi; 4],
+        pub boss_multi: [u8; 4],
     }
 }
+
+impl_enemy_param!(DiscoverEmSetDataParam);
 
 rsz_struct! {
     #[rsz("snow.quest.DiscoverEmSetData",
@@ -671,6 +778,14 @@ rsz_struct! {
     }
 }
 
+rsz_with_singleton! {
+    #[path("data/Define/Quest/System/QuestRewardSystem/QuestDataForRewardData.user")]
+    pub struct QuestDataForRewardUserDataLrHr(QuestDataForRewardUserData);
+
+    #[path("data/Define/Quest/System/QuestRewardSystem/QuestDataForRewardData_MR.user")]
+    pub struct QuestDataForRewardUserDataMr(QuestDataForRewardUserData);
+}
+
 // snow.data.ItemLotTable.LotRule
 rsz_enum! {
     #[rsz(i32)]
@@ -686,7 +801,7 @@ rsz_enum! {
 
 rsz_struct! {
     #[rsz("snow.data.RewardIdLotTableUserData.Param",
-        0x214bfede = 0
+        0x11de5dc7 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct RewardIdLotTableUserDataParam {
@@ -700,7 +815,6 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.data.RewardIdLotTableUserData",
-        path = "data/Define/Quest/System/QuestRewardSystem/RewardIdLotTableData.user",
         0xdb631ed5 = 0
     )]
     #[derive(Debug, Serialize)]
@@ -709,9 +823,17 @@ rsz_struct! {
     }
 }
 
+rsz_with_singleton! {
+    #[path("data/Define/Quest/System/QuestRewardSystem/RewardIdLotTableData.user")]
+    pub struct RewardIdLotTableUserDataLrHr(RewardIdLotTableUserData);
+
+    #[path("data/Define/Quest/System/QuestRewardSystem/RewardIdLotTableData_MR.user")]
+    pub struct RewardIdLotTableUserDataMr(RewardIdLotTableUserData);
+}
+
 rsz_struct! {
     #[rsz("snow.quest.HyakuryuQuestData.WaveData",
-        0xc4e69cfb = 0
+        0x43C9A46C = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct HyakuryuQuestDataWaveData {
@@ -746,7 +868,7 @@ rsz_enum! {
 
 rsz_struct! {
     #[rsz("snow.quest.HyakuryuQuestData",
-        0x48e96a40 = 0
+        0x238dcfc8 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct HyakuryuQuestData {
@@ -773,8 +895,7 @@ rsz_struct! {
 rsz_struct! {
     #[rsz("snow.quest.HyakuryuQuestDataTbl",
         path = "Quest/Hyakuryu/QuestData/FixHyakuryuQuestData.user",
-        0x9b163063 = 0,
-        0xB0022BC2 = 2,
+        0xB0022BC2 = 10_00_02,
     )]
     #[derive(Debug, Serialize)]
     pub struct HyakuryuQuestDataTbl {
@@ -782,8 +903,8 @@ rsz_struct! {
         pub data_list_310: Vec<HyakuryuQuestData>,
         pub data_list_320: Vec<HyakuryuQuestData>,
         pub data_list_350: Vec<HyakuryuQuestData>,
-        pub data_list_370: Versioned<Vec<HyakuryuQuestData>, 2, {u32::MAX}>,
-        pub data_list_380: Versioned<Vec<HyakuryuQuestData>, 2, {u32::MAX}>,
-        pub data_list_390: Versioned<Vec<HyakuryuQuestData>, 2, {u32::MAX}>,
+        pub data_list_370: Vec<HyakuryuQuestData>,
+        pub data_list_380: Vec<HyakuryuQuestData>,
+        pub data_list_390: Vec<HyakuryuQuestData>,
     }
 }

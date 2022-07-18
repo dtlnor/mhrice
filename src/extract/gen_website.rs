@@ -1,12 +1,12 @@
 //use super::gen_armor::*;
 //use super::gen_hyakuryu_skill::*;
-//use super::gen_item::*;
+use super::gen_item::*;
 //use super::gen_map::*;
 use super::gen_monster::*;
 //use super::gen_otomo::*;
-//use super::gen_quest::*;
+use super::gen_quest::*;
 //use super::gen_skill::*;
-//use super::gen_weapon::*;
+use super::gen_weapon::*;
 use super::pedia::*;
 use super::sink::*;
 use crate::msg::*;
@@ -92,23 +92,23 @@ pub fn navbar() -> Box<nav<String>> {
                     "Quests"
                 </a>
 
-                <div class="navbar-item has-dropdown is-hoverable">
-                <a class="navbar-link">
-                    "Skills"
-                </a>
-                <div class="navbar-dropdown">
-                    <a class="navbar-item" href="/skill.html">
-                        "Armor skills"
-                    </a>
-                    <a class="navbar-item" href="/hyakuryu_skill.html">
-                        "Ramp-up skills"
-                    </a>
-                </div>
-                </div>
+                // <div class="navbar-item has-dropdown is-hoverable">
+                // <a class="navbar-link">
+                //     "Skills"
+                // </a>
+                // <div class="navbar-dropdown">
+                //     <a class="navbar-item" href="/skill.html">
+                //         "Armor skills"
+                //     </a>
+                //     <a class="navbar-item" href="/hyakuryu_skill.html">
+                //         "Ramp-up skills"
+                //     </a>
+                // </div>
+                // </div>
 
-                <a class="navbar-item" href="/armor.html">
-                    "Armors"
-                </a>
+                // <a class="navbar-item" href="/armor.html">
+                //     "Armors"
+                // </a>
 
                 <div class="navbar-item has-dropdown is-hoverable">
                 <a class="navbar-link">
@@ -132,22 +132,25 @@ pub fn navbar() -> Box<nav<String>> {
                 </div>
                 </div>
 
-                <div class="navbar-item has-dropdown is-hoverable">
-                <a class="navbar-link">
-                    "Buddy"
-                </a>
-                <div class="navbar-dropdown">
-                    <a class="navbar-item" href="/airou.html">"Palico equipment"</a>
-                    <a class="navbar-item" href="/dog.html">"Palamute equipment"</a>
-                </div>
-                </div>
+                // <div class="navbar-item has-dropdown is-hoverable">
+                // <a class="navbar-link">
+                //     "Buddy"
+                // </a>
+                // <div class="navbar-dropdown">
+                //     <a class="navbar-item" href="/airou.html">"Palico equipment"</a>
+                //     <a class="navbar-item" href="/dog.html">"Palamute equipment"</a>
+                // </div>
+                // </div>
 
-                <a class="navbar-item" href="/map.html">
-                    "Maps"
-                </a>
+                // <a class="navbar-item" href="/map.html">
+                //     "Maps"
+                // </a>
 
                 <a class="navbar-item" href="/item.html">
-                    "Items"
+                   "Items"
+                </a>
+                <a class="navbar-item">
+                    "(More are coming soon...)"
                 </a>
                 <a class="navbar-item" href="/about.html">
                     "About"
@@ -529,8 +532,8 @@ pub fn gen_part_color_css(output: &impl Sink) -> Result<()> {
 
 pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) -> Result<()> {
     let mut toc = Toc::new();
-    //gen_quests(pedia, pedia_ex, output, &mut toc)?;
-    //gen_quest_list(&pedia_ex.quests, output)?;
+    gen_quests(pedia, pedia_ex, output, &mut toc)?;
+    gen_quest_list(&pedia_ex.quests, output)?;
     //gen_skills(pedia_ex, output, &mut toc)?;
     //gen_skill_list(&pedia_ex.skills, output)?;
     //gen_hyakuryu_skills(pedia_ex, output, &mut toc)?;
@@ -538,9 +541,9 @@ pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) ->
     //gen_armors(pedia_ex, output, &mut toc)?;
     //gen_armor_list(&pedia_ex.armors, output)?;
     gen_monsters(pedia, pedia_ex, output, &mut toc)?;
-    //gen_items(pedia, pedia_ex, output, &mut toc)?;
-    //gen_item_list(pedia_ex, output)?;
-    //gen_weapons(pedia_ex, output, &mut toc)?;
+    gen_items(pedia, pedia_ex, output, &mut toc)?;
+    gen_item_list(pedia_ex, output)?;
+    gen_weapons(pedia_ex, output, &mut toc)?;
     //gen_maps(pedia, pedia_ex, output, &mut toc)?;
     //gen_map_list(pedia, output)?;
     //gen_otomo_equips(pedia_ex, output, &mut toc)?;

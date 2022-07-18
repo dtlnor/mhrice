@@ -1,5 +1,5 @@
-//use super::gen_item::*;
-//use super::gen_quest::*;
+use super::gen_item::*;
+use super::gen_quest::*;
 use super::gen_website::{gen_multi_lang, head_common, navbar};
 use super::pedia::*;
 use super::sink::*;
@@ -13,6 +13,7 @@ use typed_html::{dom::*, elements::*, html, text};
 
 pub fn gen_monster_tag(
     pedia: &Pedia,
+    pedia_ex: &PediaEx,
     em_type: EmTypes,
     is_target: bool,
     short: bool,
@@ -31,8 +32,8 @@ pub fn gen_monster_tag(
 
     let monster_name = (!short).then(|| {
         (|| {
-            let name_name = format!("EnemyIndex{:03}", monster?.enemy_type?);
-            Some(gen_multi_lang(pedia.monster_names.get_entry(&name_name)?))
+            let name = pedia_ex.monsters[&em_type].name?;
+            Some(gen_multi_lang(name))
         })()
         .unwrap_or(html!(<span>{text!("Monster {0:03}_{1:02}",
                                 id & 0xFF, id >> 8)}</span>))
@@ -480,7 +481,6 @@ fn gen_condition_steel_fang(
     )
 }
 
-/*
 fn gen_grouped_reward_table<'a>(
     pedia_ex: &'a PediaEx,
     drop_dictionary: &'a HashMap<EnemyRewardPopTypes, Vec<String>>,
@@ -573,6 +573,7 @@ pub fn gen_lot(
     let header = match rank {
         QuestRank::Low => "Low rank reward",
         QuestRank::High => "High rank reward",
+        QuestRank::Master => "Master rank reward",
     };
 
     html!(<section>
@@ -740,7 +741,6 @@ pub fn gen_lot(
         </div>
     </section>)
 }
-*/
 
 pub fn gen_monster(
     is_large: bool,
@@ -774,21 +774,18 @@ pub fn gen_monster(
 
     let monster_id = monster.id;
     let monster_sub_id = monster.sub_id;
-    let monster_em_type =
-        if is_large { EmTypes::Em } else { EmTypes::Ems }(monster_id | (monster_sub_id << 8));
+    let monster_em_type = monster.em_type;
+    let monster_ex = &pedia_ex.monsters[&monster_em_type];
     let condition_preset = &pedia.condition_preset;
 
-    let explains = pedia.monster_explains.get_name_map();
-    let explain1 = monster
-        .enemy_type
-        .and_then(|e| explains.get(&format!("HN_MonsterListMsg_EnemyIndex{:03}_page1", e)))
+    let explain1 = monster_ex
+        .explain1
         .map(|m| html!(<pre> {gen_multi_lang(m)} </pre>));
-    let explain2 = monster
-        .enemy_type
-        .and_then(|e| explains.get(&format!("HN_MonsterListMsg_EnemyIndex{:03}_page2", e)))
+    let explain2 = monster_ex
+        .explain2
         .map(|m| html!(<pre> {gen_multi_lang(m)} </pre>));
 
-    /*let quest_list = html!(
+    let quest_list = html!(
         <section>
         <h2 >"Quests"</h2>
         <div class="mh-table"><table>
@@ -799,11 +796,12 @@ pub fn gen_monster(
                 <th>"Attack"</th>
                 <th>"Parts"</th>
                 <th>"Defense"</th>
-                <th>"Element A"</th>
-                <th>"Element B"</th>
+                <th>"Element"</th>
                 <th>"Stun"</th>
                 <th>"Exhaust"</th>
                 <th>"Ride"</th>
+                <th>"Paralyze"</th>
+                <th>"Sleep"</th>
                 <th>"Stamina"</th>
             </tr></thead>
             <tbody> {
@@ -814,8 +812,7 @@ pub fn gen_monster(
                     .map(move |(i, em_type)|{
                         html!(<tr>
                             <td> { gen_quest_tag(quest, quest.param.has_target(em_type)) } </td>
-                            { gen_quest_monster_data(quest.enemy_param.as_ref().map(|p|&p.param),
-                                em_type, i, pedia, pedia_ex) }
+                            { gen_quest_monster_data(quest.enemy_param, em_type, i, pedia, pedia_ex) }
                         </tr>)
                     })
                 })
@@ -824,16 +821,20 @@ pub fn gen_monster(
                 if let Some(&discovery) = pedia_ex.discoveries.get(&monster_em_type) {
                     vec![
                         html!(<tr><td>"Village tour"</td>{
-                            gen_quest_monster_data(Some(&discovery.param),
+                            gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 0, pedia, pedia_ex)
                         }</tr>),
                         html!(<tr><td>"Low rank tour"</td>{
-                            gen_quest_monster_data(Some(&discovery.param),
+                            gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 1, pedia, pedia_ex)
                         }</tr>),
                         html!(<tr><td>"High rank tour"</td>{
-                            gen_quest_monster_data(Some(&discovery.param),
+                            gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 2, pedia, pedia_ex)
+                        }</tr>),
+                        html!(<tr><td>"Master rank tour"</td>{
+                            gen_quest_monster_data(Some(discovery),
+                                monster_em_type, 3, pedia, pedia_ex)
                         }</tr>)
                     ]
                 } else {
@@ -843,14 +844,9 @@ pub fn gen_monster(
             </tbody>
         </table></div>
         </section>
-    );*/
+    );
 
-    let monster_alias = if let Some(enemy_type) = monster.enemy_type {
-        let name_name = format!("Alias_EnemyIndex{:03}", enemy_type);
-        pedia.monster_aliases.get_entry(&name_name)
-    } else {
-        None
-    };
+    let monster_alias = monster_ex.alias;
 
     let doc: DOMTree<String> = html!(
         <html>
@@ -898,7 +894,7 @@ pub fn gen_monster(
                 ) }</p>
                 </section>
 
-                //{ quest_list }
+                { quest_list }
 
                 <section>
                 <h2 >"Hitzone data"</h2>
@@ -974,16 +970,21 @@ pub fn gen_monster(
 
                                 meats.meat_group_info.iter().enumerate()
                                 .map(move |(phase, group_info)| {
-                                    let name = pedia_ex.meat_names.get(&MeatKey {
+                                    let names = pedia_ex.meat_names.get(&MeatKey {
                                         em_type: monster_em_type,
                                         part,
                                         phase
-                                    }).copied().map_or(html!(<span></span>), gen_multi_lang);
+                                    }).map(|v|v.as_slice()).unwrap_or_default();
 
                                     let mut tds = part_common.take().unwrap_or_default();
                                     tds.extend(vec![
                                         html!(<td>{text!("{}", phase)}</td>),
-                                        html!(<td>{name}</td>),
+                                        html!(<td>{
+                                            names.iter().enumerate().map(|(i, n)| html!(<span>
+                                                { text!("{}", if i == 0 {""} else {", "}) }
+                                                { gen_multi_lang(n) }
+                                            </span>))
+                                        }</td>),
                                         html!(<td>{text!("{}", group_info.slash)}</td>),
                                         html!(<td>{text!("{}", group_info.strike)}</td>),
                                         html!(<td>{text!("{}", group_info.shell)}</td>),
@@ -1156,8 +1157,9 @@ pub fn gen_monster(
                 </table></div>
                 </section>
 
-                //{gen_lot(monster, monster_em_type, QuestRank::Low, pedia_ex)}
-                //{gen_lot(monster, monster_em_type, QuestRank::High, pedia_ex)}
+                {gen_lot(monster, monster_em_type, QuestRank::Low, pedia_ex)}
+                {gen_lot(monster, monster_em_type, QuestRank::High, pedia_ex)}
+                {gen_lot(monster, monster_em_type, QuestRank::Master, pedia_ex)}
                 </main>
             </body>
         </html>
@@ -1192,11 +1194,6 @@ pub fn gen_monsters(
             </head>
             <body>
                 { navbar() }
-                <article class="message is-warning">
-                    <div class="message-body">
-                        "This website won't get update within the first two weeks after Sunbreak release."
-                    </div>
-                </article>
 
                 <main>
                 <header><h1>"Monsters"</h1></header>
@@ -1207,15 +1204,14 @@ pub fn gen_monsters(
                     <option value="1">"Sort by in-game order"</option>
                 </select></div>
                 <ul class="mh-list-monster" id="slist-monster">{
-                    pedia.monsters.iter().map(|monster| {
+                    pedia.monsters.iter().filter(|monster|monster.id != 131).map(|monster| {
                         let icon_path = format!("/resources/em{0:03}_{1:02}_icon.png", monster.id, monster.sub_id);
 
-                        let name_name = format!("EnemyIndex{:03}", monster.enemy_type.unwrap_or(9999));
-
-                        let name_entry = if let Some(entry) = pedia.monster_names.get_entry(&name_name) {
+                        let monster_ex = &pedia_ex.monsters[&monster.em_type];
+                        let name_entry = if let Some(entry) = monster_ex.name {
                             gen_multi_lang(entry)
                         } else {
-                            html!(<span>"-"</span>)
+                            html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>)
                         };
 
                         let order = pedia_ex.monster_order.get(&EmTypes::Em(monster.id | (monster.sub_id << 8)))
@@ -1237,12 +1233,9 @@ pub fn gen_monsters(
                     .map(|monster| {
                         let icon_path = format!("/resources/ems{0:03}_{1:02}_icon.png", monster.id, monster.sub_id);
 
-                        let name = if let Some(enemy_type) = monster.enemy_type {
-                            let name_name = format!("EnemyIndex{:03}", enemy_type);
-                            pedia.monster_names.get_entry(&name_name).map_or(
-                                html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>),
-                                gen_multi_lang
-                            )
+                        let monster_ex = &pedia_ex.monsters[&monster.em_type];
+                        let name = if let Some(entry) = monster_ex.name {
+                            gen_multi_lang(entry)
                         } else {
                             html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>)
                         };
