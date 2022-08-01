@@ -10,9 +10,11 @@ use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
 pub fn gen_hyakuryu_skill_label(skill: &HyakuryuSkill) -> Box<a<String>> {
-    html!(<a href={format!("/hyakuryu_skill/{}", hyakuryu_skill_page(skill.data.id))} class="mh-icon-text">
-        {gen_colored_icon(skill.data.item_color, "/resources/rskill", &[])}
+    html!(<a href={format!("/hyakuryu_skill/{}", hyakuryu_skill_page(skill.id()))} class="mh-icon-text">
+        {gen_colored_icon(skill.color(), "/resources/rskill", &[])}
         <span>{gen_multi_lang(skill.name)}</span>
+        {skill.recipe.is_some().then(||html!(<span class="tag">"HR"</span>))}
+        {skill.deco.is_some().then(||html!(<span class="tag">"MR"</span>))}
     </a>)
 }
 
@@ -30,13 +32,13 @@ pub fn gen_hyakuryu_skill_list(
     let doc: DOMTree<String> = html!(
         <html>
             <head>
-                <title>{text!("Ramp-up skills - MHRice")}</title>
+                <title>{text!("Rampage skills - MHRice")}</title>
                 { head_common() }
             </head>
             <body>
                 { navbar() }
                 <main>
-                <header><h1>"Ramp-up skill"</h1></header>
+                <header><h1>"Rampage skill"</h1></header>
                 <ul class="mh-item-list">
                 {
                     skills.iter().map(|(_, skill)|{
@@ -103,6 +105,19 @@ fn gen_hyakuryu_source_weapon(
     }
 }
 
+pub fn gen_hyakuryu_deco_label(deco: &HyakuryuDeco) -> Box<div<String>> {
+    let icon_id = if deco.data.decoration_lv == 4 {
+        200
+    } else {
+        63 + deco.data.decoration_lv
+    };
+    let icon = format!("/resources/item/{:03}", icon_id);
+    html!(<div class="mh-icon-text">
+        { gen_colored_icon(deco.data.icon_color, &icon, &["mh-addon-hyakuryu"]) }
+        <span>{gen_multi_lang(deco.name)}</span>
+    </div>)
+}
+
 pub fn gen_hyakuryu_skill(
     skill: &HyakuryuSkill,
     pedia_ex: &PediaEx,
@@ -110,10 +125,35 @@ pub fn gen_hyakuryu_skill(
     mut toc_sink: TocSink<'_>,
 ) -> Result<()> {
     toc_sink.add(skill.name);
+
+    let deco = skill.deco.as_ref().map(|deco| {
+        html!(<section>
+        <h2 >"Decoration"</h2>
+        <div class="mh-table"><table>
+            <thead><tr>
+                <th>"Name"</th>
+                <th>"Cost"</th>
+                <th>"Categorized Material"</th>
+                <th>"Material"</th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td>{gen_hyakuryu_deco_label(deco)}</td>
+                    <td>{text!("{}", deco.data.base_price)}</td>
+                    { gen_category(pedia_ex, deco.product.material_category,
+                        deco.product.point) }
+                    { gen_materials(pedia_ex, &deco.product.item_id_list,
+                        &deco.product.item_num_list, deco.product.item_flag) }
+                </tr>
+            </tbody>
+        </table></div>
+        </section>)
+    });
+
     let doc: DOMTree<String> = html!(
         <html>
             <head>
-                <title>{text!("Ramp-up skill - MHRice")}</title>
+                <title>{text!("Rampage skill - MHRice")}</title>
                 { head_common() }
             </head>
             <body>
@@ -121,7 +161,7 @@ pub fn gen_hyakuryu_skill(
                 <main>
                 <header>
                     <div class="mh-title-icon">
-                        {gen_colored_icon(skill.data.item_color, "/resources/rskill", &[])}
+                        {gen_colored_icon(skill.color(), "/resources/rskill", &[])}
                     </div>
                     <h1>{gen_multi_lang(skill.name)}</h1>
                 </header>
@@ -149,7 +189,9 @@ pub fn gen_hyakuryu_skill(
                     </section>
                 ))}
 
-                { gen_hyakuryu_source_weapon(skill.data.id, pedia_ex) }
+                { deco }
+
+                { gen_hyakuryu_source_weapon(skill.id(), pedia_ex) }
 
                 </main>
             </body>

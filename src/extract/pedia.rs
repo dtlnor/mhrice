@@ -1,4 +1,4 @@
-//use super::prepare_map::*;
+use super::prepare_map::*;
 use crate::msg::*;
 use crate::rsz::*;
 use serde::*;
@@ -76,6 +76,8 @@ pub struct Pedia {
     pub reward_id_lot_table_mr: RewardIdLotTableUserDataMr,
     pub main_target_reward_lot_num: MainTargetRewardLotNumDefineUserData,
     pub fixed_hyakuryu_quest: HyakuryuQuestDataTbl,
+    pub mystery_reward_item: MysteryRewardItemUserData,
+    pub quest_servant: QuestServantDataList,
     pub quest_hall_msg: Msg,
     pub quest_hall_msg_mr: Msg,
     pub quest_hall_msg_mr2: Msg,
@@ -85,7 +87,7 @@ pub struct Pedia {
     pub quest_arena_msg: Msg,
     pub quest_dlc_msg: Msg,
 
-    /*pub armor: ArmorBaseUserData,
+    pub armor: ArmorBaseUserData,
     pub armor_series: ArmorSeriesUserData,
     pub armor_product: ArmorProductUserData,
     pub overwear: PlOverwearBaseUserData,
@@ -101,22 +103,43 @@ pub struct Pedia {
     pub armor_waist_explain_msg: Msg,
     pub armor_leg_explain_msg: Msg,
     pub armor_series_name_msg: Msg,
+    pub armor_head_name_msg_mr: Msg,
+    pub armor_chest_name_msg_mr: Msg,
+    pub armor_arm_name_msg_mr: Msg,
+    pub armor_waist_name_msg_mr: Msg,
+    pub armor_leg_name_msg_mr: Msg,
+    pub armor_head_explain_msg_mr: Msg,
+    pub armor_chest_explain_msg_mr: Msg,
+    pub armor_arm_explain_msg_mr: Msg,
+    pub armor_waist_explain_msg_mr: Msg,
+    pub armor_leg_explain_msg_mr: Msg,
+    pub armor_series_name_msg_mr: Msg,
 
     pub equip_skill: PlEquipSkillBaseUserData,
     pub player_skill_detail_msg: Msg,
     pub player_skill_explain_msg: Msg,
     pub player_skill_name_msg: Msg,
+    pub player_skill_detail_msg_mr: Msg,
+    pub player_skill_explain_msg_mr: Msg,
+    pub player_skill_name_msg_mr: Msg,
 
     pub hyakuryu_skill: PlHyakuryuSkillBaseUserData,
     pub hyakuryu_skill_recipe: PlHyakuryuSkillRecipeUserData,
     pub hyakuryu_skill_name_msg: Msg,
     pub hyakuryu_skill_explain_msg: Msg,
+    pub hyakuryu_skill_name_msg_mr: Msg,
+    pub hyakuryu_skill_explain_msg_mr: Msg,
 
     pub decorations: DecorationsBaseUserData,
     pub decorations_product: DecorationsProductUserData,
     pub decorations_name_msg: Msg,
+    pub decorations_name_msg_mr: Msg,
 
-    pub alchemy_pattern: AlchemyPatturnUserData,
+    pub hyakuryu_decos: HyakuryuDecoBaseUserData,
+    pub hyakuryu_decos_product: HyakuryuDecoProductUserData,
+    pub hyakuryu_decos_name_msg: Msg,
+
+    /*pub alchemy_pattern: AlchemyPatturnUserData,
     pub alchemy_pl_skill: AlchemyPlSkillTableUserData,
     pub alchemy_grade_worth: GradeWorthTableUserData,
     pub alchemy_rare_type: RareTypeTableUserData,
@@ -147,12 +170,13 @@ pub struct Pedia {
     pub heavy_bowgun: WeaponList<HeavyBowgunBaseUserData>,
     pub bow: WeaponList<BowBaseUserData>,
 
-    // pub horn_melody: Msg,
+    pub horn_melody: Msg,
+    pub horn_melody_mr: Msg,
     pub hyakuryu_weapon_buildup: HyakuryuWeaponHyakuryuBuildupUserData,
-    /*pub maps: BTreeMap<i32, GameMap>,
+    pub maps: BTreeMap<i32, GameMap>,
     pub map_name: Msg,
+    pub map_name_mr: Msg,
     pub item_pop_lot: ItemPopLotTableUserData,
-
     pub airou_armor: OtAirouArmorBaseUserData,
     pub airou_armor_product: OtAirouArmorProductUserData,
     pub dog_armor: OtDogArmorBaseUserData,
@@ -175,7 +199,23 @@ pub struct Pedia {
     pub dog_weapon_name: Msg,
     pub dog_weapon_explain: Msg,
     pub airou_series_name: Msg,
-    pub dog_series_name: Msg,*/
+    pub dog_series_name: Msg,
+    pub airou_armor_head_name_mr: Msg,
+    pub airou_armor_head_explain_mr: Msg,
+    pub airou_armor_chest_name_mr: Msg,
+    pub airou_armor_chest_explain_mr: Msg,
+    pub dog_armor_head_name_mr: Msg,
+    pub dog_armor_head_explain_mr: Msg,
+    pub dog_armor_chest_name_mr: Msg,
+    pub dog_armor_chest_explain_mr: Msg,
+    pub airou_weapon_name_mr: Msg,
+    pub airou_weapon_explain_mr: Msg,
+    pub dog_weapon_name_mr: Msg,
+    pub dog_weapon_explain_mr: Msg,
+    pub airou_series_name_mr: Msg,
+    pub dog_series_name_mr: Msg,
+
+    pub servant_profile: Msg,
 }
 
 pub struct QuestReward<'a> {
@@ -197,6 +237,7 @@ pub struct Quest<'a> {
     pub is_dl: bool,
     pub reward: Option<QuestReward<'a>>,
     pub hyakuryu: Option<&'a HyakuryuQuestData>,
+    pub servant: Option<&'a QuestServantData>,
 }
 
 pub struct Deco<'a> {
@@ -210,14 +251,39 @@ pub struct Skill<'a> {
     pub explain: &'a MsgEntry,
     pub levels: Vec<&'a MsgEntry>,
     pub icon_color: i32,
-    pub deco: Option<Deco<'a>>,
+    pub decos: Vec<Deco<'a>>,
+}
+
+pub struct HyakuryuDeco<'a> {
+    pub data: &'a HyakuryuDecoBaseUserDataParam,
+    pub product: &'a HyakuryuDecoProductUserDataParam,
+    pub name: &'a MsgEntry,
 }
 
 pub struct HyakuryuSkill<'a> {
-    pub data: &'a PlHyakuryuSkillBaseUserDataParam,
+    pub data: Option<&'a PlHyakuryuSkillBaseUserDataParam>,
     pub recipe: Option<&'a PlHyakuryuSkillRecipeUserDataParam>,
     pub name: &'a MsgEntry,
     pub explain: &'a MsgEntry,
+    pub deco: Option<HyakuryuDeco<'a>>,
+}
+
+impl<'a> HyakuryuSkill<'a> {
+    pub fn id(&self) -> PlHyakuryuSkillId {
+        if let Some(data) = self.data {
+            data.id
+        } else {
+            self.deco.as_ref().unwrap().data.hyakuryu_skill_id
+        }
+    }
+
+    pub fn color(&self) -> i32 {
+        if let Some(data) = self.data {
+            data.item_color
+        } else {
+            self.deco.as_ref().unwrap().data.icon_color
+        }
+    }
 }
 
 pub struct Armor<'a> {
@@ -230,7 +296,7 @@ pub struct Armor<'a> {
 }
 
 pub struct ArmorSeries<'a> {
-    pub name: Option<&'a MsgEntry>,
+    pub name: &'a MsgEntry,
     pub series: &'a ArmorSeriesUserDataParam,
     pub pieces: [Option<Armor<'a>>; 10],
 }
@@ -295,6 +361,11 @@ pub struct MonsterEx<'a> {
     pub alias: Option<&'a MsgEntry>,
     pub explain1: Option<&'a MsgEntry>,
     pub explain2: Option<&'a MsgEntry>,
+    pub mystery_reward: Option<&'a MysteryRewardItemUserDataParam>,
+}
+
+pub struct Servant<'a> {
+    pub name: &'a MsgEntry,
 }
 
 pub struct PediaEx<'a> {
@@ -303,9 +374,9 @@ pub struct PediaEx<'a> {
     pub size_dists: HashMap<i32, &'a [ScaleAndRateData]>,
     pub quests: Vec<Quest<'a>>,
     pub discoveries: HashMap<EmTypes, &'a DiscoverEmSetDataParam>,
-    /*pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
+    pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
     pub hyakuryu_skills: BTreeMap<PlHyakuryuSkillId, HyakuryuSkill<'a>>,
-    pub armors: Vec<ArmorSeries<'a>>,*/
+    pub armors: Vec<ArmorSeries<'a>>,
     pub meat_names: HashMap<MeatKey, Vec<&'a MsgEntry>>,
 
     pub items: BTreeMap<ItemId, Item<'a>>,
@@ -328,9 +399,10 @@ pub struct PediaEx<'a> {
     pub heavy_bowgun: WeaponTree<'a, HeavyBowgunBaseUserDataParam>,
     pub bow: WeaponTree<'a, BowBaseUserDataParam>,
 
-    //pub horn_melody: HashMap<i32, &'a MsgEntry>,
+    pub horn_melody: HashMap<i32, &'a MsgEntry>,
     pub monster_order: HashMap<EmTypes, usize>,
-    /*pub item_pop: HashMap<(/*pop_id*/ i32, /*map*/ i32), &'a ItemPopLotTableUserDataParam>,
+    pub item_pop: HashMap<(/*pop_id*/ i32, /*map*/ i32), &'a ItemPopLotTableUserDataParam>,
+    pub ot_equip: BTreeMap<OtEquipSeriesId, OtEquipSeries<'a>>,
 
-    pub ot_equip: BTreeMap<OtEquipSeriesId, OtEquipSeries<'a>>,*/
+    pub servant: HashMap<i32, Servant<'a>>,
 }

@@ -249,6 +249,14 @@ impl Rsz {
         Ok(result)
     }
 
+    pub fn deserialize_single_any(&self) -> Result<AnyRsz> {
+        let mut result = self.deserialize()?;
+        if result.len() != 1 {
+            bail!("Not a single-valued RSZ");
+        }
+        Ok(result.pop().unwrap())
+    }
+
     pub fn deserialize_single<T: 'static>(&self) -> Result<T> {
         let mut result = self.deserialize()?;
         if result.len() != 1 {
@@ -280,13 +288,24 @@ pub struct RszDeserializer<'a, 'b> {
 }
 
 impl<'a, 'b> RszDeserializer<'a, 'b> {
-    fn get_child_inner<T: 'static>(&mut self, index: u32) -> Result<T> {
+    fn get_child_any_inner(&mut self, index: u32) -> Result<AnyRsz> {
         let node = self
             .node_buf
             .get_mut(usize::try_from(index)?)
             .context("Child index out of bound")?
             .take()
-            .context("None child")?
+            .context("None child")?;
+        Ok(node)
+    }
+
+    pub fn get_child_any(&mut self) -> Result<AnyRsz> {
+        let index = self.cursor.read_u32()?;
+        self.get_child_any_inner(index)
+    }
+
+    fn get_child_inner<T: 'static>(&mut self, index: u32) -> Result<T> {
+        let node = self
+            .get_child_any_inner(index)?
             .downcast()
             .context("Type mismatch")?;
         Ok(node)
@@ -366,7 +385,7 @@ impl AnyRsz {
         let symbol = self.type_info.symbol;
         match self.any.downcast() {
             Ok(b) => Ok(*b),
-            Err(e) => {
+            Err(_) => {
                 bail!("Expected {}, found {}", type_name::<T>(), symbol)
             }
         }
@@ -378,6 +397,10 @@ impl AnyRsz {
 
     pub fn to_json(&self) -> Result<String> {
         (self.type_info.to_json)(&*self.any)
+    }
+
+    pub fn symbol(&self) -> &'static str {
+        self.type_info.symbol
     }
 }
 
@@ -639,6 +662,11 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         HyakuryuQuestDataWaveData,
         HyakuryuQuestData,
         HyakuryuQuestDataTbl,
+        MysteryRewardItemUserDataParam,
+        MysteryRewardItemUserData,
+        SelectQuestServantInfo,
+        QuestServantData,
+        QuestServantDataList,
     );
 
     r!(
@@ -665,6 +693,10 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         DecorationsBaseUserData,
         DecorationsProductUserDataParam,
         DecorationsProductUserData,
+        HyakuryuDecoBaseUserDataParam,
+        HyakuryuDecoBaseUserData,
+        HyakuryuDecoProductUserDataParam,
+        HyakuryuDecoProductUserData,
     );
 
     r!(
@@ -776,11 +808,15 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         MotionBank,
         DynamicMotionBank,
         Motion,
+        CoreHandle,
+        BehaviorTree,
     );
 
     r!(
         MaskSetting,
         GuiMapScaleDefineData,
+        MapHyakuryuLayoutSetting,
+        GuiMap07DefineData,
         GuiQuestStart,
         GuiQuestEnd,
         QuestUIManage,
@@ -823,6 +859,26 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         FishSpawnRate,
         FishSpawnGroupInfo,
         FishSpawnData,
+        StageSceneLoader,
+        StageGridRegister,
+        M31IsletArrivalChecker,
+        StageAppTagSetter,
+        ItemPopIgnoreOtomoGathering,
+        TargetScene,
+        StageSceneStateController,
+        KeyHash,
+        StageDemoCameraSceneRequeterRequestData,
+        StageDemoCameraSceneRequeter,
+        StageAreaMoveSceneRequesterRequestData,
+        StageAreaMoveSceneRequester,
+        KillCameraConditionRegisterBlockNo,
+        QuestAreaMoveRequest,
+        QuestPhaseCondition,
+        CountCondition,
+        AreaMoveInfo,
+        QuestAreaMovePopMarker,
+        StageObjectStateControllerTargetObject,
+        StageObjectStateController,
     );
 
     r!(

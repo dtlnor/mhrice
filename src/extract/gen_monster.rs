@@ -12,23 +12,16 @@ use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
 pub fn gen_monster_tag(
-    pedia: &Pedia,
     pedia_ex: &PediaEx,
     em_type: EmTypes,
     is_target: bool,
     short: bool,
+    is_mystery: bool,
 ) -> Box<div<String>> {
     let (id, is_large) = match em_type {
         EmTypes::Em(id) => (id, true),
         EmTypes::Ems(id) => (id, false),
     };
-
-    let monster = (if is_large {
-        pedia.monsters.iter()
-    } else {
-        pedia.small_monsters.iter()
-    })
-    .find(|m| (m.id | m.sub_id << 8) == id);
 
     let monster_name = (!short).then(|| {
         (|| {
@@ -46,11 +39,6 @@ pub fn gen_monster_tag(
         id >> 8
     );
 
-    let target_tag = if is_target {
-        html!(<span class="tag is-primary">"Target"</span>)
-    } else {
-        html!(<span />)
-    };
     html!(<div>
         <a href={format!("/{}/{:03}_{:02}.html",
             if is_large { "monster" } else { "small-monster" }, id & 0xFF, id >> 8)}>
@@ -59,7 +47,9 @@ pub fn gen_monster_tag(
                 {monster_name}
             </span>
         </a>
-        {target_tag}
+
+        {is_target.then(||html!(<span class="tag is-primary">"Target"</span>))}
+        {is_mystery.then(||html!(<span class="tag is-danger">"Afflicted"</span>))}
     </div>)
 }
 
@@ -738,6 +728,27 @@ pub fn gen_lot(
         </table></div>
         </div>
 
+        { (rank == QuestRank::Master).then(||()).and_then(|_|
+            pedia_ex.monsters[&monster.em_type].mystery_reward
+            ).map(|mystery| {
+
+            html!(<div class="mh-reward-box">
+            <div class="mh-table"><table>
+                <thead><tr>
+                    <th>"Afflicted carves"</th>
+                    <th>"Probability"</th>
+                </tr></thead>
+                <tbody> {
+                    gen_reward_table(pedia_ex,
+                        &[mystery.reward_item],
+                        &[mystery.item_num],
+                        &[mystery.hagibui_probability])
+                } </tbody>
+            </table></div>
+            </div>)
+
+        })}
+
         </div>
     </section>)
 }
@@ -772,8 +783,6 @@ pub fn gen_monster(
         monster.sub_id,
     );
 
-    let monster_id = monster.id;
-    let monster_sub_id = monster.sub_id;
     let monster_em_type = monster.em_type;
     let monster_ex = &pedia_ex.monsters[&monster_em_type];
     let condition_preset = &pedia.condition_preset;
@@ -788,6 +797,14 @@ pub fn gen_monster(
     let quest_list = html!(
         <section>
         <h2 >"Quests"</h2>
+        <div>
+            <input type="checkbox" id="mh-non-target-check"/>
+            <label for="mh-non-target-check">"Display non-target"</label>
+        </div>
+        <div>
+            <input type="checkbox" id="mh-quest-detail-check"/>
+            <label for="mh-quest-detail-check">"More detailed stat"</label>
+        </div>
         <div class="mh-table"><table>
             <thead><tr>
                 <th>"Quest"</th>
@@ -795,14 +812,14 @@ pub fn gen_monster(
                 <th>"HP"</th>
                 <th>"Attack"</th>
                 <th>"Parts"</th>
-                <th>"Defense"</th>
-                <th>"Element"</th>
-                <th>"Stun"</th>
-                <th>"Exhaust"</th>
-                <th>"Ride"</th>
-                <th>"Paralyze"</th>
-                <th>"Sleep"</th>
-                <th>"Stamina"</th>
+                <th class="mh-quest-detail">"Defense"</th>
+                <th class="mh-quest-detail">"Element"</th>
+                <th class="mh-quest-detail">"Stun"</th>
+                <th class="mh-quest-detail">"Exhaust"</th>
+                <th class="mh-quest-detail">"Ride"</th>
+                <th class="mh-quest-detail">"Paralyze"</th>
+                <th class="mh-quest-detail">"Sleep"</th>
+                <th class="mh-quest-detail">"Stamina"</th>
             </tr></thead>
             <tbody> {
                 pedia_ex.quests.iter().flat_map(|quest| {
@@ -810,8 +827,20 @@ pub fn gen_monster(
                         |&(_, em_type)|em_type == monster_em_type
                     )
                     .map(move |(i, em_type)|{
-                        html!(<tr>
-                            <td> { gen_quest_tag(quest, quest.param.has_target(em_type)) } </td>
+                        let is_target = quest.param.has_target(em_type);
+                        let is_mystery = quest.enemy_param
+                            .and_then(|p|p.individual_type.get(i))
+                            .map(|&t|t == EnemyIndividualType::Mystery)
+                            .unwrap_or(false);
+                        let class = if !is_target {
+                            "mh-non-target"
+                        } else {
+                            ""
+                        };
+                        html!(<tr class={class}>
+                            <td> {
+                                gen_quest_tag(quest, true, is_target, is_mystery)
+                            } </td>
                             { gen_quest_monster_data(quest.enemy_param, em_type, i, pedia, pedia_ex) }
                         </tr>)
                     })
