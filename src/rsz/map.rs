@@ -2,12 +2,13 @@ use super::common::*;
 use super::*;
 use crate::rsz_enum;
 use crate::rsz_struct;
+use crate::rsz_sumtype;
 use nalgebra_glm::*;
 use serde::*;
 
 rsz_struct! {
     #[rsz("snow.stage.props.PopMaterialController",
-        0x2748d05a = 0
+        0x5a71bf68 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct PopMaterialController {
@@ -19,7 +20,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.access.PlayerInfluencePopMarker",
-        0x2b3d2c6c = 0
+        0xf4a0af8f = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct PlayerInfluencePopMarker {
@@ -33,7 +34,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.access.ItemPopBehavior",
-        0xdae0b08f = 0
+        0x0c330360 = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct ItemPopBehavior {
@@ -50,7 +51,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.access.ItemPopVisualController",
-        0x89989dcf = 0
+        0xf4a1f2fd = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct ItemPopVisualController {
@@ -66,7 +67,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.StageRestrictObserver",
-        0xe8f69abc = 0
+        0x95cff58e = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct StageRestrictObserver {
@@ -77,7 +78,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.pop.RelicNoteUnlock",
-        0xf2852b01 = 0
+        0x2d783185 = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct RelicNoteUnlock {
@@ -89,7 +90,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.gui.GuiCommonNpcHeadMessage",
-        0xae15ae5b = 0
+        0xb596a217 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct GuiCommonNpcHeadMessage {
@@ -143,6 +144,7 @@ rsz_struct! {
         pub control_id: u32,
         pub is_detectable: bool,
         pub is_accessible: bool,
+        pub is_accessible_ot_dog_pouch: bool,
         pub accessible_degree_list: Vec<AccessableDigree>,
         pub register_requirement: RegisterRequirementType,
         pub permit_exceptional_access: bool,
@@ -169,7 +171,7 @@ rsz_enum! {
 
 rsz_struct! {
     #[rsz("snow.access.NpcFacilityPopMarker",
-        0x3ad748a3 = 0
+        0x4129B38E = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct NpcFacilityPopMarker {
@@ -182,7 +184,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.hit.RSCAPIWrapper",
-        0x0c8d525e = 0
+        0x71b43d6c = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct RSCAPIWrapper {
@@ -203,7 +205,7 @@ rsz_enum! {
 
 rsz_struct! {
     #[rsz("snow.stage.props.TentBehavior",
-        0xee52e52d = 0
+        0x936b8a1f = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct TentBehavior {
@@ -214,7 +216,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.pop.CampFindCheck",
-        0x44a3363f = 0
+        0x5588A2F2 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct CampFindCheck {
@@ -222,12 +224,13 @@ rsz_struct! {
         pub camp_type: CampType,
         pub check_hight: f32,
         pub check_radius: f32,
+        pub sub_camp_find_chat_type: i32, // snow.gui.NpcGuideChatManager.NpcGuideChatType
     }
 }
 
 rsz_struct! {
     #[rsz("snow.access.SupplyBoxBehavior",
-        0x83471751 = 0
+        0xfe7e7863 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct SupplyBoxBehavior {
@@ -262,6 +265,34 @@ rsz_struct! {
         pub map_scale: f32,
         pub is_map_floor: bool,
         pub mask_set_list: Vec<MaskSetting>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.gui.userdata.GuiMap07DefineData.MapHyakuryuLayoutSetting",
+        0x8e07822f = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MapHyakuryuLayoutSetting {
+        pub add_hyakuryu_texture_pos: Vec3,
+        pub add_hyakuryu_mask_pos: Vec3,
+        pub hyakuryu_mask_size_w: f32,
+        pub hyakuryu_mask_size_h: f32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.gui.userdata.GuiMap07DefineData",
+        0x162be1f2 = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct GuiMap07DefineData {
+        #[serde(flatten)]
+        pub base: Flatten<GuiMapScaleDefineData>,
+        pub map_layout_setting: Vec<MapHyakuryuLayoutSetting>,
+        pub start_menu_map_layout_setting: Vec<MapHyakuryuLayoutSetting>,
+        pub detail_map_layout_setting: Vec<MapHyakuryuLayoutSetting>,
+
     }
 }
 
@@ -353,7 +384,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.data.ItemPopLotTableUserData.Param",
-        0x92603c1b = 0
+        0xa1800433 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct ItemPopLotTableUserDataParam {
@@ -366,6 +397,9 @@ rsz_struct! {
         pub upper_id: Vec<ItemId>,
         pub upper_num: Vec<u32>,
         pub upper_probability: Vec<u32>,
+        pub master_id: Vec<ItemId>,
+        pub master_num: Vec<u32>,
+        pub master_probability: Vec<u32>,
     }
 }
 
@@ -382,7 +416,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.pop.WireLongJumpUnlock",
-        0x618631a5 = 0
+        0x20e1f770 = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct WireLongJumpUnlock {
@@ -390,12 +424,14 @@ rsz_struct! {
         pub wire_long_jump_id: i32,// snow.stage.StageDef.WireLongJumpId
         pub unlock_cost: i32,
         pub unlock_time_tag: f32,
+        pub fish_check_dist: f32,
+        pub fish_check_under_dist: f32,
     }
 }
 
 rsz_struct! {
     #[rsz("via.effect.script.EnvironmentEffectManager",
-        0x96116d19 = 0
+        0xb75b4280 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct EnvironmentEffectManager {
@@ -471,7 +507,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("via.effect.script.EPVStandardData.Element",
-        0x46abcc6 = 0
+        0x6C9FC765 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct EPVStandardDataElement {
@@ -505,6 +541,7 @@ rsz_struct! {
         pub is_landing: bool,
         pub is_use_terrain_normal: bool,
         pub search_terrain_distance: f32,
+        pub ignore_landing_position: bool,
         pub cam_node_billbard_sec: f32,
         pub separate_parent_scale: bool,
         pub delay_frame: f32,
@@ -528,7 +565,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("via.effect.script.EPVStandardData",
-        0x15efc35c = 0
+        0x28ca23b3 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct EPVStandardData {
@@ -554,7 +591,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.EffectPlayerFadeByDepthData",
-        0xefafe567 = 0
+        0x92968a55 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct EffectPlayerFadeByDepthData {
@@ -564,7 +601,7 @@ rsz_struct! {
 }
 rsz_struct! {
     #[rsz("snow.EnvironmentEffectManagerHelper",
-        0xba1fd0c9 = 0
+        0xc726bffb = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct EnvironmentEffectManagerHelper {
@@ -574,7 +611,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("via.effect.script.EPVStandard",
-        0xc66ae2d3 = 0
+        0xbb538de1 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct EPVStandard {
@@ -585,7 +622,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.props.UniqueBehavior_pop010",
-        0x2AC55689 = 0
+        0x57fc39bb = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct UniqueBehaviorPop010 {
@@ -597,7 +634,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.props.TentVisualController",
-        0xa2a80c76 = 0
+        0xa33f23fe = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct TentVisualController {
@@ -605,12 +642,13 @@ rsz_struct! {
         pub camp_type: CampType,
         pub model_type: i32, // snow.stage.props.TentVisualController.ModelType
         pub map_floor_type: i32, // snow.stage.StageDef.MapFloorType
+        pub include_objects: Vec<Guid>, // Is this correct??
     }
 }
 
 rsz_struct! {
     #[rsz("snow.access.GimmickPopMarker",
-        0x23a2972 = 0
+        0x3F8D6838 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct GimmickPopMarker {
@@ -620,7 +658,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.access.StageFacilityPopMarker",
-        0x00B54C4F = 0
+        0xd5857982 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct StageFacilityPopMarker {
@@ -631,7 +669,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.pop.FishingPoint",
-        0xBC486085 = 0
+        0x813ab1b3 = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct FishingPoint {
@@ -648,7 +686,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.pop.FishingPointBuoy",
-        0x3e476f13 = 0
+        0x437e0021 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct FishingPointBuoy {
@@ -680,11 +718,249 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.stage.pop.userdata.FishSpawnData",
-        0x4ec4d134 = 0
+        0x5fae0ab5 = 10_00_02
     )]
     #[derive(Debug, Serialize, Clone)]
     pub struct FishSpawnData {
         pub spawn_group_list_info_low: Vec<FishSpawnGroupInfo>,
         pub spawn_group_list_info_high: Vec<FishSpawnGroupInfo>,
+        pub spawn_group_list_info_master: Vec<FishSpawnGroupInfo>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageSceneLoader",
+        0x64ef47ac = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageSceneLoader {
+        pub enabled: bool,
+        pub target_scene_names: Vec<String>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageGridRegister",
+        0x54957a07 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageGridRegister {
+        pub enabled: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.m31IsletArrivalChecker",
+        0x9ee9de11 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct M31IsletArrivalChecker {
+        pub enabled: bool,
+        pub check_pos: Vec3,
+        pub enable_distance: f32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageAppTagSetter",
+        0xce1cbdb1 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageAppTagSetter {
+        pub enabled: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.access.ItemPopIgnoreOtomoGathering",
+        0xb88a28ac = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct ItemPopIgnoreOtomoGathering {
+        pub enabled: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageSceneStateController.TargetScene",
+        0x261aa8f3 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct TargetScene {
+        pub key: String,
+        pub key_hash: u32,
+        pub scene_name: String,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageSceneStateController",
+        0x2e2825d8 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageSceneStateController {
+        pub enabled: bool,
+        pub data: ExternUser<()>, // snow.stage.StageSceneStateUserData
+        pub targets: Vec<TargetScene>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageObjectControllerBase.KeyHash",
+        0xb7d4fea1 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct KeyHash {
+        pub key: String,
+        pub hash: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageDemoCameraSceneRequeter.RequestData",
+        0xf64754ac = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageDemoCameraSceneRequeterRequestData {
+        pub target_types: Vec<i32>, // snow.camera.DemoCamera.RequestType
+        pub scene_key: KeyHash,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageDemoCameraSceneRequeter",
+        0x109e1f98 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageDemoCameraSceneRequeter {
+        pub enabled: bool,
+        pub request_data: Vec<StageDemoCameraSceneRequeterRequestData>,
+        pub start_request: i32, // snow.stage.StageDemoCameraSceneRequeter.RequestType
+        pub start_delay_frame: i32,
+        pub end_request: i32, // snow.stage.StageDemoCameraSceneRequeter.RequestType
+        pub end_delay_frame: i32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageAreaMoveSceneRequester.RequestData",
+        0x69196f07 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageAreaMoveSceneRequesterRequestData {
+        pub target_types: Vec<i32>, // snow.stage.StageManager.AreaMoveQuest
+        pub scene_key: KeyHash,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageAreaMoveSceneRequester",
+        0x7374e8b0 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageAreaMoveSceneRequester {
+        pub enabled: bool,
+        pub request_data: Vec<StageAreaMoveSceneRequesterRequestData>,
+        pub delay_frame: i32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.camera.KillCameraConditionRegisterBlockNo",
+        0xeb767f8a = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct KillCameraConditionRegisterBlockNo {
+        pub enabled: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageManager.QuestAreaMoveRequest",
+        0xf3eed444 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestAreaMoveRequest {
+        pub area_move_type: i32, // snow.stage.StageManager.AreaMoveQuest
+        pub player_area_move_type: i32, // snow.player.PlayerBase.AreaMoveType
+        pub warp_type: i32, // snow.stage.StagePointManager.WarpType
+        pub area_no_type: i32, // snow.stage.StageDef.AreaNoType
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.access.QuestAreaMovePopMarker.QuestPhaseCondition",
+        0xa5848ab1 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestPhaseCondition {
+        pub quest_phase: Vec<i32>, // snow.quest.QuestPhase
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.access.QuestAreaMovePopMarker.CountCondition",
+        0x743729a7 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct CountCondition {
+        pub count: i32,
+    }
+}
+
+rsz_sumtype! {
+    #[derive(Debug, Serialize)]
+    pub enum Condition {
+        QuestPhaseCondition(QuestPhaseCondition),
+        CountCondition(CountCondition),
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.access.QuestAreaMovePopMarker.AreaMoveInfo",
+        0xc5f315ce = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct AreaMoveInfo {
+        pub quest_area_move_request: QuestAreaMoveRequest,
+        pub conditions: Vec<Condition>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.access.QuestAreaMovePopMarker",
+        0x554c80d7 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestAreaMovePopMarker {
+        pub base: ObjectPopMarker,
+        pub area_move_infos: Vec<AreaMoveInfo>,
+        pub mr_area_move_set_pos: Vec3,
+        pub mr_area_move_set_angle: Quat,
+        pub mr_area_move_offset_pos: Vec<Vec3>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageObjectStateController.TargetObject",
+        0x502b2c47 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageObjectStateControllerTargetObject {
+        pub key: String,
+        pub key_has: u32,
+        pub game_object: Guid,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageObjectStateController",
+        0x7736aadc = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct StageObjectStateController {
+        pub enabled: bool,
+        pub data: ExternUser<()>, // snow.stage.StageObjectStateUserData
+        pub targets: Vec<StageObjectStateControllerTargetObject>,
     }
 }

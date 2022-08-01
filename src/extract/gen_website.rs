@@ -1,11 +1,11 @@
-//use super::gen_armor::*;
-//use super::gen_hyakuryu_skill::*;
+use super::gen_armor::*;
+use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
-//use super::gen_map::*;
+use super::gen_map::*;
 use super::gen_monster::*;
-//use super::gen_otomo::*;
+use super::gen_otomo::*;
 use super::gen_quest::*;
-//use super::gen_skill::*;
+use super::gen_skill::*;
 use super::gen_weapon::*;
 use super::pedia::*;
 use super::sink::*;
@@ -61,11 +61,15 @@ pub fn head_common() -> Vec<Box<dyn MetadataContent<String>>> {
         html!(<link rel="stylesheet" href="/part_color.css" />),
         html!(<link rel="stylesheet" href="/resources/item_color.css" />),
         html!(<link rel="stylesheet" href="/resources/rarity_color.css" />),
-        html!(<script src="https://kit.fontawesome.com/ceb13a2ba1.js" crossorigin="anonymous" />),
-        html!(<script src="/mhrice.js" crossorigin="anonymous" />),
+        html!(<script src="/mhrice.js"/>),
+        html!(<script defer=true src="/fontawesome/brands.js"/>),
+        html!(<script defer=true src="/fontawesome/solid.js"/>),
+        html!(<script defer=true src="/fontawesome/fontawesome.min.js"/>),
         html!(<style id="mh-lang-style">".mh-lang:not(.lang-default) { display:none; }"</style>),
     ]
 }
+
+const WEBSITE_VERSIONS: &[&str] = &["10.0.2", "10.0.3"];
 
 pub fn navbar() -> Box<nav<String>> {
     html!(<nav><div>
@@ -73,7 +77,7 @@ pub fn navbar() -> Box<nav<String>> {
             <a class="navbar-item" href="/index.html">
                 <img alt="Logo" src="/favicon.png"/>
                 <div class="mh-logo-text">"MHRice "</div>
-                <i class="fas fa-search"/>
+                <i class="fas fa-magnifying-glass"/>
             </a>
 
             <a id="navbarBurger" class="navbar-burger" data-target="navbarMenu">
@@ -92,23 +96,23 @@ pub fn navbar() -> Box<nav<String>> {
                     "Quests"
                 </a>
 
-                // <div class="navbar-item has-dropdown is-hoverable">
-                // <a class="navbar-link">
-                //     "Skills"
-                // </a>
-                // <div class="navbar-dropdown">
-                //     <a class="navbar-item" href="/skill.html">
-                //         "Armor skills"
-                //     </a>
-                //     <a class="navbar-item" href="/hyakuryu_skill.html">
-                //         "Ramp-up skills"
-                //     </a>
-                // </div>
-                // </div>
+                <div class="navbar-item has-dropdown is-hoverable">
+                <a class="navbar-link">
+                    "Skills"
+                </a>
+                <div class="navbar-dropdown">
+                    <a class="navbar-item" href="/skill.html">
+                        "Armor skills"
+                    </a>
+                    <a class="navbar-item" href="/hyakuryu_skill.html">
+                        "Rampage skills"
+                    </a>
+                </div>
+                </div>
 
-                // <a class="navbar-item" href="/armor.html">
-                //     "Armors"
-                // </a>
+                <a class="navbar-item" href="/armor.html">
+                    "Armors"
+                </a>
 
                 <div class="navbar-item has-dropdown is-hoverable">
                 <a class="navbar-link">
@@ -132,31 +136,56 @@ pub fn navbar() -> Box<nav<String>> {
                 </div>
                 </div>
 
-                // <div class="navbar-item has-dropdown is-hoverable">
-                // <a class="navbar-link">
-                //     "Buddy"
-                // </a>
-                // <div class="navbar-dropdown">
-                //     <a class="navbar-item" href="/airou.html">"Palico equipment"</a>
-                //     <a class="navbar-item" href="/dog.html">"Palamute equipment"</a>
-                // </div>
-                // </div>
+                <div class="navbar-item has-dropdown is-hoverable">
+                <a class="navbar-link">
+                    "Buddy"
+                </a>
+                <div class="navbar-dropdown">
+                    <a class="navbar-item" href="/airou.html">"Palico equipment"</a>
+                    <a class="navbar-item" href="/dog.html">"Palamute equipment"</a>
+                </div>
+                </div>
 
-                // <a class="navbar-item" href="/map.html">
-                //     "Maps"
-                // </a>
+                <a class="navbar-item" href="/map.html">
+                    "Maps"
+                </a>
 
                 <a class="navbar-item" href="/item.html">
                    "Items"
                 </a>
-                <a class="navbar-item">
-                    "(More are coming soon...)"
-                </a>
+
                 <a class="navbar-item" href="/about.html">
                     "About"
                 </a>
             </div>
             <div class="navbar-end">
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link" id="mh-version-menu-head">
+                        "Version"
+                    </a>
+                    <div class="navbar-dropdown">{
+                        WEBSITE_VERSIONS.iter().enumerate().map(|(i, &version)| {
+                            let latest = i == WEBSITE_VERSIONS.len() - 1;
+                            let href = if latest {
+                                "https://mhrise.mhrice.info".to_owned()
+                            } else {
+                                format!("https://mhrise-{}.mhrice.info", version.replace('.', "-"))
+                            };
+                            let text = if latest {
+                                format!("{version} (Latest)")
+                            } else {
+                                version.to_owned()
+                            };
+                            let mut class = "navbar-item mh-version-menu".to_owned();
+                            if latest {
+                                class += " mh-version-menu-latest";
+                            }
+                            html!(<a class={class.as_str()} href={href.as_str()}>
+                                {text!("{}", text)}
+                            </a>)
+                        })
+                    }</div>
+                </div>
                 <div class="navbar-item has-dropdown is-hoverable">
                     <a class="navbar-link">
                         "Language"
@@ -369,7 +398,7 @@ pub fn gen_multi_lang(msg: &MsgEntry) -> Box<span<String>> {
             let language_code: LanguageTag = language_code.parse().unwrap();
             let (msg, warning) = translate_msg(&msg.content[i]);
             let warning = warning.then(||html!(<span class="icon has-text-warning">
-                <i class="fas fa-exclamation-triangle" title="There is a parsing error"/>
+                <i class="fas fa-triangle-exclamation" title="There is a parsing error"/>
             </span>));
             Some(html! (<span class={class_string} lang={language_code} >
                 {msg} {warning}
@@ -416,7 +445,7 @@ pub fn gen_search(output: &impl Sink) -> Result<()> {
                 <div class="control has-icons-left">
                     <input class="input is-large" type="text" placeholder="Nargacuga" id="mh-search"/>
                     <span class="icon is-large is-left">
-                        <i class="fas fa-search" />
+                        <i class="fas fa-magnifying-glass" />
                     </span>
                 </div>
                 <ul id="mh-search-result">
@@ -517,6 +546,16 @@ pub fn gen_static(output: &impl Sink) -> Result<()> {
     output
         .create("error.html")?
         .write_all(include_bytes!("static/error.html"))?;
+    let fontawesome = output.sub_sink("fontawesome")?;
+    fontawesome
+        .create("brands.js")?
+        .write_all(include_bytes!("static/fontawesome/brands.js"))?;
+    fontawesome
+        .create("solid.js")?
+        .write_all(include_bytes!("static/fontawesome/solid.js"))?;
+    fontawesome
+        .create("fontawesome.min.js")?
+        .write_all(include_bytes!("static/fontawesome/fontawesome.min.js"))?;
     Ok(())
 }
 
@@ -534,20 +573,20 @@ pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) ->
     let mut toc = Toc::new();
     gen_quests(pedia, pedia_ex, output, &mut toc)?;
     gen_quest_list(&pedia_ex.quests, output)?;
-    //gen_skills(pedia_ex, output, &mut toc)?;
-    //gen_skill_list(&pedia_ex.skills, output)?;
-    //gen_hyakuryu_skills(pedia_ex, output, &mut toc)?;
-    //gen_hyakuryu_skill_list(&pedia_ex.hyakuryu_skills, output)?;
-    //gen_armors(pedia_ex, output, &mut toc)?;
-    //gen_armor_list(&pedia_ex.armors, output)?;
+    gen_skills(pedia_ex, output, &mut toc)?;
+    gen_skill_list(&pedia_ex.skills, output)?;
+    gen_hyakuryu_skills(pedia_ex, output, &mut toc)?;
+    gen_hyakuryu_skill_list(&pedia_ex.hyakuryu_skills, output)?;
+    gen_armors(pedia_ex, output, &mut toc)?;
+    gen_armor_list(&pedia_ex.armors, output)?;
     gen_monsters(pedia, pedia_ex, output, &mut toc)?;
     gen_items(pedia, pedia_ex, output, &mut toc)?;
     gen_item_list(pedia_ex, output)?;
     gen_weapons(pedia_ex, output, &mut toc)?;
-    //gen_maps(pedia, pedia_ex, output, &mut toc)?;
-    //gen_map_list(pedia, output)?;
-    //gen_otomo_equips(pedia_ex, output, &mut toc)?;
-    //gen_otomo_equip_list(pedia_ex, output)?;
+    gen_maps(pedia, pedia_ex, output, &mut toc)?;
+    gen_map_list(pedia, output)?;
+    gen_otomo_equips(pedia_ex, output, &mut toc)?;
+    gen_otomo_equip_list(pedia_ex, output)?;
     gen_about(output)?;
     gen_search(output)?;
     gen_static(output)?;

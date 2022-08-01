@@ -1,10 +1,11 @@
 use super::sink::Sink;
 use crate::pak::*;
 use crate::rsz;
+use crate::rsz::FromRsz;
 use crate::scn::*;
 use crate::tex::*;
 use crate::user::*;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use nalgebra::*;
 use nalgebra_glm::*;
 use serde::*;
@@ -17,7 +18,7 @@ struct MapFiles {
     scene_file: &'static str,
 }
 
-static MAP_FILES: [Option<MapFiles>; 15] = [
+static MAP_FILES: [Option<MapFiles>; 16] = [
     None, // 0
     Some(MapFiles {
         // 1
@@ -62,13 +63,12 @@ static MAP_FILES: [Option<MapFiles>; 15] = [
         scene_file: "scene/m05/normal/m05_normal.scn",
     }),
     None, // 6
-    None, // 7
-    /*Some(MapFiles {
+    Some(MapFiles {
         // 7
         tex_files: &["gui/80_Texture/map/map_007_IAM.tex"],
         scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_007_sp.user", // special type
-        scene_file: "scene/m01/hyakuryu/m_01_hyakuryo_A.scn",
-    }),*/
+        scene_file: "scene/m01/hyakuryu/m01_hyakuryu_A.scn",
+    }),
     None, // 8
     Some(MapFiles {
         // 9
@@ -91,9 +91,36 @@ static MAP_FILES: [Option<MapFiles>; 15] = [
         scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_011.user",
         scene_file: "scene/m22/normal/m22_normal.scn",
     }),
-    None, // 12
-    None, // 13
+    Some(MapFiles {
+        // 12
+        tex_files: &[
+            "gui/80_Texture/map/map_031_IAM.tex",
+            "gui/80_Texture/map/map_031_2_IAM.tex",
+        ],
+        scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_031.user",
+        scene_file: "scene/m31/normal/m31_normal.scn",
+    }),
+    Some(MapFiles {
+        // 13
+        tex_files: &[
+            "gui/80_Texture/map/map_032_IAM.tex",
+            "gui/80_Texture/map/map_032_2_IAM.tex",
+        ],
+        scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_032.user",
+        scene_file: "scene/m32/normal/m32_normal.scn",
+    }),
     None, // 14
+    Some(MapFiles {
+        // 15
+        tex_files: &[
+            "gui/80_Texture/map/map_042_IAM.tex",
+            "gui/80_Texture/map/map_042_2_IAM.tex",
+            "gui/80_Texture/map/map_042_3_IAM.tex",
+        ],
+        // This scale doesn't look right
+        scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_042.user",
+        scene_file: "scene/m42/normal/m42_normal.scn",
+    }),
 ];
 
 #[derive(Debug, Serialize)]
@@ -131,16 +158,31 @@ pub struct GameMap {
 
 fn get_map<F: Read + Seek>(pak: &mut PakReader<F>, files: &MapFiles) -> Result<GameMap> {
     let scale = pak.find_file(files.scale_file)?;
-    let scale: rsz::GuiMapScaleDefineData = User::new(Cursor::new(pak.read_file(scale)?))?
+    let scale = User::new(Cursor::new(pak.read_file(scale)?))?
         .rsz
-        .deserialize_single()?;
+        .deserialize_single_any()?;
+
+    let scale: rsz::GuiMapScaleDefineData = if scale.symbol() == rsz::GuiMapScaleDefineData::SYMBOL
+    {
+        scale.downcast().unwrap()
+    } else if scale.symbol() == rsz::GuiMap07DefineData::SYMBOL {
+        let scale: rsz::GuiMap07DefineData = scale.downcast().unwrap();
+        scale.base.0
+    } else {
+        bail!("Unknown map scale type {}", scale.symbol())
+    };
 
     let scene = Scene::new(pak, files.scene_file)?;
 
     let mut pops = vec![];
 
-    scene.for_each_free_object(&mut |object: &GameObject| {
-        if let Ok(behavior) = object.get_component::<rsz::ItemPopBehavior>() {
+    scene.for_each_object(&mut |object: &GameObject| {
+        if object
+            .get_component::<rsz::M31IsletArrivalChecker>()
+            .is_ok()
+        {
+            return Ok(true);
+        } else if let Ok(behavior) = object.get_component::<rsz::ItemPopBehavior>() {
             let transform = object
                 .get_component::<rsz::Transform>()
                 .context("Lack of transform")?;
@@ -215,7 +257,7 @@ fn get_map<F: Read + Seek>(pak: &mut PakReader<F>, files: &MapFiles) -> Result<G
             }
         }
 
-        Ok(())
+        Ok(false)
     })?;
 
     Ok(GameMap {

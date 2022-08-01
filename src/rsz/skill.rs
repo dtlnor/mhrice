@@ -7,16 +7,34 @@ use serde::*;
 // snow.data.DataDef.PlEquipSkillId
 rsz_enum! {
     #[rsz(u8)]
-    #[derive(Debug, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
     pub enum PlEquipSkillId {
         None = 0,
-        Skill(u8) = 1..=255,
+        Skill(u8) = 1..=0x6F,
+        MrSkill(u8) = 0x70..=0xA7
+    }
+}
+
+impl PlEquipSkillId {
+    pub fn to_tag_id(self) -> Option<u8> {
+        match self {
+            PlEquipSkillId::None => None,
+            PlEquipSkillId::Skill(i) => Some(i),
+            PlEquipSkillId::MrSkill(i) => Some(i + 200),
+        }
+    }
+
+    pub fn to_msg_tag(self) -> String {
+        match self.to_tag_id() {
+            None => "PlayerSkill_None".to_owned(),
+            Some(id) => format!("PlayerSkill_{id:03}"),
+        }
     }
 }
 
 rsz_struct! {
     #[rsz("snow.data.PlEquipSkillBaseUserData.Param",
-        0x90d277a2 = 0
+        0xac747724 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct PlEquipSkillBaseUserDataParam {
@@ -275,7 +293,7 @@ rsz_newtype! {
 
 rsz_struct! {
     #[rsz("snow.data.PlHyakuryuSkillBaseUserData.Param",
-        0x352d582d = 0
+        0xc72df418 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct PlHyakuryuSkillBaseUserDataParam {
@@ -331,7 +349,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.data.PlHyakuryuSkillRecipeUserData.Param",
-        0xd8943d8c = 0
+        0xa10bbbc4 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct PlHyakuryuSkillRecipeUserDataParam {
@@ -360,13 +378,24 @@ rsz_enum! {
     #[derive(Debug, Serialize, Copy, Clone, Hash, PartialEq, Eq)]
     pub enum DecorationsId {
         None = 0,
-        Deco(u32) = 1..=255,
+        Deco(u32) = 1..=108,
+        MrDeco(u32) = 109..=255,
+    }
+}
+
+impl DecorationsId {
+    pub fn to_msg_tag(self) -> String {
+        match self {
+            DecorationsId::None => "Decorations_None".to_owned(),
+            DecorationsId::Deco(i) => format!("Decorations_{i:03}"),
+            DecorationsId::MrDeco(i) => format!("Decorations_{:04}", i + 200),
+        }
     }
 }
 
 rsz_struct! {
     #[rsz("snow.data.DecorationsBaseUserData.Param",
-        0xf2ad08c4 = 0
+        0x041e623d = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct DecorationsBaseUserDataParam {
@@ -374,10 +403,10 @@ rsz_struct! {
         pub sort_id: u32,
         pub rare: RareTypes,
         pub icon_color: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor
-        pub decoration_lv: i32,
-        pub skill_id_list: Vec<PlEquipSkillId>,
-        pub skill_lv_list: Vec<i32>,
         pub base_price: u32,
+        pub decoration_lv: i32, // snow.data.DataDef.DecorationsSlotLvTypes
+        pub skill_id_list: [PlEquipSkillId; 2],
+        pub skill_lv_list: [i32; 2],
     }
 }
 
@@ -394,7 +423,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.data.DecorationsProductUserData.Param",
-        0x556b482b = 0
+        0x1B205AA6 = 10_00_02
     )]
     #[derive(Debug, Serialize)]
     pub struct DecorationsProductUserDataParam {
@@ -415,5 +444,72 @@ rsz_struct! {
     #[derive(Debug, Serialize)]
     pub struct DecorationsProductUserData {
         pub param: Vec<DecorationsProductUserDataParam>,
+    }
+}
+
+// snow.equip.DecorationsId
+rsz_enum! {
+    #[rsz(u32)]
+    #[derive(Debug, Serialize, Copy, Clone, Hash, PartialEq, Eq)]
+    pub enum HyakuryuDecoId {
+        None = 0x00100000,
+        Deco(u32) = 0x00100001..=0x0010FFFF
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.HyakuryuDecoBaseUserData.Param",
+        0xd431117c = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct HyakuryuDecoBaseUserDataParam {
+        pub id: HyakuryuDecoId,
+        pub sort_id: u32,
+        pub rare: RareTypes,
+        pub icon_color: i32, // snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor
+        pub base_price: u32,
+
+        pub decoration_lv: i32, // snow.data.DataDef.HyakuryuDecoSlotTypes
+        pub hyakuryu_skill_id: PlHyakuryuSkillId,
+        pub weapon_equip_flag: Vec<bool>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.HyakuryuDecoBaseUserData",
+        path = "data/Define/Player/Equip/HyakuryuDeco/HyakuryuDecoBaseData.user",
+        0xf5419ea6 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct HyakuryuDecoBaseUserData {
+        pub param: Vec<HyakuryuDecoBaseUserDataParam>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.HyakuryuDecoProductUserData.Param",
+        0x4788eebf = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct HyakuryuDecoProductUserDataParam {
+        pub id: HyakuryuDecoId,
+        pub item_flag: ItemId,
+        pub enemy_flag: EmTypes,
+        pub progress_flag: i32, // snow.data.DataDef.UnlockProgressTypes
+        pub item_id_list: Vec<ItemId>,
+        pub item_num_list: Vec<u32>,
+        pub material_category: MaterialCategory,
+        pub point: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.HyakuryuDecoProductUserData",
+        path = "data/Define/Player/Equip/HyakuryuDeco/HyakuryuDecoProductData.user",
+        0x1bbfd96d = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct HyakuryuDecoProductUserData {
+        pub param: Vec<HyakuryuDecoProductUserDataParam>,
     }
 }

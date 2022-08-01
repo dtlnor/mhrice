@@ -352,6 +352,16 @@ impl NormalQuestDataParam {
 
         self.tgt_em_type.contains(&em_type)
     }
+
+    // snow.quest.QuestUtility.isKingdomQuest
+    pub fn is_kingdom(&self) -> bool {
+        (self.quest_no / 100000) % 10 == 4 && (self.quest_no / 10000) % 10 == 5
+    }
+
+    // snow.quest.QuestUtility.isServantRequestQuest
+    pub fn is_servant_request(&self) -> bool {
+        (self.quest_no / 100000) % 10 == 4 && (self.quest_no / 10000) % 10 == 6
+    }
 }
 
 rsz_struct! {
@@ -428,7 +438,7 @@ rsz_enum! {
 // snow.enemy.EnemyDef.EnemyIndividualType
 rsz_enum! {
     #[rsz(i32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
     pub enum EnemyIndividualType {
         Normal = 0,
         Mystery = 1,
@@ -906,5 +916,110 @@ rsz_struct! {
         pub data_list_370: Vec<HyakuryuQuestData>,
         pub data_list_380: Vec<HyakuryuQuestData>,
         pub data_list_390: Vec<HyakuryuQuestData>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.MysteryRewardItemUserData.Param",
+        0xc3438c68 = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MysteryRewardItemUserDataParam {
+        pub em_type:EmTypes,
+        pub lv_lower_limit: u32,
+        pub lv_upper_limit: u32,
+        pub quest_no: i32,
+        pub hagibui_probability: u32,
+        pub reward_item: ItemId,
+        pub item_num: u32,
+        pub quest_reward_table_index: u32,
+        pub additional_quest_reward_table_index: Vec<u32>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.MysteryRewardItemUserData",
+        path = "data/Define/Quest/System/QuestRewardSystem/MysteryRewardItemUserData.user",
+        0x1479db1b = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct MysteryRewardItemUserData {
+        pub param: Vec<MysteryRewardItemUserDataParam>
+    }
+}
+
+// snow.player.PlayerWeaponType
+rsz_enum! {
+    #[rsz(i32)]
+    #[derive(Debug, Serialize, Clone, Copy)]
+    pub enum PlayerWeaponType {
+        GreatSword = 0,
+        SlashAxe = 1,
+        LongSword = 2,
+        LightBowgun = 3,
+        HeavyBowgun = 4,
+        Hammer = 5,
+        GunLance = 6,
+        Lance = 7,
+        ShortSword = 8,
+        DualBlades = 9,
+        Horn = 10,
+        ChargeAxe = 11,
+        InsectGlaive = 12,
+        Bow = 13,
+    }
+}
+
+impl PlayerWeaponType {
+    pub fn name(self) -> &'static str {
+        match self {
+            PlayerWeaponType::GreatSword => "Great sword",
+            PlayerWeaponType::SlashAxe => "Switch axe",
+            PlayerWeaponType::LongSword => "Long sword",
+            PlayerWeaponType::LightBowgun => "Light bowgun",
+            PlayerWeaponType::HeavyBowgun => "Heavy bowgun",
+            PlayerWeaponType::Hammer => "Hammer",
+            PlayerWeaponType::GunLance => "Gunlance",
+            PlayerWeaponType::Lance => "Lance",
+            PlayerWeaponType::ShortSword => "Sword & sheild",
+            PlayerWeaponType::DualBlades => "Dual blades",
+            PlayerWeaponType::Horn => "Hunting horn",
+            PlayerWeaponType::ChargeAxe => "Charge blade",
+            PlayerWeaponType::InsectGlaive => "Insect glaive",
+            PlayerWeaponType::Bow => "Bow",
+        }
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.ai.QuestServantDataList.SelectQuestServantInfo",
+        0xaf9d45b8 = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct SelectQuestServantInfo {
+        pub servant_id: i32, // snow.ai.ServantDefine.ServantId
+        pub weapon_type: PlayerWeaponType, // snow.player.PlayerWeaponType
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.ai.QuestServantDataList.QuestServantData",
+        0x29c450b1 = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestServantData {
+        pub quest_no: i32,
+        pub servant_info_list: Vec<SelectQuestServantInfo>
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.ai.QuestServantDataList",
+        path = "servant/prefab/ServantManager/QuestServantDataList.user",
+        0x35f0b1a7 = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestServantDataList {
+        pub quest_servant_data_list: Vec<QuestServantData>
     }
 }

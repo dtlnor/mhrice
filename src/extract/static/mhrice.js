@@ -15,6 +15,7 @@ let g_map_layer = 0;
 let g_cur_map_filter = "all";
 
 let g_cur_item_filter = "all";
+let g_cur_armor_filter = "all";
 
 let g_toc = null;
 
@@ -31,10 +32,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     check_cookie();
     switchLanguage();
+    adjustVersionMenu();
     hide_class("mh-ride-cond");
     hide_class("mh-invalid-meat");
     hide_class("mh-invalid-part");
     hide_class("mh-no-preset");
+    hide_class("mh-non-target");
+    hide_class("mh-quest-detail");
 
     change_sort("monster", 1);
     change_sort("item", 1);
@@ -50,6 +54,7 @@ function addEventListensers() {
     addEventListenerToId("mh-search", "keydown", search);
 
     addEventListenerToClass("mh-item-filter-button", "click", changeItemFilter);
+    addEventListenerToClass("mh-armor-filter-button", "click", changeArmorFilter);
     addEventListenerToClass("mh-scombo", "change", onChangeSort);
 
     addEventListenerToClass("mh-map-pop", "click", onShowMapExplain);
@@ -67,8 +72,13 @@ function addEventListensers() {
         e => onCheckDisplay(e.currentTarget, 'mh-ride-cond', 'mh-default-cond'));
     addEventListenerToId("mh-preset-check", "click",
         e => onCheckDisplay(e.currentTarget, 'mh-no-preset', 'mh-preset'));
+    addEventListenerToId("mh-non-target-check", "click",
+        e => onCheckDisplay(e.currentTarget, 'mh-non-target', null));
+    addEventListenerToId("mh-quest-detail-check", "click",
+        e => onCheckDisplay(e.currentTarget, 'mh-quest-detail', null));
 
     addEventListenerToClass("mh-color-diagram-switch", "click", onChangeDiagramColor);
+    addEventListenerToClass("has-dropdown", "click", onDropdownClick);
 }
 
 function addEventListenerToClass(class_name, event_name, f) {
@@ -82,6 +92,12 @@ function addEventListenerToId(id, event_name, f) {
     if (element) {
         element.addEventListener(event_name, f);
     }
+}
+
+function onDropdownClick(e) {
+    // TODO: make this work well
+    e
+    //e.currentTarget.classList.toggle("is-active");
 }
 
 function check_cookie() {
@@ -140,6 +156,26 @@ function delete_all_cookie() {
     for (const cookie of cookies) {
         const name = cookie.trim().split("=")[0];
         document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    }
+}
+
+
+function adjustVersionMenu() {
+    for (const item of document.getElementsByClassName("mh-version-menu")) {
+        let href = item.getAttribute("href");
+        let hostname = window.location.hostname;
+        let current = `https://${hostname}`;
+        if (href === current) {
+            item.classList.add("has-text-weight-bold");
+            if (!item.classList.contains("mh-version-menu-latest")) {
+                let head = document.getElementById("mh-version-menu-head")
+                if (head != null) {
+                    head.textContent = "Version:" + item.textContent;
+                    head.classList.add("has-text-danger")
+                }
+            }
+        }
+        item.setAttribute("href", href + window.location.pathname);
     }
 }
 
@@ -352,26 +388,38 @@ function changeMapFilter(e) {
 }
 
 function changeItemFilter(e) {
-    let filter = removePrefix(e.currentTarget.id, "mh-item-filter-button-");
-    const style = document.getElementById("mh-item-list-style");
+    const global = { ref: g_cur_item_filter };
+    changeFilter(e, 'item', global);
+    g_cur_item_filter = global.ref;
+}
+
+function changeArmorFilter(e) {
+    const global = { ref: g_cur_armor_filter };
+    changeFilter(e, 'armor', global);
+    g_cur_armor_filter = global.ref;
+}
+
+function changeFilter(e, category, global) {
+    let filter = removePrefix(e.currentTarget.id, `mh-${category}-filter-button-`);
+    const style = document.getElementById(`mh-${category}-list-style`);
     if (style) {
         if (filter == "all") {
             style.innerHTML = "";
         } else {
             style.innerHTML =
-                `.mh-item-filter-item:not([data-filter="${filter}"]) { display:none; }`;
+                `.mh-${category}-filter-item:not([data-filter="${filter}"]) { display:none; }`;
         }
     }
 
-    const filter_button_prefix = "mh-item-filter-button-";
-    const prev = document.getElementById(filter_button_prefix + g_cur_item_filter);
+    const filter_button_prefix = `mh-${category}-filter-button-`;
+    const prev = document.getElementById(filter_button_prefix + global.ref);
     if (prev !== null) {
         prev.classList.remove("is-active")
     }
 
-    g_cur_item_filter = filter;
+    global.ref = filter;
 
-    const cur = document.getElementById(filter_button_prefix + g_cur_item_filter);
+    const cur = document.getElementById(filter_button_prefix + global.ref);
     if (cur !== null) {
         cur.classList.add("is-active")
     }

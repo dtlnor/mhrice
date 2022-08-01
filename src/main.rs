@@ -366,7 +366,7 @@ enum Mhrice {
         #[clap(short, long)]
         dmp: String,
         /// Hash of the type in hex
-        #[clap(short, long)]
+        #[clap(long)]
         hash: String,
         /// CRC of the type in hex
         #[clap(short, long)]
@@ -988,27 +988,32 @@ fn dump_tree(pak: Vec<String>, list: String, output: String) -> Result<()> {
     let mut unvisited: std::collections::HashSet<_> = pak.all_file_indexs().into_iter().collect();
     for line in BufReader::new(list).lines() {
         let line = line?;
-        let mut path = line.split(" $ ").next().context("Empty line")?;
-        if let Some(new_path) = path.strip_prefix('@') {
-            path = new_path;
+        let mut origin_path = line.split(" $ ").next().context("Empty line")?;
+        if let Some(new_path) = origin_path.strip_prefix('@') {
+            origin_path = new_path;
         }
 
-        for i18n_index in pak.find_file_i18n(path)? {
-            let index = i18n_index.index;
-            let path_i18n = if i18n_index.language.is_empty() {
-                path.to_owned()
-            } else {
-                format!("{}.{}", path, i18n_index.language)
-            };
+        let streaming_path = "streaming/".to_owned() + origin_path;
+        let paths = [origin_path, &streaming_path];
 
-            let mut path = PathBuf::from(&output);
-            for component in path_i18n.split('/') {
-                path.push(component);
+        for path in paths {
+            for i18n_index in pak.find_file_i18n(path)? {
+                let index = i18n_index.index;
+                let path_i18n = if i18n_index.language.is_empty() {
+                    path.to_owned()
+                } else {
+                    format!("{}.{}", path, i18n_index.language)
+                };
+
+                let mut path = PathBuf::from(&output);
+                for component in path_i18n.split('/') {
+                    path.push(component);
+                }
+
+                std::fs::create_dir_all(path.parent().context("no parent")?)?;
+                std::fs::write(path, &pak.read_file(index)?)?;
+                unvisited.remove(&index);
             }
-
-            std::fs::create_dir_all(path.parent().context("no parent")?)?;
-            std::fs::write(path, &pak.read_file(index)?)?;
-            unvisited.remove(&index);
         }
     }
 
@@ -1020,7 +1025,8 @@ fn dump_tree(pak: Vec<String>, list: String, output: String) -> Result<()> {
                 if c.is_ascii_alphanumeric() {
                     format.push(*c as char);
                 } else {
-                    format += &format!("_{:02x}", c);
+                    use std::fmt::Write as _;
+                    write!(format, "_{:02x}", c)?;
                 }
             }
             format
@@ -1275,7 +1281,7 @@ fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: Strin
     let tex = Tex::new(File::open(tex)?)?;
     let mut rgba = tex.to_rgba(0, 0)?;
 
-    scene.for_each_free_object(&mut |object: &GameObject| {
+    scene.for_each_object(&mut |object: &GameObject| {
         if let Ok(_pop) = object.get_component::<rsz::ItemPopBehavior>() {
             let transform = object.get_component::<rsz::Transform>()?;
             let x = (transform.position.x + scale.map_wide_min_pos) / scale.map_scale;
@@ -1283,13 +1289,13 @@ fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: Strin
             let x = (x * rgba.width() as f32) as i32;
             let y = (y * rgba.height() as f32) as i32;
             if x < 0 || y < 0 || x >= rgba.width() as i32 || y >= rgba.height() as i32 {
-                return Ok(());
+                return Ok(false);
             }
             let pixel = rgba.pixel(x as u32, y as u32);
             pixel.copy_from_slice(&[255, 0, 0, 255]);
         }
 
-        Ok(())
+        Ok(false)
     })?;
 
     rgba.save_png(File::create(output)?)?;

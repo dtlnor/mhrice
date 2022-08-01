@@ -1,4 +1,5 @@
 use super::gen_item::*;
+use super::gen_map::*;
 use super::gen_monster::*;
 use super::gen_website::*;
 use super::pedia::*;
@@ -9,26 +10,68 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
-pub fn gen_quest_tag(quest: &Quest, is_target: bool) -> Box<div<String>> {
-    let target_tag = if is_target {
-        html!(<span class="tag is-primary">"Target"</span>)
-    } else {
-        html!(<span />)
+pub fn quest_level_tag(quest: &Quest) -> Box<span<String>> {
+    let (quest_level_tag, name) = match quest.param.enemy_level {
+        EnemyLevel::Village => ("mh-quest-village", "Vi"),
+        EnemyLevel::Low => ("mh-quest-low", "LR"),
+        EnemyLevel::High => ("mh-quest-high", "HR"),
+        EnemyLevel::Master => ("mh-quest-master", "MR"),
     };
+    let level = match quest.param.quest_level {
+        QuestLevel::QL1 => "1",
+        QuestLevel::QL2 => "2",
+        QuestLevel::QL3 => "3",
+        QuestLevel::QL4 => "4",
+        QuestLevel::QL5 => "5",
+        QuestLevel::QL6 => "6",
+        QuestLevel::QL7 => "7",
+        QuestLevel::QL7Ex => "7+",
+    };
+    let level_tag_class = format!("tag {quest_level_tag}");
+    html!(<span class={level_tag_class.as_str()}>{
+        text!("{}{}", name, level)}</span>)
+}
+
+pub fn gen_quest_tag(
+    quest: &Quest,
+    tag_level: bool,
+    is_target: bool,
+    is_mystery: bool,
+) -> Box<div<String>> {
+    let img = format!(
+        "/resources/questtype_{}.png",
+        quest.param.quest_type.icon_index()
+    );
     html!(<div>
-        <span class="tag">{text!("{:?}-{:?}", quest.param.enemy_level, quest.param.quest_level)}</span>
+        <a href={format!("/quest/{:06}.html", quest.param.quest_no)} class="mh-icon-text">
+        <img alt="Quest icon" src={img} class="mh-quest-icon"/>
         {
-            quest.is_dl.then(
-                ||html!(<span class="tag">{text!("Event")}</span>)
+            tag_level.then(
+                ||quest_level_tag(quest)
             )
         }
-        <a href={format!("/quest/{:06}.html", quest.param.quest_no)}>
+        {
+            quest.is_dl.then(
+                ||html!(<span class="tag mh-quest-event">{text!("Event")}</span>)
+            )
+        }
+        {
+            quest.param.is_servant_request().then(
+                ||html!(<span class="tag mh-quest-follower">{text!("Follower")}</span>)
+            )
+        }
+        {
+            quest.param.is_kingdom().then(
+                ||html!(<span class="tag mh-quest-follower">{text!("Survey")}</span>)
+            )
+        }
         {quest.name.map_or(
             html!(<span>{text!("Quest {:06}", quest.param.quest_no)}</span>),
             gen_multi_lang
         )}
+        {is_target.then(||html!(<span class="tag is-primary">"Target"</span>))}
+        {is_mystery.then(||html!(<span class="tag is-danger">"Afflicted"</span>))}
         </a>
-        {target_tag}
     </div>)
 }
 
@@ -63,23 +106,8 @@ pub fn gen_quest_list(quests: &[Quest], output: &impl Sink) -> Result<()> {
                                     <h3>{text!("{:?}", quest_level)}</h3>
                                     <ul class="mh-quest-list">{
                                         quests.into_iter().map(|quest|{
-                                            let link = format!("/quest/{:06}.html", quest.param.quest_no);
-                                            let name = quest.name.map_or(
-                                                html!(<span>{text!("Quest {:06}", quest.param.quest_no)}</span>),
-                                                gen_multi_lang
-                                            );
-                                            let img = format!("/resources/questtype_{}.png",
-                                                quest.param.quest_type.icon_index());
                                             html!{<li>
-                                                <a href={link} class="mh-icon-text">
-                                                <img alt="Quest icon" src={img} class="mh-quest-icon"/>
-                                                {
-                                                    quest.is_dl.then(
-                                                        ||html!(<span class="tag">{text!("Event")}</span>)
-                                                    )
-                                                }
-                                                {name}
-                                                </a>
+                                                { gen_quest_tag(quest, false, false, false) }
                                             </li>}
                                         })
                                     }</ul>
@@ -133,20 +161,20 @@ pub fn gen_quest_monster_data(
             }
 
             let small = (small_chance != 0).then(|| {
-                html!(<span>
+                html!(<span class="mh-crown">
                     <img alt="Small crown" src="/resources/small_crown.png" />
                     {text!("{}%", small_chance)}
                 </span>)
             });
 
             let large = (large_chance != 0).then(|| {
-                html!(<span>
+                html!(<span class="mh-crown">
                     <img alt="Large crown" src="/resources/king_crown.png" />
                     {text!("{}%", large_chance)}
                 </span>)
             });
 
-            html!(<span>{small}<br/>{large}</span>)
+            html!(<span>{small}{large}</span>)
         } else {
             html!(<span>"-"</span>)
         }
@@ -244,14 +272,14 @@ pub fn gen_quest_monster_data(
         html!(<td>{text!("{}", hp)}</td>),
         html!(<td>{text!("{}", attack)}</td>),
         html!(<td>{text!("{}", parts)}</td>),
-        html!(<td>{defense}</td>),
-        html!(<td>{element_ab}</td>),
-        html!(<td>{stun}</td>),
-        html!(<td>{exhaust}</td>),
-        html!(<td>{paralyze}</td>),
-        html!(<td>{sleep}</td>),
-        html!(<td>{ride}</td>),
-        html!(<td>{text!("{}", stamina)}</td>),
+        html!(<td class="mh-quest-detail">{defense}</td>),
+        html!(<td class="mh-quest-detail">{element_ab}</td>),
+        html!(<td class="mh-quest-detail">{stun}</td>),
+        html!(<td class="mh-quest-detail">{exhaust}</td>),
+        html!(<td class="mh-quest-detail">{paralyze}</td>),
+        html!(<td class="mh-quest-detail">{sleep}</td>),
+        html!(<td class="mh-quest-detail">{ride}</td>),
+        html!(<td class="mh-quest-detail">{text!("{}", stamina)}</td>),
     ]
 }
 
@@ -280,7 +308,7 @@ fn gen_quest_monster_multi_player_data(
     index: usize,
     pedia: &Pedia,
 ) -> Vec<Box<td<String>>> {
-    let no_data = || vec![html!(<td colspan=9>"[NO DATA]"</td>)];
+    let no_data = || vec![html!(<td colspan=13>"[NO DATA]"</td>)];
 
     let enemy_param = if let Some(enemy_param) = enemy_param.as_ref() {
         enemy_param
@@ -306,7 +334,11 @@ fn gen_quest_monster_multi_player_data(
 
     table
         .iter()
-        .map(|d| html!(<td>{gen_multi_factor(d)}</td>))
+        .enumerate()
+        .map(|(i, d)| {
+            let class = if i > 2 { "mh-quest-detail" } else { "" };
+            html!(<td class={class}>{gen_multi_factor(d)}</td>)
+        })
         .collect()
 }
 
@@ -428,10 +460,20 @@ fn gen_quest(
                         <img alt="Quest icon" src={img} class="mh-quest-icon"/>
                     </div>
                     <h1>
-                    <span class="tag">{text!("{:?}-{:?}", quest.param.enemy_level, quest.param.quest_level)}</span>
+                    {quest_level_tag(quest)}
                     {
                         quest.is_dl.then(
-                            ||html!(<span class="tag">{text!("Event")}</span>)
+                            ||html!(<span class="tag mh-quest-event">{text!("Event")}</span>)
+                        )
+                    }
+                    {
+                        quest.param.is_servant_request().then(
+                            ||html!(<span class="tag mh-quest-follower">{text!("Follower")}</span>)
+                        )
+                    }
+                    {
+                        quest.param.is_kingdom().then(
+                            ||html!(<span class="tag mh-quest-follower">{text!("Survey")}</span>)
                         )
                     }
                     {
@@ -466,7 +508,7 @@ fn gen_quest(
                 <h2 >"Basic data"</h2>
                 <div class="mh-kvlist">
                 <p class="mh-kv"><span>"Map"</span>
-                    <span>{ text!("{}", quest.param.map_no) }</span></p>
+                    <span>{ gen_map_label(quest.param.map_no, pedia) }</span></p>
                 <p class="mh-kv"><span>"Base time"</span>
                     <span>{ text!("{}", quest.param.base_time) }</span></p>
                 <p class="mh-kv"><span>"Time variation"</span>
@@ -492,6 +534,21 @@ fn gen_quest(
                 </div>
                 </section>
 
+                { quest.servant.map(|servants| {
+                    html!(<section><h2>"Fixed followers"</h2>
+                        <ul> {
+                            servants.servant_info_list.iter().map(|servant| {
+                                let name = pedia_ex.servant.get(&servant.servant_id)
+                                    .map_or_else(||html!(<span>{text!("{}", servant.servant_id)}</span>),
+                                    |s|gen_multi_lang(s.name));
+                                html!(<li> "NPC: " {name} ", " {
+                                    text!("Weapon: {}", servant.weapon_type.name())
+                                } </li>)
+                            })
+                        } </ul>
+                    </section>)
+                })}
+
                 { target_material }
 
                 // TODO: monster spawn/swap behavior
@@ -501,6 +558,14 @@ fn gen_quest(
 
                 { has_normal_em.then(||html!(<section>
                 <h2 >"Monster stats"</h2>
+                <div>
+                    <input type="checkbox" id="mh-non-target-check"/>
+                    <label for="mh-non-target-check">"Display non-target"</label>
+                </div>
+                <div>
+                    <input type="checkbox" id="mh-quest-detail-check"/>
+                    <label for="mh-quest-detail-check">"More detailed stat"</label>
+                </div>
                 <div class="mh-table"><table>
                     <thead><tr>
                         <th>"Monster"</th>
@@ -508,21 +573,33 @@ fn gen_quest(
                         <th>"HP"</th>
                         <th>"Attack"</th>
                         <th>"Parts"</th>
-                        <th>"Defense"</th>
-                        <th>"Element"</th>
-                        <th>"Stun"</th>
-                        <th>"Exhaust"</th>
-                        <th>"Ride"</th>
-                        <th>"Paralyze"</th>
-                        <th>"Sleep"</th>
-                        <th>"Stamina"</th>
+                        <th class="mh-quest-detail">"Defense"</th>
+                        <th class="mh-quest-detail">"Element"</th>
+                        <th class="mh-quest-detail">"Stun"</th>
+                        <th class="mh-quest-detail">"Exhaust"</th>
+                        <th class="mh-quest-detail">"Ride"</th>
+                        <th class="mh-quest-detail">"Paralyze"</th>
+                        <th class="mh-quest-detail">"Sleep"</th>
+                        <th class="mh-quest-detail">"Stamina"</th>
                     </tr></thead>
                     <tbody> {
                         quest.param.boss_em_type.iter().copied().enumerate()
                         .filter(|&(_, em_type)|em_type != EmTypes::Em(0))
                         .map(|(i, em_type)|{
-                            html!(<tr>
-                                <td>{ gen_monster_tag(pedia, pedia_ex, em_type, quest.param.has_target(em_type), false) }</td>
+                            let is_target = quest.param.has_target(em_type);
+                            let is_mystery = quest.enemy_param
+                                .and_then(|p|p.individual_type.get(i))
+                                .map(|&t|t == EnemyIndividualType::Mystery)
+                                .unwrap_or(false);
+                            let class = if !is_target {
+                                "mh-non-target"
+                            } else {
+                                ""
+                            };
+                            html!(<tr class={class}>
+                                <td>{
+                                    gen_monster_tag(pedia_ex, em_type, is_target, false, is_mystery)
+                                }</td>
                                 { gen_quest_monster_data(quest.enemy_param, em_type, i, pedia, pedia_ex) }
                             </tr>)
                         })
@@ -539,23 +616,33 @@ fn gen_quest(
                         <th>"HP"</th>
                         <th>"Attack"</th>
                         <th>"Parts"</th>
-                        <th>"Other parts"</th>
-                        <th>"Multi parts"</th>
-                        <th>"Defense"</th>
-                        <th>"Element A"</th>
-                        <th>"Element B"</th>
-                        <th>"Stun"</th>
-                        <th>"Exhaust"</th>
-                        <th>"Ride"</th>
-                        <th>"Monster to monster"</th>
-                        <th>"Qurio"</th>
+                        <th class="mh-quest-detail">"Other parts"</th>
+                        <th class="mh-quest-detail">"Multi parts"</th>
+                        <th class="mh-quest-detail">"Defense"</th>
+                        <th class="mh-quest-detail">"Element A"</th>
+                        <th class="mh-quest-detail">"Element B"</th>
+                        <th class="mh-quest-detail">"Stun"</th>
+                        <th class="mh-quest-detail">"Exhaust"</th>
+                        <th class="mh-quest-detail">"Ride"</th>
+                        <th class="mh-quest-detail">"Monster to monster"</th>
+                        <th class="mh-quest-detail">"Qurio"</th>
                     </tr></thead>
                     <tbody> {
                         quest.param.boss_em_type.iter().copied().enumerate()
                         .filter(|&(_, em_type)|em_type != EmTypes::Em(0))
                         .map(|(i, em_type)|{
-                            html!(<tr>
-                                <td>{ gen_monster_tag(pedia, pedia_ex, em_type, quest.param.has_target(em_type), false)}</td>
+                            let is_target = quest.param.has_target(em_type);
+                            let is_mystery = quest.enemy_param
+                                .and_then(|p|p.individual_type.get(i))
+                                .map(|&t|t == EnemyIndividualType::Mystery)
+                                .unwrap_or(false);
+                            let class = if !is_target {
+                                "mh-non-target"
+                            } else {
+                                ""
+                            };
+                            html!(<tr class={class}>
+                                <td>{ gen_monster_tag(pedia_ex, em_type, is_target, false, is_mystery)}</td>
                                 { gen_quest_monster_multi_player_data(
                                     quest.enemy_param, i, pedia) }
                             </tr>)
@@ -629,13 +716,13 @@ fn gen_quest(
                         .filter(|wave|wave.boss_em != EmTypes::Em(0))
                         .map(|wave| {
                             html!(<tr>
-                                <td>{ gen_monster_tag(pedia, pedia_ex, wave.boss_em, false, false) }</td>
+                                <td>{ gen_monster_tag(pedia_ex, wave.boss_em, false, false, false) }</td>
                                 <td>{text!("{}", wave.boss_sub_type)}</td>
                                 <td>{text!("{}", wave.boss_em_nando_tbl_no)}</td>
                                 <td><ul class="mh-rampage-em-list"> {
                                     wave.em_table.iter().filter(|&&em|em != EmTypes::Em(0))
                                     .map(|&em|html!(<li>
-                                        { gen_monster_tag(pedia, pedia_ex, em, false, true) }
+                                        { gen_monster_tag(pedia_ex, em, false, true, false) }
                                     </li>))
                                 } </ul></td>
                                 <td>{text!("{}", wave.wave_em_nando_tbl_no)}</td>

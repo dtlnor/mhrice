@@ -1,5 +1,5 @@
 use super::gen_common::*;
-//use super::gen_hyakuryu_skill::*;
+use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_website::*;
 use super::pedia::*;
@@ -231,7 +231,7 @@ where
     let horn = horn.map(|horn| {
         html!(<section>
         <h2 >"Melody"</h2>
-        /*<ul> {
+        <ul> {
             horn.horn_melody_type_list.iter().map(|id| {
                 html!(<li> {
                     if let Some(name) = pedia_ex.horn_melody.get(id) {
@@ -241,7 +241,7 @@ where
                     }
                 } </li>)
             })
-        } </ul>*/
+        } </ul>
         </section>)
     });
 
@@ -408,8 +408,9 @@ where
                 <p class="mh-kv"><span>"Defense"</span>
                 <span>{text!("{}", main.def_bonus)}</span></p>
                 <p class="mh-kv"><span>"Slot"</span>
-                <span>{gen_slot(&main.slot_num_list)}</span></p>
-                // TODO: rampage slot
+                <span>{gen_slot(&main.slot_num_list, false)}</span></p>
+                <p class="mh-kv"><span>"Rampage Slot"</span>
+                <span>{gen_slot(&main.slot_num_list, true)}</span></p>
 
                 {first_element.map(|first_element| html!(
                     <p class="mh-kv"><span>"Element"</span>
@@ -440,9 +441,8 @@ where
                 </div>
                 </section>
 
-                /*
                 <section>
-                <h2 >"Ramp-up skills"</h2>
+                <h2 >"Rampage skills"</h2>
                 <ul> {
                     let main_list = main.hyakuryu_skill_id_list.iter()
                         .zip(std::iter::repeat(None));
@@ -466,7 +466,7 @@ where
                         }
                     })
                 } </ul>
-                </section>*/
+                </section>
 
                 { horn }
 
