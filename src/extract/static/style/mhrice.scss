@@ -30,6 +30,18 @@ nav {
     >div {
         @extend .container;
     }
+
+    .navbar-folded {
+        @include from($navbar-breakpoint) {
+            display: none;
+        }
+    }
+
+    .navbar-expanded {
+        @include until($navbar-breakpoint) {
+            display: none;
+        }
+    }
 }
 
 main {
@@ -256,6 +268,11 @@ ul.mh-item-list {
         font-weight: bold;
         margin-right: 2rem;
     }
+}
+
+.mh-kvlist.mh-wide {
+    column-width: 40rem;
+    column-count: 3;
 }
 
 /** Armor page **/
@@ -525,6 +542,10 @@ img.mh-quest-icon {
     display: inline-block;
 }
 
+.mh-crown-icon {
+    vertical-align: middle;
+}
+
 /** Monster part color **/
 div.mh-color-diagram {
     display: grid;
@@ -553,6 +574,16 @@ span.mh-part {
     height: 1.5rem;
     width: 1.5rem;
     border-radius: 2px;
+    box-shadow: 0 2px 3px 0 $grey, inset 0 0 0 1px $grey;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+
+span.mh-part-group {
+    display: inline-block;
+    height: 1.5rem;
+    width: 1.5rem;
+    border-radius: 60% 0 60% 0;
     box-shadow: 0 2px 3px 0 $grey, inset 0 0 0 1px $grey;
     margin-right: 0.5rem;
     vertical-align: middle;
@@ -679,4 +710,11 @@ ul#mh-search-result {
 .mh-item-in-out {
     margin-left: 1rem;
     margin-bottom: 1rem;
+}
+
+/** game progress **/
+
+ul.mh-progress {
+    margin-left: 0;
+    margin-top: 0;
 }

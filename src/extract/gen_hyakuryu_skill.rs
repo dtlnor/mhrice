@@ -38,7 +38,17 @@ pub fn gen_hyakuryu_skill_list(
             <body>
                 { navbar() }
                 <main>
-                <header><h1>"Rampage skill"</h1></header>
+                <header><h1>"Rampage skills"</h1></header>
+
+                <div>
+                    <a href="/skill.html"><span class="icon-text">
+                    <span class="icon">
+                    <i class="fas fa-arrow-right"></i>
+                    </span>
+                    <span>"go to armor skill"</span>
+                    </span></a>
+                </div>
+
                 <ul class="mh-item-list">
                 {
                     skills.iter().map(|(_, skill)|{
@@ -139,7 +149,7 @@ pub fn gen_hyakuryu_skill(
             <tbody>
                 <tr>
                     <td>{gen_hyakuryu_deco_label(deco)}</td>
-                    <td>{text!("{}", deco.data.base_price)}</td>
+                    <td>{text!("{}z", deco.data.base_price)}</td>
                     { gen_category(pedia_ex, deco.product.material_category,
                         deco.product.point) }
                     { gen_materials(pedia_ex, &deco.product.item_id_list,
@@ -180,7 +190,7 @@ pub fn gen_hyakuryu_skill(
                         </tr></thead>
                         <tbody>
                         <tr>
-                            <td>{ text!("{}", recipe.cost) }</td>
+                            <td>{ text!("{}z", recipe.cost) }</td>
                             { gen_materials(pedia_ex, &recipe.recipe_item_id_list,
                                 &recipe.recipe_item_num_list, ItemId::None) }
                         </tr>

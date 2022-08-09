@@ -92,6 +92,7 @@ pub struct Pedia {
     pub armor_product: ArmorProductUserData,
     pub overwear: PlOverwearBaseUserData,
     pub overwear_product: PlOverwearProductUserData,
+    pub armor_buildup: ArmorBuildupTableUserData,
     pub armor_head_name_msg: Msg,
     pub armor_chest_name_msg: Msg,
     pub armor_arm_name_msg: Msg,
@@ -325,6 +326,7 @@ pub struct Weapon<'a, Param> {
     pub children: Vec<WeaponId>,
     pub parent: Option<WeaponId>,
     pub hyakuryu_weapon_buildup: BTreeMap<i32, &'a HyakuryuWeaponHyakuryuBuildupUserDataParam>,
+    pub update: Option<&'a WeaponUpdateTreeUserDataParam>,
 }
 
 pub struct WeaponTree<'a, Param> {
@@ -357,6 +359,7 @@ pub struct OtEquipSeries<'a> {
 
 #[derive(Debug)]
 pub struct MonsterEx<'a> {
+    pub data: &'a Monster,
     pub name: Option<&'a MsgEntry>,
     pub alias: Option<&'a MsgEntry>,
     pub explain1: Option<&'a MsgEntry>,
@@ -377,6 +380,7 @@ pub struct PediaEx<'a> {
     pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
     pub hyakuryu_skills: BTreeMap<PlHyakuryuSkillId, HyakuryuSkill<'a>>,
     pub armors: Vec<ArmorSeries<'a>>,
+    pub armor_buildup: HashMap<i32, Vec<&'a ArmorBuildupTableUserDataParam>>,
     pub meat_names: HashMap<MeatKey, Vec<&'a MsgEntry>>,
 
     pub items: BTreeMap<ItemId, Item<'a>>,
