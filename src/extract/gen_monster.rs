@@ -6,10 +6,49 @@ use super::sink::*;
 use crate::part_color::PART_COLORS;
 use crate::rsz::*;
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
+
+// snow.enemy.....MeatType or MeatChangeNo or MeatGroup
+const MEAT_TYPES: &[(u32, &[&str])] = &[
+    (4, &["Normal", "Glowing", "Broken", "Broken & glowing"]),
+    (19, &["Normal", "Guarding", "Broken"]),
+    (25, &["Normal", "Stealth"]),
+    (27, &["Normal", "Flame", "Blast"]),
+    (44, &["Normal", "Mud", "MR normal", "MR mud"]),
+    (57, &["Normal", "Charged", "Charged & enraged"]),
+    (81, &["Normal", "Charged", "Broken"]),
+    (82, &["Normal", "Enraged", "Broken", "Wet", "Wet & enraged"]),
+    (
+        86,
+        &[
+            "Normal",
+            "Dragon energy",
+            "Enraged",
+            "Dragon energy & enraged",
+        ],
+    ),
+    (
+        89, // only apply to 89_05 but 89_00 doesn't have multi phase anyway
+        &[
+            "Normal",
+            "Concentrated hellfire (1 pole)",
+            "Raging hellfire (2 pole)",
+        ],
+    ),
+    (100, &["Normal", "Broken"]),
+    (108, &["Normal", "Mud"]),
+];
+
+const SPECIFIC_MEAT_TYPES: &[((u32, usize), &[&str])] = &[((81, 3), &["Normal", "Broken"])];
+
+static MEAT_TYPE_MAP: Lazy<HashMap<u32, &[&str]>> =
+    Lazy::new(|| HashMap::from_iter(MEAT_TYPES.iter().cloned()));
+static SPECIFIC_MEAT_TYPE_MAP: Lazy<HashMap<(u32, usize), &[&str]>> =
+    Lazy::new(|| HashMap::from_iter(SPECIFIC_MEAT_TYPES.iter().cloned()));
 
 pub fn gen_monster_tag(
     pedia_ex: &PediaEx,
@@ -522,11 +561,11 @@ pub fn gen_lot(
     em_type: EmTypes,
     rank: QuestRank,
     pedia_ex: &PediaEx<'_>,
-) -> Box<section<String>> {
+) -> Option<Box<section<String>>> {
     let lot = if let Some(lot) = pedia_ex.monster_lot.get(&(em_type, rank)) {
         *lot
     } else {
-        return html!(<section></section>);
+        return None;
     };
 
     let mut drop_dictionary = HashMap::new();
@@ -566,7 +605,7 @@ pub fn gen_lot(
         QuestRank::Master => "Master rank reward",
     };
 
-    html!(<section>
+    Some(html!(<section>
         <h2 >{text!("{}", header)}</h2>
         <div class="mh-reward-tables">
 
@@ -657,7 +696,7 @@ pub fn gen_lot(
                                         .map(|pbr| {
                                             let conds = pbr.parts_break_condition_list.iter()
                                                 .map(|cond| {
-                                                    let part_color = format!("mh-part mh-part-{}", cond.parts_group);
+                                                    let part_color = format!("mh-part-group mh-part-{}", cond.parts_group);
                                                     html!(<li>
                                                         <span class=part_color.as_str() />
                                                         {text!("[{}]", cond.parts_group)}
@@ -735,7 +774,7 @@ pub fn gen_lot(
             html!(<div class="mh-reward-box">
             <div class="mh-table"><table>
                 <thead><tr>
-                    <th>"Afflicted carves"</th>
+                    <th>"Afflicted carves / part breaks"</th>
                     <th>"Probability"</th>
                 </tr></thead>
                 <tbody> {
@@ -750,7 +789,78 @@ pub fn gen_lot(
         })}
 
         </div>
-    </section>)
+    </section>))
+}
+
+pub fn gen_multipart<'a>(
+    multipart: impl IntoIterator<Item = (/*is_system*/ bool, usize, &'a EnemyMultiPartsVitalData)>,
+) -> Box<div<String>> {
+    html!(<div class="mh-table"><table>
+    <thead><tr>
+        <th>"Index"</th>
+        <th>"Part"</th>
+        <th>"priority"</th>
+        //<th>"enable_last_attack_parts"</th>
+        <th>"Attributes"</th>
+        //<th>"prio_damage_catagory_flag"</th>
+        <th>"HP"</th>
+        //<th>"enable_parts_names"</th>
+        //<th>"enable_parts_values"</th>
+    </tr></thead>
+    <tbody>
+    {
+        multipart.into_iter().map(|(is_system, i, m)| html!(<tr>
+            <td> {
+                let explain = match (is_system, i) {
+                    (true, 0) => " (Apex knockdown?)",
+                    (true, 1) => " (Riding initiate?)",
+                    (true, 2) => " (Apex related?)",
+                    _ => "",
+                };
+                text!("{}{}{}", if is_system {"System"} else {"Unique"}, i, explain)
+            } </td>
+            <td>
+            {
+                if m.enable_parts_data[0].enable_parts == [true; 16] {
+                    html!(<span>"All"</span>)
+                } else {
+                    let parts = ||m.enable_parts_data[0].enable_parts.iter()
+                        .enumerate().filter(|&(_, &p)| p)
+                        .map(|(part, _)| part);
+                    html!(<span>
+                        {parts().map(|part|{let part_color = format!("mh-part-group mh-part-{}", part);
+                            html!(<span class=part_color.as_str()/>)})}
+                        {parts().map(|part|html!(<span>{text!("[{}]", part)}</span>))}
+                    </span>)
+                }
+            }</td>
+            <td>{text!("{}", m.priority)}</td>
+            //<td>{text!("{:?}", m.enable_last_attack_parts)}</td>
+            <td>
+                <span class="tag">{text!("{:?}", m.use_type)}</span>
+                {m.is_enable_hyakuryu.then(||html!(<span class="tag">"Rampage enable"</span>))}
+                {m.is_enable_overwrite_down.then(||html!(<span class="tag">"Overwrite topple"</span>))}
+                //{m.is_prio_damage_customize.then(||html!(<span class="tag">"Prio damage customize"</span>))}
+                {m.is_not_use_difficulty_rate.then(||html!(<span class="tag">"No difficulty rate"</span>))}
+                {m.is_multi_rate_ex.then(||html!(<span class="tag">"Multi rate EX"</span>))}
+            </td>
+            //<td>{text!("{:?}", m.prio_damage_catagory_flag)}</td>
+            <td>{
+                let s = m.multi_parts_vital_data.iter().map(
+                    |p| if p.master_vital == -1 {
+                        format!("{}", p.vital)
+                    } else {
+                        format!("(LR/HR) {}, (MR) {}", p.vital, p.master_vital)
+                    }
+                ).collect::<Vec<_>>().join(" / ");
+                text!("{}", s)
+            }</td>
+            //<td>{text!("{:?}", m.enable_parts_names)}</td>
+            //<td>{text!("{:?}", m.enable_parts_values)}</td>
+        </tr>))
+    }
+    </tbody>
+    </table></div>)
 }
 
 pub fn gen_monster(
@@ -849,19 +959,23 @@ pub fn gen_monster(
             {
                 if let Some(&discovery) = pedia_ex.discoveries.get(&monster_em_type) {
                     vec![
-                        html!(<tr><td>"Village tour"</td>{
+                        html!(<tr><td>{text!("Village tour ({})",
+                            discovery.cond_village.display().unwrap_or_default())}</td>{
                             gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 0, pedia, pedia_ex)
                         }</tr>),
-                        html!(<tr><td>"Low rank tour"</td>{
+                        html!(<tr><td>{text!("Low rank tour ({})",
+                            discovery.cond_low.display().unwrap_or_default())}</td>{
                             gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 1, pedia, pedia_ex)
                         }</tr>),
-                        html!(<tr><td>"High rank tour"</td>{
+                        html!(<tr><td>{text!("High rank tour ({})",
+                            discovery.cond_high.display().unwrap_or_default())}</td>{
                             gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 2, pedia, pedia_ex)
                         }</tr>),
-                        html!(<tr><td>"Master rank tour"</td>{
+                        html!(<tr><td>{text!("Master rank tour ({})",
+                            discovery.cond_master.display().unwrap_or_default())}</td>{
                             gen_quest_monster_data(Some(discovery),
                                 monster_em_type, 3, pedia, pedia_ex)
                         }</tr>)
@@ -876,6 +990,8 @@ pub fn gen_monster(
     );
 
     let monster_alias = monster_ex.alias;
+    let phase_map = MEAT_TYPE_MAP.get(&monster.id).copied();
+    let size_range = pedia_ex.sizes.get(&monster.em_type).copied();
 
     let doc: DOMTree<String> = html!(
         <html>
@@ -903,24 +1019,105 @@ pub fn gen_monster(
                 </section>
                 <section>
                 <h2 >"Basic data"</h2>
-                <p>{ text!("Base HP: (LR/HR) {}, (MR) {}", monster.data_tune.base_hp_vital,
-                    monster.data_tune.master_hp_vital) }</p>
-                <p>{ text!("Limping threshold: (village) {}% / (LR) {}% / (HR) {}% / (MR) {}%",
+                <div class="mh-kvlist mh-wide">
+                <p class="mh-kv"><span>"Base HP"</span>
+                    <span>{ text!("(LR/HR) {}, (MR) {}", monster.data_tune.base_hp_vital,
+                    monster.data_tune.master_hp_vital) }</span></p>
+                <p class="mh-kv"><span>"Limping threshold"</span>
+                    <span>{ text!("(village) {}% / (LR) {}% / (HR) {}% / (MR) {}%",
                     monster.data_tune.dying_village_hp_vital_rate,
                     monster.data_tune.dying_low_level_hp_vital_rate,
                     monster.data_tune.dying_high_level_hp_vital_rate,
                     monster.data_tune.dying_master_class_hp_vital_rate
-                ) }</p>
-                <p>{ text!("Capturing threshold: (village) {}% / (LR) {}% / (HR) {}% / (MR) {}%",
+                ) }</span></p>
+                <p class="mh-kv"><span>"Capturing threshold"</span>
+                    <span>{ text!("(village) {}% / (LR) {}% / (HR) {}% / (MR) {}%",
                     monster.data_tune.capture_village_hp_vital_rate,
                     monster.data_tune.capture_low_level_hp_vital_rate,
                     monster.data_tune.capture_high_level_hp_vital_rate,
                     monster.data_tune.capture_master_level_hp_vital_rate
-                ) }</p>
-                <p>{ text!("Sleep recovering: {} seconds / recover {}% HP",
+                ) }</span></p>
+                <p class="mh-kv"><span>"Sleep recovering"</span>
+                    <span>{ text!("{} seconds / recover {}% HP",
                     monster.data_tune.self_sleep_time,
                     monster.data_tune.self_sleep_recover_hp_vital_rate
-                ) }</p>
+                ) }</span></p>
+                {size_range.map(|size_range| html!(<p class="mh-kv"><span>"Size"</span>
+                    <span>
+                        {text!("{}", size_range.base_size)}
+                        {(!size_range.no_size_scale).then(||html!(<span>
+                            " ("
+                            <img class="mh-crown-icon" alt="Small crown" src="/resources/small_crown.png" />
+                            {text!("{}, ", size_range.base_size * size_range.small_boarder)}
+                            <img class="mh-crown-icon" alt="Silver large crown" src="/resources/large_crown.png" />
+                            {text!("{}, ", size_range.base_size * size_range.big_boarder)}
+                            <img class="mh-crown-icon" alt="Large crown" src="/resources/king_crown.png" />
+                            {text!("{})", size_range.base_size * size_range.king_boarder)}
+                        </span>))}
+                    </span>
+                </p>))}
+                <p class="mh-kv"><span>"GimmickVital"</span>
+                    <span>{text!("(S) {} / (M) {} / (L) {} / (KB) {}",
+                        monster.data_tune.gimmick_vital_data.vital_s,
+                        monster.data_tune.gimmick_vital_data.vital_m,
+                        monster.data_tune.gimmick_vital_data.vital_l,
+                        monster.data_tune.gimmick_vital_data.vital_knock_back
+                    )}</span>
+                </p>
+                <p class="mh-kv"><span>"Riding HP"</span>
+                    <span>{text!("(S) {} / (M) {} / (L) {}",
+                        monster.data_tune.marionette_vital_data.vital_s,
+                        monster.data_tune.marionette_vital_data.vital_m,
+                        monster.data_tune.marionette_vital_data.vital_l
+                    )}</span>
+                </p>
+                <p class="mh-kv"><span>"Weight"</span>
+                    <span>{text!("{:?}", monster.data_tune.weight)}</span>
+                </p>
+                <p class="mh-kv"><span>"Caution to combat timer"</span>
+                    <span>{text!("{}", monster.data_base.caution_to_combat_vision_timer)}</span>
+                </p>
+                <p class="mh-kv"><span>"Caution to normal timer"</span>
+                    <span>{text!("{}", monster.data_base.caution_to_non_combat_timer)}</span>
+                </p>
+                <p class="mh-kv"><span>"Combat to normal timer"</span>
+                    <span>{text!("{}", monster.data_base.combat_to_non_combat_timer)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage threshold"</span>
+                    <span>{text!("(LR) {} / (HR) {} / (Rampage) {} / (MR) {}",
+                        monster.anger_data.data_info[0].val,
+                        monster.anger_data.data_info[1].val,
+                        monster.anger_data.data_info[2].val,
+                        monster.anger_data.data_info[3].val)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage timer"</span>
+                    <span>{text!("{}", monster.anger_data.timer)}</span>
+                </p>
+                <p class="mh-kv"><span>"Rampage enrage timer"</span>
+                    <span>{text!("{}", monster.anger_data.hyakuryu_cool_timer)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage motion multiplier"</span>
+                    <span>{text!("{}", monster.anger_data.mot_rate)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage attack multiplier"</span>
+                    <span>{text!("{}", monster.anger_data.atk_rate)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage defense multiplier"</span>
+                    <span>{text!("{}", monster.anger_data.def_rate)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage compensation rate"</span>
+                    <span>{text!("{:?}", monster.anger_data.compensation_rate)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage compensation rate (rampage)"</span>
+                    <span>{text!("{:?}", monster.anger_data.hyakuryu_compensation_rate)}</span>
+                </p>
+                <p class="mh-kv"><span>"Enrage add staying time"</span>
+                    <span>{text!("{}", monster.anger_data.anger_stay_add_sec)}</span>
+                </p>
+                <p class="mh-kv"><span>"life_area_timer_rate"</span>
+                    <span>{text!("{}", monster.anger_data.life_area_timer_rate)}</span>
+                </p>
+                </div>
                 </section>
 
                 { quest_list }
@@ -938,7 +1135,7 @@ pub fn gen_monster(
                 <div class="mh-table"><table>
                     <thead>
                     <tr>
-                        <th>"Part"</th>
+                        <th>"Hitzone"</th>
                         <th>"Phase"</th>
                         <th>"Name"</th>
                         <th>"Slash"</th>
@@ -1006,8 +1203,21 @@ pub fn gen_monster(
                                     }).map(|v|v.as_slice()).unwrap_or_default();
 
                                     let mut tds = part_common.take().unwrap_or_default();
+
+                                    let phase_text = if let Some(phase_text) = SPECIFIC_MEAT_TYPE_MAP
+                                        .get(&(monster.id, part)).copied().and_then(|m|m.get(phase)) {
+
+                                        phase_text.to_string()
+                                    } else if let Some(phase_text) =
+                                        phase_map.and_then(|m|m.get(phase)) {
+
+                                        phase_text.to_string()
+                                    } else {
+                                        format!("{}", phase)
+                                    };
+
                                     tds.extend(vec![
-                                        html!(<td>{text!("{}", phase)}</td>),
+                                        html!(<td>{text!("{}", phase_text)}</td>),
                                         html!(<td>{
                                             names.iter().enumerate().map(|(i, n)| html!(<span>
                                                 { text!("{}", if i == 0 {""} else {", "}) }
@@ -1061,7 +1271,7 @@ pub fn gen_monster(
                                 format!("{}", index)
                             };
 
-                            let part_color = format!("mh-part mh-part-{}", index);
+                            let part_color = format!("mh-part-group mh-part-{}", index);
 
                             let class_str = if part.extractive_type == ExtractiveType::None {
                                 "mh-invalid-part mh-color-diagram-switch"
@@ -1075,7 +1285,11 @@ pub fn gen_monster(
                                 .filter(|p| Ok(p.parts_group) == index_u16)
                                 .map(|part_break|{
                                     part_break.parts_break_data_list.iter().map(
-                                        |p| format!("(x{}) (LR/HR) {}, (MR) {}", p.break_level, p.vital, p.master_vital)
+                                        |p| if p.master_vital == -1 {
+                                            format!("(x{}) {}", p.break_level, p.vital)
+                                        } else {
+                                            format!("(x{}) (LR/HR) {}, (MR) {}", p.break_level, p.vital, p.master_vital)
+                                        }
                                     ).collect::<Vec<_>>().join(" / ")
                                 }).collect::<Vec<_>>().join(" , ");
 
@@ -1087,8 +1301,12 @@ pub fn gen_monster(
                                         PermitDamageAttrEnum::Strike => "(Impact) ",
                                         PermitDamageAttrEnum::All => "",
                                     };
-                                    format!("{} (LR/HR) {}, (MR) {}", attr, part_loss.parts_loss_data.vital,
-                                        part_loss.parts_loss_data.master_vital)
+                                    if part_loss.parts_loss_data.master_vital == -1 {
+                                        format!("{} {}", attr, part_loss.parts_loss_data.vital)
+                                    } else {
+                                        format!("{} (LR/HR) {}, (MR) {}", attr, part_loss.parts_loss_data.vital,
+                                            part_loss.parts_loss_data.master_vital)
+                                    }
                                 }).collect::<Vec<_>>().join(" , ");
 
                             let id = format!("mh-part-dt-{index}");
@@ -1100,7 +1318,11 @@ pub fn gen_monster(
                                     { text!("[{}]", index) }
                                     { text!("{}", part_name) }
                                 </td>
-                                <td>{ text!("(LR/HR) {}, (MR) {}", part.vital, part.master_vital) }</td>
+                                <td>{ if part.master_vital == -1 {
+                                    text!("{}", part.vital)
+                                } else {
+                                    text!("(LR/HR) {}, (MR) {}", part.vital, part.master_vital)
+                                }}</td>
                                 <td>{ text!("{}", part_break) }</td>
                                 <td>{ text!("{}", part_loss) }</td>
                                 <td>{ gen_extractive_type(part.extractive_type) }</td>
@@ -1108,6 +1330,17 @@ pub fn gen_monster(
                         }).collect::<Vec<_>>()
                     }</tbody>
                 </table></div>
+                </section>
+
+                <section>
+                <h2>"Multi-part vital"</h2>
+                {
+                    let system = monster.data_tune.enemy_multi_parts_vital_system_data
+                        .iter().enumerate().map(|(i, m)|(true, i, &m.base.0));
+                    let additional = monster.data_tune.enemy_multi_parts_vital_data_list
+                        .iter().enumerate().map(|(i, m)|(false, i, m));
+                    gen_multipart(system.chain(additional))
+                }
                 </section>
 
                 <section>

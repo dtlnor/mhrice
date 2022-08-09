@@ -198,14 +198,10 @@ pub fn gen_monsters(
                 None
             };
 
-            let enemy_type = if id == 99 && sub_id == 5 {
-                Some(39)
-            } else {
-                boss_init_set_data
-                    .as_ref()
-                    .map(|b: &EnemyBossInitSetData| b.enemy_type)
-                    .or_else(|| EMS_ID_MAP.get(&(id + (sub_id << 8) + 0x1000)).cloned())
-            };
+            let enemy_type = boss_init_set_data
+                .as_ref()
+                .map(|b: &EnemyBossInitSetData| b.enemy_type)
+                .or_else(|| EMS_ID_MAP.get(&(id + (sub_id << 8) + 0x1000)).cloned());
 
             let rcol_path = collider_path_gen(id, sub_id);
             let rcol_index = pak.find_file(&rcol_path)?;
@@ -328,6 +324,20 @@ fn get_weapon_list<BaseData: 'static>(
 }
 
 pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
+    fn boss_init_set_path(id: u32, sub_id: u32) -> Option<String> {
+        if id == 99 && sub_id == 5 {
+            // wow
+            return Some(format!(
+                "enemy/em{0:03}/00/user_data/em{0:03}_{1:02}_boss_init_set_data.user",
+                id, sub_id
+            ));
+        }
+        Some(format!(
+            "enemy/em{0:03}/{1:02}/user_data/em{0:03}_{1:02}_boss_init_set_data.user",
+            id, sub_id
+        ))
+    }
+
     let monsters = gen_monsters(
         pak,
         |id, sub_id| {
@@ -336,12 +346,7 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
                 id, sub_id
             )
         },
-        |id, sub_id| {
-            Some(format!(
-                "enemy/em{0:03}/{1:02}/user_data/em{0:03}_{1:02}_boss_init_set_data.user",
-                id, sub_id
-            ))
-        },
+        boss_init_set_path,
         gen_em_collider_path,
         |id, sub_id| {
             format!(
@@ -694,6 +699,7 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         armor_product: get_singleton(pak)?,
         overwear: get_singleton(pak)?,
         overwear_product: get_singleton(pak)?,
+        armor_buildup: get_singleton(pak)?,
         armor_head_name_msg,
         armor_chest_name_msg,
         armor_arm_name_msg,
@@ -988,6 +994,10 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
     guild_card
         .sub_image(302, 397, 24, 24)?
         .save_png(output.create("king_crown.png")?)?;
+
+    guild_card
+        .sub_image(302, 424, 24, 24)?
+        .save_png(output.create("large_crown.png")?)?;
 
     guild_card
         .sub_image(302, 453, 24, 24)?
@@ -2164,6 +2174,7 @@ where
             children: vec![],
             parent: None,
             hyakuryu_weapon_buildup: hyakuryu_weapon_map.remove(&id).unwrap_or_default(),
+            update: None,
         };
         weapons.insert(param.to_base().id, weapon);
     }
@@ -2189,7 +2200,9 @@ where
         if tree_id_set.contains(&node.weapon_id) {
             bail!("Multiple tree node for weapon {:?}", node.weapon_id)
         }
-        if !weapons.contains_key(&node.weapon_id) {
+        if let Some(weapon) = weapons.get_mut(&node.weapon_id) {
+            weapon.update = Some(node);
+        } else {
             bail!("Unknown weapon in tree node {:?}", node.weapon_id);
         }
         tree_id_set.insert(node.weapon_id);
@@ -2699,6 +2712,7 @@ fn prepare_monsters(pedia: &Pedia) -> Result<HashMap<EmTypes, MonsterEx<'_>>> {
                 });
 
             MonsterEx {
+                data: monster,
                 name,
                 alias,
                 explain1,
@@ -2707,6 +2721,7 @@ fn prepare_monsters(pedia: &Pedia) -> Result<HashMap<EmTypes, MonsterEx<'_>>> {
             }
         } else {
             MonsterEx {
+                data: monster,
                 name: None,
                 alias: None,
                 explain1: None,
@@ -2730,6 +2745,25 @@ pub fn prepare_servant(pedia: &Pedia) -> Result<HashMap<i32, Servant<'_>>> {
                 .with_context(|| format!("Unexpected servant name tag {}", entry.name))?;
             let servant = Servant { name: entry };
             result.insert(id, servant);
+        }
+    }
+    Ok(result)
+}
+
+pub fn prepare_armor_buildup(
+    pedia: &Pedia,
+) -> Result<HashMap<i32, Vec<&ArmorBuildupTableUserDataParam>>> {
+    let mut result: HashMap<i32, Vec<&ArmorBuildupTableUserDataParam>> = HashMap::new();
+    for param in &pedia.armor_buildup.param {
+        result.entry(param.table_type).or_default().push(param);
+    }
+    for (table_type, series) in &mut result {
+        series.sort_unstable_by_key(|e| e.limit_lv);
+        if series
+            .windows(2)
+            .any(|window| window[0].limit_lv == window[1].limit_lv)
+        {
+            bail!("Duplicate limit lv for armor buildup type {table_type}");
         }
     }
     Ok(result)
@@ -2768,6 +2802,7 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         skills: prepare_skills(pedia)?,
         hyakuryu_skills: prepare_hyakuryu_skills(pedia)?,
         armors: prepare_armors(pedia)?,
+        armor_buildup: prepare_armor_buildup(pedia)?,
         meat_names: prepare_meat_names(pedia)?,
         items: prepare_items(pedia)?,
         material_categories: prepare_material_categories(pedia),

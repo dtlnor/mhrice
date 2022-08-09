@@ -60,12 +60,8 @@ use std::rc::*;
 
 Version list:
 
-0 = 3.6.1.0
-1 = 3.6.1.1
-2 = 3.9.0.0
-3 = 3.9.1.0
-
-42 = sunbreak demo (temporary)
+0        = 3.6.1.0
+10_00_02 = 10.0.2.0
 
 ****/
 
@@ -680,6 +676,8 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         PlOverwearBaseUserData,
         PlOverwearProductUserDataParam,
         PlOverwearProductUserData,
+        ArmorBuildupTableUserDataParam,
+        ArmorBuildupTableUserData,
     );
 
     r!(

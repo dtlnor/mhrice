@@ -17,13 +17,23 @@ pub fn gen_skill_list(skills: &BTreeMap<PlEquipSkillId, Skill>, output: &impl Si
     let doc: DOMTree<String> = html!(
         <html>
             <head>
-                <title>{text!("Skills - MHRice")}</title>
+                <title>{text!("Armor skills - MHRice")}</title>
                 { head_common() }
             </head>
             <body>
                 { navbar() }
                 <main>
-                <header><h1>"Skill"</h1></header>
+                <header><h1>"Armor skills"</h1></header>
+
+                <div>
+                    <a href="/hyakuryu_skill.html"><span class="icon-text">
+                    <span class="icon">
+                    <i class="fas fa-arrow-right"></i>
+                    </span>
+                    <span>"go to rampage skill"</span>
+                    </span></a>
+                </div>
+
                 <ul class="mh-item-list">
                 {
                     skills.iter().map(|(&id, skill)|{
@@ -110,7 +120,7 @@ pub fn gen_skill(
                     <tr>
                         <td>{gen_deco_label(deco)}</td>
                         <td>{text!("{}", deco.data.skill_lv_list[0])}</td>
-                        <td>{text!("{}", deco.data.base_price)}</td>
+                        <td>{text!("{}z", deco.data.base_price)}</td>
                         { gen_materials(pedia_ex, &deco.product.item_id_list,
                             &deco.product.item_num_list, deco.product.item_flag) }
                     </tr>
