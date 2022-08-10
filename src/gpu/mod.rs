@@ -20,13 +20,7 @@ struct Job {
 }
 
 fn gpu_thread(receiver: Receiver<Job>) {
-    #[cfg(target_family = "unix")]
-    use glutin::platform::unix::EventLoopExtUnix;
-    #[cfg(target_family = "windows")]
-    use glutin::platform::windows::EventLoopExtWindows;
-
-    let event_loop: glutin::event_loop::EventLoop<()> =
-        glutin::event_loop::EventLoop::new_any_thread();
+    let event_loop: glutin::event_loop::EventLoop<()> = glutin::event_loop::EventLoop::new();
     let cb = glutin::ContextBuilder::new()
         .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)))
         .with_gl_profile(glutin::GlProfile::Core);
