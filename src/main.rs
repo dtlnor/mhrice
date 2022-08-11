@@ -1304,6 +1304,7 @@ fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: Strin
 }
 
 fn main() -> Result<()> {
+    gpu::gpu_init();
     match Mhrice::from_args() {
         Mhrice::Dump { pak, name, output } => dump(pak, name, output),
         Mhrice::DumpIndex {
