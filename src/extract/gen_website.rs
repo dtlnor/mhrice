@@ -586,12 +586,12 @@ pub fn gen_website(pedia: &Pedia, pedia_ex: &PediaEx<'_>, output: &impl Sink) ->
     gen_skill_list(&pedia_ex.skills, output)?;
     gen_hyakuryu_skills(pedia_ex, output, &mut toc)?;
     gen_hyakuryu_skill_list(&pedia_ex.hyakuryu_skills, output)?;
-    gen_armors(pedia_ex, output, &mut toc)?;
+    gen_armors(pedia, pedia_ex, output, &mut toc)?;
     gen_armor_list(&pedia_ex.armors, output)?;
     gen_monsters(pedia, pedia_ex, output, &mut toc)?;
     gen_items(pedia, pedia_ex, output, &mut toc)?;
     gen_item_list(pedia_ex, output)?;
-    gen_weapons(pedia_ex, output, &mut toc)?;
+    gen_weapons(pedia, pedia_ex, output, &mut toc)?;
     gen_maps(pedia, pedia_ex, output, &mut toc)?;
     gen_map_list(pedia, output)?;
     gen_otomo_equips(pedia_ex, output, &mut toc)?;

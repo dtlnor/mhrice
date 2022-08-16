@@ -364,6 +364,14 @@ impl NormalQuestDataParam {
     pub fn is_servant_request(&self) -> bool {
         (self.quest_no / 100000) % 10 == 4 && (self.quest_no / 10000) % 10 == 6
     }
+
+    pub fn anomaly_level(&self) -> Option<i32> {
+        // snow.quest.QuestUtility.isMysteryQuest
+        if (self.quest_no / 10000) % 10 != 8 || (self.quest_no / 100000) % 10 == 9 {
+            return None;
+        }
+        Some((self.quest_no / 100) % 10)
+    }
 }
 
 rsz_struct! {
@@ -384,7 +392,10 @@ rsz_with_singleton! {
     pub struct BaseNormalQuestDataMr(NormalQuestData);
 
     #[path("Quest/QuestData/DlQuestData.user")]
-    pub struct DlNormalQuestData(NormalQuestData);
+    pub struct DlNormalQuestDataLrHr(NormalQuestData);
+
+    #[path("Quest/QuestData/DlQuestData_MR.user")]
+    pub struct DlNormalQuestDataMr(NormalQuestData);
 }
 
 /*rsz_enum! {
@@ -549,7 +560,10 @@ rsz_with_singleton! {
     pub struct BaseNormalQuestDataForEnemyMr(NormalQuestDataForEnemy);
 
     #[path("Quest/QuestData/DlQuestDataForEnemy.user")]
-    pub struct DlNormalQuestDataForEnemy(NormalQuestDataForEnemy);
+    pub struct DlNormalQuestDataForEnemyLrHr(NormalQuestDataForEnemy);
+
+    #[path("Quest/QuestData/DlQuestDataForEnemy_MR.user")]
+    pub struct DlNormalQuestDataForEnemyMr(NormalQuestDataForEnemy);
 }
 
 rsz_struct! {
@@ -934,7 +948,7 @@ rsz_struct! {
     )]
     #[derive(Debug, Serialize)]
     pub struct MysteryRewardItemUserDataParam {
-        pub em_type:EmTypes,
+        pub em_type: EmTypes,
         pub lv_lower_limit: u32,
         pub lv_upper_limit: u32,
         pub quest_no: i32,
