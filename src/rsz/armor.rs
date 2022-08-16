@@ -80,7 +80,7 @@ rsz_struct! {
         pub skill_list: Vec<PlEquipSkillId>,
         pub skill_lv_list: Vec<i32>,
         pub id_after_ex_change: PlArmorId,
-        pub cutom_table_no: u32,
+        pub custom_table_no: u32,
         pub custom_cost: u32,
     }
 }
@@ -302,7 +302,7 @@ rsz_struct! {
 
 rsz_struct! {
     #[rsz("snow.data.ArmorBuildupTableUserData",
-    path = "data/System/ContentsIdSystem/Armor/ArmorBuildupTableData.user",
+        path = "data/System/ContentsIdSystem/Armor/ArmorBuildupTableData.user",
         0x85fb2c77 = 10_00_02
     )]
     #[derive(Debug, Serialize)]

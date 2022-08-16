@@ -64,8 +64,10 @@ pub struct Pedia {
     pub normal_quest_data_mr: BaseNormalQuestDataMr,
     pub normal_quest_data_for_enemy: BaseNormalQuestDataForEnemyLrHr,
     pub normal_quest_data_for_enemy_mr: BaseNormalQuestDataForEnemyMr,
-    pub dl_quest_data: DlNormalQuestData,
-    pub dl_quest_data_for_enemy: DlNormalQuestDataForEnemy,
+    pub dl_quest_data: DlNormalQuestDataLrHr,
+    pub dl_quest_data_for_enemy: DlNormalQuestDataForEnemyLrHr,
+    pub dl_quest_data_mr: Option<DlNormalQuestDataMr>,
+    pub dl_quest_data_for_enemy_mr: Option<DlNormalQuestDataForEnemyMr>,
     pub difficulty_rate: SystemDifficultyRateData,
     pub random_scale: EnemyBossRandomScaleData,
     pub size_list: EnemySizeListData,
@@ -217,6 +219,16 @@ pub struct Pedia {
     pub dog_series_name_mr: Msg,
 
     pub servant_profile: Msg,
+
+    pub custom_buildup_base: Option<CustomBuildupBaseUserData>,
+    pub custom_buildup_armor_open: Option<CustomBuildupArmorOpenUserData>,
+    pub custom_buildup_weapon_open: Option<CustomBuildupWeaponOpenUserData>,
+    pub custom_buildup_armor_material: Option<CustomBuildupArmorMaterialUserData>,
+    pub custom_buildup_weapon_material: Option<CustomBuildupWeaponMaterialUserData>,
+    pub custom_buildup_armor_lot: Option<CustomBuildupArmorLotUserData>,
+    pub custom_buildup_armor_category_lot: Option<CustomBuildupArmorCategoryLotUserData>,
+    pub custom_buildup_equip_skill_detail: Option<CustomBuildupEquipSkillDetailUserData>,
+    pub custom_buildup_wep_table: Option<CustomBuildupWepTableUserData>,
 }
 
 pub struct QuestReward<'a> {
@@ -253,6 +265,7 @@ pub struct Skill<'a> {
     pub levels: Vec<&'a MsgEntry>,
     pub icon_color: i32,
     pub decos: Vec<Deco<'a>>,
+    pub custom_buildup_cost: Option<u32>,
 }
 
 pub struct HyakuryuDeco<'a> {
@@ -357,18 +370,63 @@ pub struct OtEquipSeries<'a> {
     pub chest: Option<OtArmor<'a>>,
 }
 
-#[derive(Debug)]
+pub struct MysteryReward<'a> {
+    pub lv_lower_limit: u32,
+    pub lv_upper_limit: u32,
+    pub hagibui_probability: u32,
+    pub reward_item: ItemId,
+    pub item_num: u32,
+    pub quest_reward: Option<&'a RewardIdLotTableUserDataParam>,
+    pub additional_quest_reward: Vec<&'a RewardIdLotTableUserDataParam>,
+    pub special_quest_reward: Option<&'a RewardIdLotTableUserDataParam>,
+    pub multiple_target_reward: Option<&'a RewardIdLotTableUserDataParam>,
+    pub multiple_fix_reward: Option<&'a RewardIdLotTableUserDataParam>,
+}
+
 pub struct MonsterEx<'a> {
     pub data: &'a Monster,
     pub name: Option<&'a MsgEntry>,
     pub alias: Option<&'a MsgEntry>,
     pub explain1: Option<&'a MsgEntry>,
     pub explain2: Option<&'a MsgEntry>,
-    pub mystery_reward: Option<&'a MysteryRewardItemUserDataParam>,
+    pub mystery_reward: Vec<MysteryReward<'a>>,
 }
 
 pub struct Servant<'a> {
     pub name: &'a MsgEntry,
+}
+
+#[derive(Debug)]
+pub struct ArmorCustomBuildupPiece<'a> {
+    pub lot: u32,
+    pub data: &'a CustomBuildupBaseUserDataParam,
+}
+
+#[derive(Debug)]
+pub struct ArmorCustomBuildupCategory<'a> {
+    pub lot: u32,
+    pub pieces: BTreeMap<u16, ArmorCustomBuildupPiece<'a>>,
+}
+
+#[derive(Debug)]
+pub struct ArmorCustomBuildup<'a> {
+    pub categories: BTreeMap<u16, ArmorCustomBuildupCategory<'a>>,
+}
+
+#[derive(Debug)]
+pub struct WeaponCustomBuildupPiece<'a> {
+    pub data: &'a CustomBuildupBaseUserDataParam,
+    pub material: &'a CustomBuildupWeaponMaterialUserDataParam,
+}
+
+#[derive(Debug)]
+pub struct WeaponCustomBuildupCategory<'a> {
+    pub pieces: BTreeMap<u16, WeaponCustomBuildupPiece<'a>>,
+}
+
+#[derive(Default, Debug)]
+pub struct WeaponCustomBuildup<'a> {
+    pub categories: BTreeMap<u16, WeaponCustomBuildupCategory<'a>>,
 }
 
 pub struct PediaEx<'a> {
@@ -409,4 +467,7 @@ pub struct PediaEx<'a> {
     pub ot_equip: BTreeMap<OtEquipSeriesId, OtEquipSeries<'a>>,
 
     pub servant: HashMap<i32, Servant<'a>>,
+
+    pub armor_custom_buildup: HashMap<u32, ArmorCustomBuildup<'a>>,
+    pub weapon_custom_buildup: HashMap<u32, WeaponCustomBuildup<'a>>,
 }

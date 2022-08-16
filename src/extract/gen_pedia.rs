@@ -255,6 +255,21 @@ fn get_singleton<T: 'static + SingletonUser>(pak: &mut PakReader<impl Read + See
     Ok(T::from_rsz(get_user(pak, T::PATH)?))
 }
 
+fn get_singleton_opt<T: 'static + SingletonUser>(
+    pak: &mut PakReader<impl Read + Seek>,
+) -> Result<Option<T>> {
+    let index = if let Ok(index) = pak.find_file(T::PATH) {
+        index
+    } else {
+        return Ok(None);
+    };
+    let user = User::new(Cursor::new(pak.read_file(index)?))?
+        .rsz
+        .deserialize_single()
+        .with_context(|| T::PATH.to_string())?;
+    Ok(Some(T::from_rsz(user)))
+}
+
 fn get_weapon_list<BaseData: 'static>(
     pak: &mut PakReader<impl Read + Seek>,
     weapon_class: &str,
@@ -674,6 +689,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         normal_quest_data_for_enemy_mr: get_singleton(pak)?,
         dl_quest_data: get_singleton(pak)?,
         dl_quest_data_for_enemy: get_singleton(pak)?,
+        dl_quest_data_mr: get_singleton_opt(pak)?,
+        dl_quest_data_for_enemy_mr: get_singleton_opt(pak)?,
         difficulty_rate: get_singleton(pak)?,
         random_scale: get_singleton(pak)?,
         size_list: get_singleton(pak)?,
@@ -815,6 +832,15 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         airou_series_name_mr,
         dog_series_name_mr,
         servant_profile,
+        custom_buildup_base: get_singleton_opt(pak)?,
+        custom_buildup_armor_open: get_singleton_opt(pak)?,
+        custom_buildup_weapon_open: get_singleton_opt(pak)?,
+        custom_buildup_armor_material: get_singleton_opt(pak)?,
+        custom_buildup_weapon_material: get_singleton_opt(pak)?,
+        custom_buildup_armor_lot: get_singleton_opt(pak)?,
+        custom_buildup_armor_category_lot: get_singleton_opt(pak)?,
+        custom_buildup_equip_skill_detail: get_singleton_opt(pak)?,
+        custom_buildup_wep_table: get_singleton_opt(pak)?,
     })
 }
 
@@ -1021,11 +1047,11 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
     let item_icon_path = output.sub_sink("item")?;
 
     let item_icon_files = [
-        ("gui/70_UVSequence/cmn_icon.uvs", 0),
-        ("gui/70_UVSequence/cmn_icon_MR.uvs", 200),
+        ("gui/70_UVSequence/cmn_icon.uvs", 0, 200),
+        ("gui/70_UVSequence/cmn_icon_MR.uvs", 200, usize::MAX),
     ];
 
-    for (file, offset) in item_icon_files {
+    for (file, offset, max_i) in item_icon_files {
         let item_icon_uvs = pak.find_file(file)?;
         let item_icon_uvs = Uvs::new(Cursor::new(pak.read_file(item_icon_uvs)?))?;
         if item_icon_uvs.textures.len() != 1 || item_icon_uvs.spriter_groups.len() != 1 {
@@ -1034,6 +1060,9 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
         let item_icon = pak.find_file(&item_icon_uvs.textures[0].path)?;
         let item_icon = Tex::new(Cursor::new(pak.read_file(item_icon)?))?.to_rgba(0, 0)?;
         for (i, spriter) in item_icon_uvs.spriter_groups[0].spriters.iter().enumerate() {
+            if i >= max_i {
+                break;
+            }
             let i = i + offset;
             let item_icon = item_icon.sub_image_f(spriter.p0, spriter.p1)?;
 
@@ -1045,19 +1074,19 @@ pub fn gen_resources(pak: &mut PakReader<impl Read + Seek>, output: &impl Sink) 
                 item_icon_a.save_png(item_icon_path.create(&format!("{:03}.a.png", i))?)?;
             }
         }
+    }
 
-        let item_addon_uvs = pak.find_file("gui/70_UVSequence/Item_addonicon.uvs")?;
-        let item_addon_uvs = Uvs::new(Cursor::new(pak.read_file(item_addon_uvs)?))?;
-        if item_addon_uvs.textures.len() != 1 || item_addon_uvs.spriter_groups.len() != 1 {
-            bail!("Broken item_addon.uvs");
-        }
-        let item_addon = pak.find_file(&item_addon_uvs.textures[0].path)?;
-        let item_addon = Tex::new(Cursor::new(pak.read_file(item_addon)?))?.to_rgba(0, 0)?;
-        for (i, spriter) in item_addon_uvs.spriter_groups[0].spriters.iter().enumerate() {
-            item_addon
-                .sub_image_f(spriter.p0, spriter.p1)?
-                .save_png(output.create(&format!("item_addon_{}.png", i))?)?;
-        }
+    let item_addon_uvs = pak.find_file("gui/70_UVSequence/Item_addonicon.uvs")?;
+    let item_addon_uvs = Uvs::new(Cursor::new(pak.read_file(item_addon_uvs)?))?;
+    if item_addon_uvs.textures.len() != 1 || item_addon_uvs.spriter_groups.len() != 1 {
+        bail!("Broken item_addon.uvs");
+    }
+    let item_addon = pak.find_file(&item_addon_uvs.textures[0].path)?;
+    let item_addon = Tex::new(Cursor::new(pak.read_file(item_addon)?))?.to_rgba(0, 0)?;
+    for (i, spriter) in item_addon_uvs.spriter_groups[0].spriters.iter().enumerate() {
+        item_addon
+            .sub_image_f(spriter.p0, spriter.p1)?
+            .save_png(output.create(&format!("item_addon_{}.png", i))?)?;
     }
 
     let message_window_uvs = pak.find_file("gui/70_UVSequence/message_window.uvs")?;
@@ -1329,7 +1358,10 @@ fn prepare_size_dist_map(
     Ok(result)
 }
 
-fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
+fn prepare_quests<'a>(
+    pedia: &'a Pedia,
+    reward_lot: &'_ HashMap<u32, &'a RewardIdLotTableUserDataParam>,
+) -> Result<Vec<Quest<'a>>> {
     let all_msg = pedia
         .quest_hall_msg
         .entries
@@ -1350,6 +1382,12 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
         .iter()
         .chain(&pedia.dl_quest_data_for_enemy.param)
         .chain(&pedia.normal_quest_data_for_enemy_mr.param)
+        .chain(
+            pedia
+                .dl_quest_data_for_enemy_mr
+                .iter()
+                .flat_map(|p| &p.param),
+        )
         .filter(|e| e.quest_no != 0);
 
     let enemy_params = hash_map_unique(enemy_params, |param| (param.quest_no, param), false)?;
@@ -1362,16 +1400,6 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
             .chain(&pedia.quest_data_for_reward_mr.param)
             .filter(|e| e.quest_numer != 0),
         |param| (param.quest_numer, param),
-        false,
-    )?;
-
-    let reward_lot = hash_map_unique(
-        pedia
-            .reward_id_lot_table
-            .param
-            .iter()
-            .chain(&pedia.reward_id_lot_table_mr.param),
-        |param| (param.id, param),
         false,
     )?;
 
@@ -1417,6 +1445,14 @@ fn prepare_quests(pedia: &Pedia) -> Result<Vec<Quest<'_>>> {
                 .dl_quest_data
                 .param
                 .iter()
+                .filter(|param| param.quest_no != 0)
+                .map(|param| (param, true)),
+        )
+        .chain(
+            pedia
+                .dl_quest_data_mr
+                .iter()
+                .flat_map(|p| &p.param)
                 .filter(|param| param.quest_no != 0)
                 .map(|param| (param, true)),
         )
@@ -1549,6 +1585,15 @@ fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> 
     let mut detail_msg_mr: HashMap<&String, &MsgEntry> =
         pedia.player_skill_detail_msg_mr.get_name_map();
 
+    let custom_buildup_costs: HashMap<PlEquipSkillId, u32> = hash_map_unique(
+        pedia
+            .custom_buildup_equip_skill_detail
+            .iter()
+            .flat_map(|p| &p.param),
+        |p| (p.skill_id, p.cost),
+        false,
+    )?;
+
     for skill in &pedia.equip_skill.param {
         if skill.id == PlEquipSkillId::None {
             continue;
@@ -1597,6 +1642,7 @@ fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> 
                 levels,
                 icon_color: skill.icon_color,
                 decos: vec![],
+                custom_buildup_cost: custom_buildup_costs.get(&skill.id).copied(),
             },
         );
     }
@@ -2650,7 +2696,10 @@ fn prepeare_ot_equip(pedia: &Pedia) -> Result<BTreeMap<OtEquipSeriesId, OtEquipS
     Ok(res)
 }
 
-fn prepare_monsters(pedia: &Pedia) -> Result<HashMap<EmTypes, MonsterEx<'_>>> {
+fn prepare_monsters<'a>(
+    pedia: &'a Pedia,
+    reward_lot: &'_ HashMap<u32, &'a RewardIdLotTableUserDataParam>,
+) -> Result<HashMap<EmTypes, MonsterEx<'a>>> {
     let mut result = HashMap::new();
 
     let names = pedia.monster_names.get_name_map();
@@ -2660,21 +2709,90 @@ fn prepare_monsters(pedia: &Pedia) -> Result<HashMap<EmTypes, MonsterEx<'_>>> {
     let explains = pedia.monster_explains.get_name_map();
     let explains_mr = pedia.monster_explains_mr.get_name_map();
 
-    // TODO: v11 data
-    let mut mystery_rewards = hash_map_unique(
-        pedia.mystery_reward_item.param.iter().filter(|p| {
-            p.em_type != EmTypes::Em(0)
-                && p.quest_no == -1
-                && p.lv_lower_limit == 0
-                && p.lv_upper_limit == 0
-        }),
-        |p| (p.em_type, p),
-        false,
-    )?;
+    let mut mystery_rewards: HashMap<EmTypes, Vec<MysteryReward>> = HashMap::new();
+
+    for mystery_reward in &pedia.mystery_reward_item.param {
+        if mystery_reward.em_type == EmTypes::Em(0) {
+            continue;
+        }
+        if mystery_reward.quest_no != -1 {
+            bail!("Mystery reward with quest_no: {mystery_reward:?}")
+        }
+
+        let quest_reward = (mystery_reward.quest_reward_table_index != 0)
+            .then(|| {
+                reward_lot
+                    .get(&mystery_reward.quest_reward_table_index)
+                    .copied()
+                    .with_context(|| format!("Quest reward not found for {mystery_reward:?}"))
+            })
+            .transpose()?;
+
+        let additional_quest_reward = mystery_reward
+            .additional_quest_reward_table_index
+            .iter()
+            .filter(|&&i| i != 0)
+            .map(|i| -> Result<&RewardIdLotTableUserDataParam> {
+                reward_lot.get(i).copied().with_context(|| {
+                    format!("additional quest reward not found for {mystery_reward:?}")
+                })
+            })
+            .collect::<Result<Vec<&RewardIdLotTableUserDataParam>>>()?;
+
+        let special_quest_reward = mystery_reward
+            .special_quest_reward_table_index
+            .0
+            .filter(|&i| i != 0)
+            .map(|i| {
+                reward_lot.get(&i).copied().with_context(|| {
+                    format!("Special quest reward not found for {mystery_reward:?}")
+                })
+            })
+            .transpose()?;
+
+        let multiple_target_reward = mystery_reward
+            .multiple_target_reward_table_index
+            .0
+            .filter(|&i| i != 0)
+            .map(|i| {
+                reward_lot.get(&i).copied().with_context(|| {
+                    format!("Multiple target quest reward not found for {mystery_reward:?}")
+                })
+            })
+            .transpose()?;
+
+        let multiple_fix_reward = mystery_reward
+            .multiple_fix_reward_table_index
+            .0
+            .filter(|&i| i != 0)
+            .map(|i| {
+                reward_lot.get(&i).copied().with_context(|| {
+                    format!("Multiple fix quest reward not found for {mystery_reward:?}")
+                })
+            })
+            .transpose()?;
+
+        mystery_rewards
+            .entry(mystery_reward.em_type)
+            .or_default()
+            .push(MysteryReward {
+                lv_lower_limit: mystery_reward.lv_lower_limit,
+                lv_upper_limit: mystery_reward.lv_upper_limit,
+                hagibui_probability: mystery_reward.hagibui_probability,
+                reward_item: mystery_reward.reward_item,
+                item_num: mystery_reward.item_num,
+                quest_reward,
+                additional_quest_reward,
+                special_quest_reward,
+                multiple_target_reward,
+                multiple_fix_reward,
+            })
+    }
 
     let monsters = pedia.monsters.iter().chain(&pedia.small_monsters);
     for monster in monsters {
-        let mystery_reward = mystery_rewards.remove(&monster.em_type);
+        let mut mystery_reward = mystery_rewards.remove(&monster.em_type).unwrap_or_default();
+        mystery_reward.sort_by_key(|m| m.lv_lower_limit);
         let entry = if let Some(index) = monster.enemy_type {
             let name = names
                 .get(&format!("EnemyIndex{index:03}"))
@@ -2763,6 +2881,130 @@ pub fn prepare_armor_buildup(
     Ok(result)
 }
 
+// Hardcoded in snow.data.ArmorCustomBuildupData..cctor
+const ARMOR_CUSTOM_BUILDUP_CATEGORIES: [u16; 4] = [
+    13, // Def
+    14, // Ele res
+    19, // Slot
+    20, // Skill
+];
+
+pub fn prepare_armor_custom_buildup<'a>(
+    pedia: &'a Pedia,
+    custom_buildup_pieces: &mut HashMap<(u32, u16, u16), &'a CustomBuildupBaseUserDataParam>,
+) -> Result<HashMap<u32, ArmorCustomBuildup<'a>>> {
+    let mut result = HashMap::new();
+    for category_lot in pedia
+        .custom_buildup_armor_category_lot
+        .iter()
+        .flat_map(|p| &p.param)
+    {
+        if category_lot.table_no == 0 {
+            continue;
+        }
+        if result.contains_key(&category_lot.table_no) {
+            bail!(
+                "Duplicate armor custom buildup category entry for table {}",
+                category_lot.table_no
+            )
+        }
+        let categories = ARMOR_CUSTOM_BUILDUP_CATEGORIES
+            .into_iter()
+            .zip(category_lot.lot_num.iter().copied())
+            .filter(|(_, l)| *l != 0)
+            .map(|(c, lot)| {
+                (
+                    c,
+                    ArmorCustomBuildupCategory {
+                        lot,
+                        pieces: BTreeMap::new(),
+                    },
+                )
+            })
+            .collect();
+        result.insert(category_lot.table_no, ArmorCustomBuildup { categories });
+    }
+
+    for piece_lot in pedia.custom_buildup_armor_lot.iter().flat_map(|p| &p.param) {
+        if piece_lot.table_no == 0 {
+            continue;
+        }
+        let category = result
+            .get_mut(&piece_lot.table_no)
+            .with_context(|| format!("Armor customer buildup table not found for {:?}", piece_lot))?
+            .categories
+            .get_mut(&piece_lot.category_id)
+            .with_context(|| {
+                format!(
+                    "Armor customer buildup category not found for {:?}",
+                    piece_lot
+                )
+            })?;
+        if category.pieces.contains_key(&piece_lot.id) {
+            bail!("Duplicate armor custom buildup piece entry {:?}", piece_lot)
+        }
+        let data = custom_buildup_pieces
+            .remove(&(piece_lot.table_no, piece_lot.category_id, piece_lot.id))
+            .with_context(|| format!("No data found for custom buildup {:?}", piece_lot))?;
+        category.pieces.insert(
+            piece_lot.id,
+            ArmorCustomBuildupPiece {
+                lot: piece_lot.lot_num,
+                data,
+            },
+        );
+    }
+    Ok(result)
+}
+
+pub fn prepare_weapon_custom_buildup<'a>(
+    pedia: &'a Pedia,
+    custom_buildup_pieces: &mut HashMap<(u32, u16, u16), &'a CustomBuildupBaseUserDataParam>,
+) -> Result<HashMap<u32, WeaponCustomBuildup<'a>>> {
+    let mut result = HashMap::<u32, WeaponCustomBuildup>::new();
+    let material = hash_map_unique(
+        pedia
+            .custom_buildup_weapon_material
+            .iter()
+            .flat_map(|p| &p.param)
+            .filter(|p| p.id != 0),
+        |p| (p.id, p),
+        false,
+    )?;
+    for category in pedia.custom_buildup_wep_table.iter().flat_map(|p| &p.param) {
+        if category.table_no == 0 {
+            continue;
+        }
+        let pieces = category
+            .id
+            .iter()
+            .filter(|&&id| id != 0)
+            .map(|&id| {
+                let data = custom_buildup_pieces
+                    .remove(&(category.table_no, category.category_id, id))
+                    .with_context(|| format!("Weapon custom buildup data not found for {id}"))?;
+                let material = material.get(&id).with_context(|| {
+                    format!("Weapon custom buildup material not found for {id}")
+                })?;
+                Ok((id, WeaponCustomBuildupPiece { data, material }))
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
+        let categories = &mut result.entry(category.table_no).or_default().categories;
+        if categories
+            .insert(category.category_id, WeaponCustomBuildupCategory { pieces })
+            .is_some()
+        {
+            bail!(
+                "Multiple weapon buildup definition for table {}, category {}",
+                category.table_no,
+                category.category_id
+            );
+        }
+    }
+
+    Ok(result)
+}
+
 pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
     let monster_order = pedia
         .monster_list
@@ -2787,11 +3029,38 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         }
     }
 
+    let reward_lot = hash_map_unique(
+        pedia
+            .reward_id_lot_table
+            .param
+            .iter()
+            .chain(&pedia.reward_id_lot_table_mr.param),
+        |param| (param.id, param),
+        false,
+    )?;
+
+    let mut custom_buildup_pieces = hash_map_unique(
+        pedia
+            .custom_buildup_base
+            .iter()
+            .flat_map(|p| &p.param)
+            .filter(|p| p.table_no != 0),
+        |p| ((p.table_no, p.category_id, p.id), p),
+        false,
+    )?;
+
+    let armor_custom_buildup = prepare_armor_custom_buildup(pedia, &mut custom_buildup_pieces)?;
+    let weapon_custom_buildup = prepare_weapon_custom_buildup(pedia, &mut custom_buildup_pieces)?;
+
+    if !custom_buildup_pieces.is_empty() {
+        bail!("Leftover custom buildup pieces {custom_buildup_pieces:?}");
+    }
+
     Ok(PediaEx {
-        monsters: prepare_monsters(pedia)?,
+        monsters: prepare_monsters(pedia, &reward_lot)?,
         sizes: prepare_size_map(&pedia.size_list)?,
         size_dists: prepare_size_dist_map(&pedia.random_scale)?,
-        quests: prepare_quests(pedia)?,
+        quests: prepare_quests(pedia, &reward_lot)?,
         discoveries: prepare_discoveries(pedia)?,
         skills: prepare_skills(pedia)?,
         hyakuryu_skills: prepare_hyakuryu_skills(pedia)?,
@@ -2822,5 +3091,8 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         item_pop: prepare_item_pop(pedia)?,
         ot_equip: prepeare_ot_equip(pedia)?,
         servant: prepare_servant(pedia)?,
+
+        armor_custom_buildup,
+        weapon_custom_buildup,
     })
 }
