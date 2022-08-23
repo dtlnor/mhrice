@@ -68,7 +68,8 @@ pub struct Pedia {
     pub dl_quest_data_for_enemy: DlNormalQuestDataForEnemyLrHr,
     pub dl_quest_data_mr: Option<DlNormalQuestDataMr>,
     pub dl_quest_data_for_enemy_mr: Option<DlNormalQuestDataForEnemyMr>,
-    pub difficulty_rate: SystemDifficultyRateData,
+    pub difficulty_rate: SystemDifficultyRateDataNormal,
+    pub difficulty_rate_anomaly: Option<SystemDifficultyRateDataAnomaly>,
     pub random_scale: EnemyBossRandomScaleData,
     pub size_list: EnemySizeListData,
     pub discover_em_set_data: DiscoverEmSetData,
@@ -229,6 +230,9 @@ pub struct Pedia {
     pub custom_buildup_armor_category_lot: Option<CustomBuildupArmorCategoryLotUserData>,
     pub custom_buildup_equip_skill_detail: Option<CustomBuildupEquipSkillDetailUserData>,
     pub custom_buildup_wep_table: Option<CustomBuildupWepTableUserData>,
+
+    pub random_mystery_difficulty: Option<RandomMysteryDifficultyRateListData>,
+    pub random_mystery_enemy: Option<RandomMysteryLotEnemyData>,
 }
 
 pub struct QuestReward<'a> {
@@ -390,6 +394,7 @@ pub struct MonsterEx<'a> {
     pub explain1: Option<&'a MsgEntry>,
     pub explain2: Option<&'a MsgEntry>,
     pub mystery_reward: Vec<MysteryReward<'a>>,
+    pub random_quest: Option<&'a LotEnemyData>,
 }
 
 pub struct Servant<'a> {

@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', function () {
     change_sort("monster", 1);
     change_sort("item", 1);
     change_sort("armor", 1);
+
+    autoSearch();
 });
 
 function addEventListensers() {
@@ -52,7 +54,13 @@ function addEventListensers() {
     addEventListenerToId("cookie-no", "click", disableCookie);
     addEventListenerToId("navbarBurger", "click", onToggleNavbarMenu);
 
+    addEventListenerToId("left-aside-button", "click", onToggleLeftAside);
+    addEventListenerToId("right-aside-button", "click", onToggleRightAside);
+    // doesn't work on all platform
+    // addEventListenerToClass("left-aside-item", "click", onLeftAsideItem);
+
     addEventListenerToId("mh-search", "keydown", search);
+    addEventListenerToId("nav-search", "keydown", goSearch);
 
     addEventListenerToClass("mh-item-filter-button", "click", changeItemFilter);
     addEventListenerToClass("mh-armor-filter-button", "click", changeArmorFilter);
@@ -95,6 +103,35 @@ function addEventListenerToId(id, event_name, f) {
         element.addEventListener(event_name, f);
     }
 }
+
+function onToggleLeftAside() {
+    const aside = document.getElementById("left-aside");
+    const the_other = document.getElementById("right-aside");
+    if (aside) {
+        aside.classList.toggle("is-active");
+        if (the_other && aside.classList.contains("is-active")) {
+            the_other.classList.remove("is-active");
+        }
+    }
+}
+
+function onToggleRightAside() {
+    const aside = document.getElementById("right-aside");
+    const the_other = document.getElementById("left-aside");
+    if (aside) {
+        aside.classList.toggle("is-active");
+        if (the_other && aside.classList.contains("is-active")) {
+            the_other.classList.remove("is-active");
+        }
+    }
+}
+
+//function onLeftAsideItem() {
+//    const left_aside = document.getElementById("left-aside");
+//    if (left_aside) {
+//        left_aside.classList.remove("is-active");
+//    }
+//}
 
 function onDropdownClick(e) {
     // TODO: make this work well
@@ -169,13 +206,6 @@ function adjustVersionMenu() {
         let current = `https://${hostname}`;
         if (href === current) {
             item.classList.add("has-text-weight-bold");
-            if (!item.classList.contains("mh-version-menu-latest")) {
-                let head = document.getElementById("mh-version-menu-head")
-                if (head != null) {
-                    head.textContent = "Version:" + item.textContent;
-                    head.classList.add("has-text-danger")
-                }
-            }
         }
         item.setAttribute("href", href + window.location.pathname);
     }
@@ -296,6 +326,15 @@ function onToggleNavbarMenu() {
     if (g_navbar_menu_active) {
         document.getElementById("navbarBurger").classList.add("is-active");
         document.getElementById("navbarMenu").classList.add("is-active");
+
+        const left = document.getElementById("right-aside");
+        const right = document.getElementById("left-aside");
+        if (left) {
+            left.classList.remove("is-active");
+        }
+        if (right) {
+            right.classList.remove("is-active");
+        }
     } else {
         document.getElementById("navbarBurger").classList.remove("is-active");
         document.getElementById("navbarMenu").classList.remove("is-active");
@@ -440,7 +479,7 @@ function doSearch() {
     }
     const matchers = text.split(' ').filter(m => m.length > 0);
 
-    const results = [];
+    let results = [];
     for (const entry of g_toc) {
         let matched = 0;
         let matched_length = 0;
@@ -460,6 +499,7 @@ function doSearch() {
     }
 
     results.sort((a, b) => b.score - a.score);
+    results = results.slice(0, 100);
 
     const ul = document.getElementById("mh-search-result");
     ul.replaceChildren();
@@ -512,6 +552,10 @@ function search(e) {
         return;
     }
 
+    loadTocAndDoSearch();
+}
+
+function loadTocAndDoSearch() {
     if (g_toc === null) {
         fetch(`/toc/${g_language_code}.json`)
             .then(response => response.json())
@@ -522,6 +566,32 @@ function search(e) {
     } else {
         doSearch();
     }
+}
+
+function goSearch(e) {
+    if (e.key !== 'Enter') {
+        return;
+    }
+
+    const text = document.getElementById("nav-search").value.trim();
+
+    window.location.assign(`/index.html?search=${encodeURIComponent(text)}`)
+}
+
+
+function autoSearch() {
+    const param = new URLSearchParams(window.location.search);
+    const text = param.get("search");
+    if (text === null || text === "") {
+        return;
+    }
+
+    const searchBox = document.getElementById("mh-search");
+    if (searchBox === null) {
+        return;
+    }
+    searchBox.value = text;
+    loadTocAndDoSearch();
 }
 
 function startDragMap(e) {
