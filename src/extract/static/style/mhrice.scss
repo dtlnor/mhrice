@@ -2,11 +2,11 @@
 
 @import "bulma/sass/utilities/_all";
 @import "bulma/sass/base/_all.sass";
+@import "bulma/sass/components/menu.sass";
 @import "bulma/sass/components/message.sass";
 @import "bulma/sass/components/navbar.sass";
 @import "bulma/sass/components/tabs.sass";
 @import "bulma/sass/elements/button.sass";
-@import "bulma/sass/elements/container.sass";
 @import "bulma/sass/elements/content.sass";
 @import "bulma/sass/elements/icon.sass";
 @import "bulma/sass/elements/tag.sass";
@@ -17,18 +17,41 @@
 $select-background-color: $grey-lightest;
 $active-background-color: hsl(40, 84%, 90%);
 
+$sidebar-width: 200px;
+$sidebar-hide-threshold: 1400px;
+$sidebar-button-width: 30px;
+$sidebar-button-height: 50px;
+
 /** Page layout **/
-div.mh-logo-text {
+#mh-logo-text {
     font-weight: bold;
     margin-left: 1em;
-    margin-right: 1em;
+}
+
+.lr-padded {
+    margin: 0 auto;
+    position: relative;
+    width: 100%;
+
+    @media(min-width: $sidebar-hide-threshold) {
+        padding-left: $sidebar-width+10px;
+        padding-right: $sidebar-width+10px;
+    }
+
 }
 
 nav {
     @extend .navbar, .is-primary;
 
     >div {
-        @extend .container;
+        @extend .lr-padded;
+        display: block;
+
+        @include from($navbar-breakpoint) {
+            display: flex;
+            align-items: stretch;
+            flex-grow: 1;
+        }
     }
 
     .navbar-folded {
@@ -42,10 +65,125 @@ nav {
             display: none;
         }
     }
+
+    .nav-search-item {
+        flex-grow: 1;
+        flex-shrink: 1;
+        width: 10rem;
+
+        >div {
+            width: 100%;
+        }
+    }
+}
+
+#nav-search {
+    @extend .is-small
+}
+
+aside {
+    height: calc(100% - 3.25rem);
+    width: 0;
+    top: 3.25rem;
+    position: fixed;
+    z-index: 100;
+    padding-top: 20px;
+
+    @media(min-width: $sidebar-hide-threshold) {
+        width: Min($sidebar-width, calc(100% - #{$sidebar-button-width}));
+    }
+
+    &.is-active {
+        width: Min($sidebar-width, calc(100% - #{$sidebar-button-width}));
+    }
+
+    >.aside-button {
+        position: absolute;
+        bottom: 5%;
+        width: $sidebar-button-width;
+        height: $sidebar-button-height;
+        background-color: white;
+        border: solid grey 1px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        font-size: larger;
+        cursor: pointer;
+
+        &:hover {
+            background-color: #DDDDDD;
+        }
+
+        @media(min-width: $sidebar-hide-threshold) {
+            display: none;
+        }
+    }
+
+    >.side-menu {
+        @extend .menu;
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: 100%;
+
+        >.menu-label {
+            padding-left: 0.4rem;
+        }
+    }
+}
+
+#cookie-consent {
+    padding-left: 2rem;
+}
+
+#left-aside {
+    left: 0;
+    box-shadow: 2px 0px 3px lightgray;
+    background-color: white;
+
+    &.is-active {
+        #left-aside-button:after {
+            content: "<";
+        }
+    }
+
+    #left-aside-button {
+        left: 100%;
+        border-radius: 0 5px 5px 0;
+        border-left-width: 0;
+        box-shadow: 2px 2px 3px lightgray;
+
+        &:after {
+            content: ">";
+        }
+    }
+}
+
+#right-aside {
+    right: 0;
+    box-shadow: -2px 0px 3px lightgray;
+    background-color: white;
+
+    &.is-active {
+        #right-aside-button:after {
+            content: ">";
+        }
+    }
+
+    #right-aside-button {
+        right: 100%;
+        border-radius: 5px 0 0 5px;
+        border-right-width: 0;
+        box-shadow: -2px 2px 3px lightgray;
+
+        &:after {
+            content: "<";
+        }
+    }
 }
 
 main {
-    @extend .content, .container;
+    @extend .content, .lr-padded;
 
     >header {
         display: flex;
@@ -298,7 +436,6 @@ ul.mh-armor-skill-list {
         top: 0.3rem;
         width: 1.65rem;
         height: 1.25rem;
-        vertical-align: middle;
     }
 
     >.mh-slot-large {
@@ -308,7 +445,6 @@ ul.mh-armor-skill-list {
         top: 0rem;
         width: 1.85rem;
         height: 1.85rem;
-        vertical-align: middle;
     }
 
     >.mh-slot-rampage {
@@ -316,6 +452,16 @@ ul.mh-armor-skill-list {
         position: absolute;
         left: 0.75rem;
         top: 0rem;
+    }
+
+    >.mh-slot-0 {
+        display: inline-block;
+        position: absolute;
+        left: 0.1rem;
+        top: 0.875rem;
+        width: 1.65rem;
+        height: 0.2rem;
+        background-color: black;
     }
 }
 
@@ -760,4 +906,10 @@ ul.mh-custom-lot {
 .tag.mh-cb-lv10 {
     color: #FFFFFF;
     background-color: rgb(0, 0, 0);
+}
+
+/** Monster anomaly stat **/
+.mh-anomaly-maps {
+    margin-top: 1rem;
+    margin-left: 1rem;
 }

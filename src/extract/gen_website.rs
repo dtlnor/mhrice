@@ -1,4 +1,5 @@
 use super::gen_armor::*;
+use super::gen_common::*;
 use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_map::*;
@@ -69,16 +70,22 @@ pub fn head_common() -> Vec<Box<dyn MetadataContent<String>>> {
     ]
 }
 
-const WEBSITE_VERSIONS: &[&str] = &["10.0.2", "10.0.3", "11.0.1"];
-
 pub fn navbar() -> Box<nav<String>> {
     html!(<nav><div>
         <div class="navbar-brand">
             <a class="navbar-item" href="/index.html">
                 <img alt="Logo" src="/favicon.png"/>
-                <div class="mh-logo-text">"MHRice "</div>
-                <i class="fas fa-magnifying-glass"/>
+                <div id="mh-logo-text">"MHRice "</div>
             </a>
+
+            <div class="navbar-item nav-search-item">
+                <div class="control has-icons-left">
+                <input id="nav-search" class="input" type="search" placeholder="Search"/>
+                <span class="icon is-small is-left">
+                    <i class="fas fa-magnifying-glass" />
+                </span>
+                </div>
+            </div>
 
             <a id="navbarBurger" class="navbar-burger" data-target="navbarMenu">
                 <span></span>
@@ -162,65 +169,6 @@ pub fn navbar() -> Box<nav<String>> {
                 <a class="navbar-item" href="/item.html">
                    "Items"
                 </a>
-
-                <a class="navbar-item" href="/about.html">
-                    "About"
-                </a>
-            </div>
-            <div class="navbar-end">
-                <div class="navbar-item has-dropdown is-hoverable">
-                    <a class="navbar-link" id="mh-version-menu-head">
-                        "Version"
-                    </a>
-                    <div class="navbar-dropdown">{
-                        WEBSITE_VERSIONS.iter().enumerate().map(|(i, &version)| {
-                            let latest = i == WEBSITE_VERSIONS.len() - 1;
-                            let href = if latest {
-                                "https://mhrise.mhrice.info".to_owned()
-                            } else {
-                                format!("https://mhrise-{}.mhrice.info", version.replace('.', "-"))
-                            };
-                            let text = if latest {
-                                format!("{version} (Latest)")
-                            } else {
-                                version.to_owned()
-                            };
-                            let mut class = "navbar-item mh-version-menu".to_owned();
-                            if latest {
-                                class += " mh-version-menu-latest";
-                            }
-                            html!(<a class={class.as_str()} href={href.as_str()}>
-                                {text!("{}", text)}
-                            </a>)
-                        })
-                    }</div>
-                </div>
-                <div class="navbar-item has-dropdown is-hoverable">
-                    <a class="navbar-link">
-                        "Language"
-                    </a>
-                    <div class="navbar-dropdown">{
-                        (0..32).filter_map(|i| {
-                            let (language_name, language_code) = LANGUAGE_MAP[i]?;
-                            let id_string = format!("mh-lang-menu-{language_code}");
-                            Some(html!{ <a class="navbar-item mh-lang-menu" id={id_string.as_str()}> {
-                                text!("{}", language_name)
-                            }</a>})
-                        })
-                    }
-                    <hr class="navbar-divider"/>
-                    <div class="navbar-item">
-                        "Use cookie to save preference"
-                    </div>
-                    <div class="navbar-item">
-                        <div class="buttons has-addons">
-                            <button id="cookie-yes" class="button is-small">"Yes"</button>
-                            <button id="cookie-no" class="button is-small is-selected is-danger">"No"</button>
-                        </div>
-                    </div>
-
-                    </div>
-                </div>
             </div>
         </div>
     </div></nav>)
@@ -449,10 +397,11 @@ pub fn gen_search(output: &impl Sink) -> Result<()> {
             </head>
             <body>
                 { navbar() }
+                { right_aside() }
                 <main>
                 <header><h1>"Search"</h1></header>
                 <div class="control has-icons-left">
-                    <input class="input is-large" type="text" placeholder="Nargacuga" id="mh-search"/>
+                    <input class="input is-large" type="search" placeholder="Nargacuga" id="mh-search"/>
                     <span class="icon is-large is-left">
                         <i class="fas fa-magnifying-glass" />
                     </span>
@@ -480,6 +429,7 @@ pub fn gen_about(output: &impl Sink) -> Result<()> {
             </head>
             <body>
                 { navbar() }
+                { right_aside() }
                 <main>
                 <header><h1>"About MHRice"</h1></header>
                 <section>

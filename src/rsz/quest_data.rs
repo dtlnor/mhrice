@@ -164,7 +164,7 @@ rsz_enum! {
 // snow.QuestManager.BossSetCondition
 rsz_enum! {
     #[rsz(u32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
     pub enum BossSetCondition {
         None = 0,
         Default = 1,
@@ -330,6 +330,7 @@ rsz_struct! {
 }
 
 impl NormalQuestDataParam {
+    // Some of the logic is from snow.quest.QuestData.getTargetEmTypeLis
     pub fn has_target(&self, em_type: EmTypes) -> bool {
         if self.target_type.get(0) == Some(&QuestTargetType::AllMainEnemy) {
             let count = if let Some(&count) = self.tgt_num.get(0) {
@@ -339,17 +340,17 @@ impl NormalQuestDataParam {
                 return false;
             };
 
-            let targets = if let Some(targets) = self.boss_em_type.get(0..count) {
-                targets
-            } else {
-                eprintln!(
-                    "tgt_num is larget than boss_em_type len for quest {}",
-                    self.quest_no
-                );
-                return false;
-            };
-
-            return targets.contains(&em_type);
+            return self
+                .boss_em_type
+                .iter()
+                .zip(&self.boss_set_condition)
+                .filter(|&(_, &condition)| {
+                    // Nice logic
+                    condition != BossSetCondition::InitRandom
+                        && condition != BossSetCondition::SwapRandom
+                })
+                .take(count)
+                .any(|(&em, _)| em == em_type);
         }
 
         self.tgt_em_type.contains(&em_type)
@@ -468,7 +469,7 @@ pub trait EnemyParam {
     fn scale(&self, i: usize) -> Option<u8>;
     fn scale_tbl(&self, i: usize) -> Option<i32>;
     fn difficulty(&self, i: usize) -> Option<NandoYuragi>;
-    fn boss_multi(&self, i: usize) -> Option<u8>;
+    fn boss_multi(&self, i: usize) -> Option<u16>;
 }
 
 macro_rules! impl_enemy_param {
@@ -501,8 +502,8 @@ macro_rules! impl_enemy_param {
             fn difficulty(&self, i: usize) -> Option<NandoYuragi> {
                 self.difficulty.get(i).copied()
             }
-            fn boss_multi(&self, i: usize) -> Option<u8> {
-                self.boss_multi.get(i).copied()
+            fn boss_multi(&self, i: usize) -> Option<u16> {
+                self.boss_multi.get(i).copied().map(Into::into)
             }
         }
     };
@@ -655,6 +656,14 @@ rsz_struct! {
         pub other_rate_table_list: Vec<OtherRateTableData>,
         pub multi_rate_table_list: Vec<MultiRateTableData>,
     }
+}
+
+rsz_with_singleton! {
+    #[path("enemy/user_data/system_difficulty_rate_data.user")]
+    pub struct SystemDifficultyRateDataNormal(SystemDifficultyRateData);
+
+    #[path("Quest/RandomMystery/RandomMysterySystemDifficutyRateBaseData.user")]
+    pub struct SystemDifficultyRateDataAnomaly(SystemDifficultyRateData);
 }
 
 rsz_struct! {
