@@ -8,6 +8,40 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::io::{Read, Seek, Write};
+use std::char::{REPLACEMENT_CHARACTER};
+
+fn as_hex(array: &[u8], len: usize) -> String {
+    let mut s = String::new();
+    if len % 4 == 0 {
+        if len > 4 {
+            /*
+            s += "[in-order-hexBE]";
+            for i in 0..(len/4){
+                for j in (0..4).rev(){
+                    s += &(format!("{:01$X}", array[i*4+j] as u8, 2));
+                }
+                if i < (len/4) - 1 { s += " " }
+            }*/
+            s += "[hexLE]"; //remain order
+            for i in 0..len { //.rev() to get BE
+                if i % 4 == 0 && i > 0 { s += " " }
+                s += &(format!("{:01$X}", array[i] as u8, 2));
+            }
+        }else{ //len = 4
+            //s += "[hexBE]"; //remain order
+            //for i in (0..len).rev(){
+            //    s += &(format!("{:01$X}", array[i] as u8, 2));
+            //}
+        }
+    }else{
+        s += "[hexLE]"; //remain order
+        for i in 0..len { //.rev() to get BE
+            s += &(format!("{:01$X} ", array[i] as u8, 2));
+        }
+    }
+
+    s
+}
 
 bitflags! {
     #[derive(Serialize)]
@@ -34,6 +68,8 @@ bitflags! {
         const PINVOKE                  = 0x2000;
         const EXPOSE_MEMBER            = 0x4000;
         const DEFAULT                  = 0x8000;
+        const RESERVED_MASK            = 0x9500;
+        const NO_RESERVE               = 0x0000;
     }
 }
 
@@ -110,15 +146,18 @@ bitflags! {
         const NESTED_ASSEMBLY      = 0x00000005;
         const NESTED_FAMANDASSEM   = 0x00000006;
         const NESTED_FAMORASSEM    = 0x00000007;
-        const VISIBILITY_MASK      = 0x00000007;
+        const VISIBILITY_MASK      = 0x00000007; //111 {0~7}
 
         const AUTO_LAYOUT          = 0x00000000;
         const SEQUENTIAL_LAYOUT    = 0x00000008;
         const EXPLICIT_LAYOUT      = 0x00000010;
-        const LAYOUT_MASK          = 0x00000018;
+        const LAYOUT_MASK          = 0x00000018; //11000 {0, 8, 16, 24}
 
+        const CLASS                = 0x00000000;
         const INTERFACE            = 0x00000020;
+        const CLASS_SEMANTICS_MASK = 0x00000020; //100000 {0, 32} 
         // no 0x0040
+        //no mask
         const ABSTRACT             = 0x00000080;
         const SEALED               = 0x00000100;
         // no 0x0200
@@ -133,17 +172,20 @@ bitflags! {
         const UNICODE_CLASS        = 0x00010000;
         const AUTO_CLASS           = 0x00020000;
         const CUSTOM_FORMAT_CLASS  = 0x00030000;
-        const STRING_FORMAT_MASK   = 0x00030000;
+        const STRING_FORMAT_MASK   = 0x00030000; //110000000000000000 {0, 65536, 131072, 196608}
 
         const HAS_SECURITY         = 0x00040000;
         // no 0x080000
         const BEFORE_FIELD_INIT    = 0x00100000;
         // no 0x200000
-        const CUSTOM_FORMAT_MASK   = 0x00C00000;
+        //const NO_RESERVE           = 0x00000000;
+        //const RESERVED_MASK        = 0x00040800; //1000000100000000000 {0, 2048, 262144, 264192}
+        // no 0x200000
+        const CUSTOM_FORMAT_MASK   = 0x00C00000; //110000000000000000000000 {0, 4194304, 8388608, 12582912}
         const LOCAL_HEAP           = 0x01000000;
         const FINALIZE             = 0x02000000;
         const NATIVE_TYPE          = 0x04000000;
-        const UNK_08000000         = 0x08000000;
+        const MARK_FIELDS          = 0x08000000;
         const NATIVE_CTOR          = 0x10000000;
         // no 0x20000000
         const MANAGED_VTABLE       = 0x40000000;
@@ -169,7 +211,7 @@ bitflags! {
         const NO_INLINING                 = 0x0008;
         const FORWARD_REF                 = 0x0010;
         const SYNCHRONIZED                = 0x0020;
-        const NO_OPTMIZATION              = 0x0040;
+        const NO_OPTIMIZATION             = 0x0040;
         const PRESERVE_SIG                = 0x0080;
         const AGGRESSIVE_INLINING         = 0x0100;
         const HAS_RET_VAL                 = 0x0200;
@@ -179,6 +221,9 @@ bitflags! {
         const CONTAINS_GENERIC_PARAMETERS = 0x2000;
         const HAS_THIS                    = 0x4000;
         const THREAD_SAFE                 = 0x8000;
+        
+        const MANAGED_MASK                = 0x0004;
+        const MANAGED                     = 0x0000;
     }
 }
 
@@ -233,24 +278,16 @@ fn display_param_modifier(param_modifier: u32, return_pos: bool) -> String {
 }
 
 fn display_type_flags(flags: TypeFlag) -> String {
-    let mut s = String::new();
+    let mut s = String::new();    
+    //https://docs.microsoft.com/en-us/dotnet/api/system.reflection.typeattributes?view=net-6.0
 
     s += match flags & TypeFlag::LAYOUT_MASK {
-        TypeFlag::AUTO_LAYOUT => "[auto]",
-        TypeFlag::SEQUENTIAL_LAYOUT => "[sequential]",
-        TypeFlag::EXPLICIT_LAYOUT => "[explicit]",
+        TypeFlag::AUTO_LAYOUT => "[auto]", //"[StructLayoutAttribute(LayoutKind.Auto)]",
+        TypeFlag::SEQUENTIAL_LAYOUT => "[sequential]", //"[StructLayoutAttribute(LayoutKind.Sequential)]",
+        TypeFlag::EXPLICIT_LAYOUT => "[explicit]", //"[StructLayoutAttribute(LayoutKind.Explicit)]",
         _ => "[unknown_layout]",
     };
 
-    if flags.contains(TypeFlag::INTERFACE) {
-        s += "[interface]"
-    }
-    if flags.contains(TypeFlag::ABSTRACT) {
-        s += "[abstract]"
-    }
-    if flags.contains(TypeFlag::SEALED) {
-        s += "[sealed]"
-    }
     if flags.contains(TypeFlag::SPECIAL_NAME) {
         s += "[special]"
     }
@@ -274,6 +311,16 @@ fn display_type_flags(flags: TypeFlag) -> String {
         TypeFlag::CUSTOM_FORMAT_CLASS => "[custom_format]",
         _ => panic!(),
     };
+    
+    /*
+    s += match flags & TypeFlag::CUSTOM_FORMAT_MASK {
+        TypeFlag::CUSTOM_00 => "",
+        TypeFlag::CUSTOM_01 => "[Custom01]",
+        TypeFlag::CUSTOM_10 => "[Custom10]",
+        TypeFlag::CUSTOM_11 => "[Custom11]",
+        _ => panic!(),
+    };*/
+    
     if flags.contains(TypeFlag::HAS_SECURITY) {
         s += "[has_security]"
     }
@@ -289,8 +336,8 @@ fn display_type_flags(flags: TypeFlag) -> String {
     if flags.contains(TypeFlag::NATIVE_TYPE) {
         s += "[native]"
     }
-    if flags.contains(TypeFlag::UNK_08000000) {
-        s += "[UNK_08000000]"
+    if flags.contains(TypeFlag::MARK_FIELDS) {
+        s += "[MarkFields]"
     }
     if flags.contains(TypeFlag::NATIVE_CTOR) {
         s += "[native_ctor]"
@@ -299,15 +346,30 @@ fn display_type_flags(flags: TypeFlag) -> String {
         s += "[managed_vtable]"
     }
 
+    s += "\n";
+
     s += match flags & TypeFlag::VISIBILITY_MASK {
         TypeFlag::NOT_PUBLIC => "",
         TypeFlag::PUBLIC => "public ",
-        TypeFlag::NESTED_PUBLIC => "[nested]public",
-        TypeFlag::NESTED_PRIVATE => "[nested]private",
-        TypeFlag::NESTED_FAMILY => "[nested]protected",
-        TypeFlag::NESTED_ASSEMBLY => "[nested]internal",
-        TypeFlag::NESTED_FAMANDASSEM => "[nested]private protected",
-        TypeFlag::NESTED_FAMORASSEM => "[nested]protected internal",
+        TypeFlag::NESTED_PUBLIC => "/*nested*/ public ",
+        TypeFlag::NESTED_PRIVATE => "/*nested*/ private ",
+        TypeFlag::NESTED_FAMILY => "/*nested*/ protected ",
+        TypeFlag::NESTED_ASSEMBLY => "/*nested*/ internal ",
+        TypeFlag::NESTED_FAMANDASSEM => "/*nested*/ private protected ",
+        TypeFlag::NESTED_FAMORASSEM => "/*nested*/ protected internal ",
+        _ => panic!(),
+    };
+    
+    if flags.contains(TypeFlag::ABSTRACT) {
+        s += "abstract "
+    }
+    if flags.contains(TypeFlag::SEALED) {
+        s += "sealed "
+    }
+
+    s += match flags & TypeFlag::CLASS_SEMANTICS_MASK {
+        TypeFlag::CLASS => "class ",
+        TypeFlag::INTERFACE => "interface ",
         _ => panic!(),
     };
 
@@ -325,7 +387,7 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "[no_serialize]"
     }
 
-    if attributes.contains(FieldAttribute::HAS_RVA) {
+    if attributes.contains(FieldAttribute::HAS_RVA) { //RESERVED_MASK
         s += "[has_rva]"
     }
 
@@ -333,7 +395,7 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "[special]"
     }
 
-    if attributes.contains(FieldAttribute::RT_SPECIAL) {
+    if attributes.contains(FieldAttribute::RT_SPECIAL) { //RESERVED_MASK
         s += "[rt_special]"
     }
 
@@ -341,7 +403,7 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "[pointer]"
     }
 
-    if attributes.contains(FieldAttribute::MARSHAL) {
+    if attributes.contains(FieldAttribute::MARSHAL) { //RESERVED_MASK
         s += "[marshal]"
     }
 
@@ -353,9 +415,19 @@ fn display_field_attributes(attributes: FieldAttribute) -> String {
         s += "[expose]"
     }
 
-    if attributes.contains(FieldAttribute::DEFAULT) {
+    if attributes.contains(FieldAttribute::DEFAULT) { //RESERVED_MASK
         s += "[default]"
     }
+    /*
+    s += match attributes & FieldAttribute::RESERVED_MASK {
+        FieldAttribute::NO_RESERVE => "",
+        FieldAttribute::HAS_RVA => "[has_rva]",
+        FieldAttribute::RT_SPECIAL => "[rt_special]",
+        FieldAttribute::MARSHAL => "[marshal]",
+        FieldAttribute::DEFAULT => "[default]",
+        FieldAttribute::RESERVED_MASK => "[reserve?]",
+        _ => panic!(),
+    };*/
 
     s += match attributes & FieldAttribute::MEMBER_ACCESS_MASK {
         FieldAttribute::PRIVATE_SCOPE => "[hidden]private ",
@@ -384,12 +456,19 @@ fn display_method_impl_flag(attributes: MethodImplFlag) -> String {
     let mut s = String::new();
 
     s += match attributes & MethodImplFlag::CODE_TYPE_MASK {
-        MethodImplFlag::IL => "[il]",
-        MethodImplFlag::NATIVE => "[native]",
-        MethodImplFlag::OPTIL => "[optil]",
-        MethodImplFlag::RUNTIME => "[runtime]",
+        MethodImplFlag::IL => "[il]", //implemented in IL
+        MethodImplFlag::NATIVE => "[native]", //native platform-specific code
+        MethodImplFlag::OPTIL => "[optil]", //optimaized IL
+        MethodImplFlag::RUNTIME => "[runtime]", //auto gen by runtime (RVA must be zero)
         _ => panic!(),
     };
+
+    /*
+    s += match attributes & MethodImplFlag::MANAGED_MASK {
+        MethodImplFlag::UNMANAGED => "[unmanaged]",
+        MethodImplFlag::MANAGED => "",
+        _ => panic!(),
+    };*/
 
     if attributes.contains(MethodImplFlag::UNMANAGED) {
         s += "[unmanaged]"
@@ -405,7 +484,7 @@ fn display_method_impl_flag(attributes: MethodImplFlag) -> String {
     if attributes.contains(MethodImplFlag::SYNCHRONIZED) {
         s += "[synchronized]"
     }
-    if attributes.contains(MethodImplFlag::NO_OPTMIZATION) {
+    if attributes.contains(MethodImplFlag::NO_OPTIMIZATION) {
         s += "[no_optimization]"
     }
     if attributes.contains(MethodImplFlag::PRESERVE_SIG) {
@@ -476,6 +555,8 @@ fn display_method_attributes(attributes: MethodAttribute) -> String {
     if attributes.contains(MethodAttribute::REQUIRE_SEC_OBJECT) {
         s += "[require_sec_object]";
     }
+
+    s += "\n    ";
 
     s += match attributes & MethodAttribute::MEMBER_ACCESS_MASK {
         MethodAttribute::PRIVATE_SCOPE => "[hidden]private ",
@@ -745,6 +826,8 @@ struct TypeInfo {
     flags: TypeFlag,
 
     hash: u32,
+    runtime_len: u32,
+    crc: u32,
     assembly: usize,
     mi_default_ctor: Option<usize>,
     attributes: Vec<AttributeInfo>,
@@ -794,8 +877,8 @@ impl Tdb {
             bail!("Wrong version for TDB file");
         }
 
-        if file.read_u32()? != 0 {
-            bail!("Expected 0");
+        if file.read_u32()? != 0 { //initialized, zero when its not runtime
+            //bail!("Expected 0");
         }
 
         let type_instance_count = file.read_u32()?;
@@ -814,10 +897,10 @@ impl Tdb {
             file.read_u32()?.bit_split((16, 16));
         let intern_string_count = file.read_u32()?;
         let assembly_count = file.read_u32()?;
-        if file.read_u32()? != 0 {
+        if file.read_u32()? != 0 { //dev_entry
             bail!("Expected 0");
         }
-        let _unknown = file.read_u32()?;
+        let _app_entry = file.read_u32()?;
         let string_table_len = file.read_u32()?;
         let heap_len = file.read_u32()?;
 
@@ -839,7 +922,46 @@ impl Tdb {
         let string_table_offset = file.read_u64()? - base_address;
         let heap_offset = file.read_u64()? - base_address;
         let intern_string_offset = file.read_u64()? - base_address;
-        let _ = file.read_u64()?;
+        let _padding = file.read_u64()?;
+
+        // eprintln!("type_instance_count = {}", type_instance_count);
+        // eprintln!("method_membership_count = {}", method_membership_count);
+        // eprintln!("field_membership_count = {}", field_membership_count);
+        // eprintln!("type_count = {}", type_count);
+        // eprintln!("field_count = {}", field_count);
+        // eprintln!("method_count = {}", method_count);
+        // eprintln!("property_count = {}", property_count);
+        // eprintln!("property_membership_count = {}", property_membership_count);
+        // eprintln!("event_count = {}", event_count);
+        // eprintln!("param_count = {}", param_count);
+        // eprintln!("attribute_count = {}", attribute_count);
+        // eprintln!("constant_count = {}", constant_count);
+        // eprintln!("attribute_list_count = {}", attribute_list_count);
+        // eprintln!("data_attribute_list_count = {}", data_attribute_list_count);
+        // eprintln!("intern_string_count = {}", intern_string_count);
+        // eprintln!("assembly_count = {}", assembly_count);
+        // eprintln!("_app_entry = {}", _app_entry);
+        // eprintln!("string_table_len = {}", string_table_len);
+        // eprintln!("heap_len = {}", heap_len);
+
+        // eprintln!("assembly_offset = {}", assembly_offset);
+        // eprintln!("type_instance_offset = {}", type_instance_offset);
+        // eprintln!("type_offset = {}", type_offset);
+        // eprintln!("method_offset = {}", method_offset);
+        // eprintln!("field_membership_offset = {}", field_membership_offset);
+        // eprintln!("field_offset = {}", field_offset);
+        // eprintln!("property_membership_offset = {}", property_membership_offset);
+        // eprintln!("property_offset = {}", property_offset);
+        // eprintln!("event_offset = {}", event_offset);
+        // eprintln!("param_offset = {}", param_offset);
+        // eprintln!("attribute_offset = {}", attribute_offset);
+        // eprintln!("constant_offset = {}", constant_offset);
+        // eprintln!("attribute_list_offset = {}", attribute_list_offset);
+        // eprintln!("data_attribute_list_offset = {}", data_attribute_list_offset);
+        // eprintln!("string_table_offset = {}", string_table_offset);
+        // eprintln!("heap_offset = {}", heap_offset);
+        // eprintln!("intern_string_offset = {}", intern_string_offset);
+        // eprintln!("_padding = {}", _padding);
 
         struct Assembly {
             name_offset: u32,
@@ -887,7 +1009,9 @@ impl Tdb {
             system_type: u64,
 
             flags: TypeFlag,
+            runtime_len: u32,
             hash: u32,
+            crc: u32,
 
             ctor_method_membership_index: usize,
             method_membership_start_index: usize,
@@ -924,9 +1048,9 @@ impl Tdb {
                 ) = file.read_u64()?.bit_split((19, 19, 18, 8));
 
                 let flags = file.read_u32()?;
-                let _runtime_len = file.read_u32()?;
+                let runtime_len = file.read_u32()?;
                 let hash = file.read_u32()?;
-                let _crc = file.read_u32()?;
+                let crc = file.read_u32()?;
 
                 let (
                     ctor_method_membership_index,
@@ -959,7 +1083,9 @@ impl Tdb {
                     system_type,
 
                     flags: TypeFlag::from_bits(flags).context("Unknown type flag")?,
+                    runtime_len,
                     hash,
+                    crc,
 
                     ctor_method_membership_index: ctor_method_membership_index.try_into()?,
                     method_membership_start_index: method_membership_start_index.try_into()?,
@@ -1227,7 +1353,7 @@ impl Tdb {
             name_offset: u32,
             modifier: u32,
             type_instance_index: usize,
-            attribute: ParamAttribute,
+            attribute: ParamAttribute, //paramFlag
         }
         file.seek_assert_align_up(param_offset, 16)?;
         let params = (0..param_count)
@@ -1846,7 +1972,9 @@ impl Tdb {
                     system_type: instance.system_type,
                     element_type: instance.element_type,
                     flags: instance.flags,
+                    runtime_len: instance.runtime_len,
                     hash: instance.hash,
+                    crc: instance.crc,
                     assembly: ty.assembly_index,
                     mi_default_ctor: (ctor != 0)
                         .then(|| to_mi_self(ctor, instance_index))
@@ -2147,7 +2275,87 @@ impl Tdb {
             Ok(())
         }
 
+        fn print_constant_optional_text(value: &Option<ValueInfo>, data_type: &String, output: &mut File) -> Result<()> {
+            match value {
+                None => (),
+                Some(ValueInfo::String(_s)) => {},
+                Some(ValueInfo::Bytes(b)) => {
+                    write!(output, " /*")?;
+                    let hex_value = as_hex(&b, b.len());
+                    match data_type.as_str() {
+                        //"System.Boolean" => {
+                        //}
+                        "System.UInt16" => {
+                            write!(output, " uint: {}", u16::from_le_bytes(b[0..2].try_into().unwrap()))?;
+                        }
+                        "System.Int16" => {
+                            write!(output, " int: {}", i16::from_le_bytes(b[0..2].try_into().unwrap()))?;
+                        }
+                        "System.Char" => {
+                            let u = u16::from_le_bytes(b[0..2].try_into().unwrap()); //to let utf16 decode
+                            let c = char::decode_utf16([u].iter().cloned())
+                                                        .map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
+                                                        .collect::<String>();
+                            write!(output, " char: {}, {}", c, hex_value)?;
+                        }
+                        "System.UInt32" => {
+                            write!(output, " uint: {}", u32::from_le_bytes(b[0..4].try_into().unwrap()))?;
+                        }
+                        "System.Int32" => {
+                            write!(output, " int: {}", i32::from_le_bytes(b[0..4].try_into().unwrap()))?;
+                        }
+                        "System.Single" => {
+                            write!(output, " float: {}", f32::from_le_bytes(b[0..4].try_into().unwrap()))?;
+                        }
+                        _ => {
+                            match b.len() {
+                                1 => {
+                                }
+                                2 => {
+                                    write!(output, " {}, {}", u16::from_le_bytes(b[0..2].try_into().unwrap()), hex_value)?;
+                                }
+                                4 => {
+                                    let uint_value = u32::from_le_bytes(b[0..4].try_into().unwrap());
+                                    let float_value = f32::from_le_bytes(b[0..4].try_into().unwrap());
+                                    let int_value = i32::from_le_bytes(b[0..4].try_into().unwrap());
+                                    let is_positive = int_value >> 31 == 0;
+                                    let display_float;
+                                    let display_int;
+                                    if is_positive { //positive
+                                        if (float_value < 0.0001) | (float_value > 10000.0) { //not float
+                                            display_float = false;
+                                            if int_value > 10000 { display_int = false } else { display_int = true }
+                                        } else {
+                                            display_float = true;
+                                            if int_value > 10000 { display_int = false } else { display_int = true }
+                                        }
+                                        if display_int { write!(output, " uint: {}", uint_value)?; }
+                                        if display_float { write!(output, " float: {}", float_value)?; }
+                                    }else{ 
+                                        if (float_value > -0.0001) | (float_value < -10000.0) { //not float
+                                            display_float = false;
+                                            if int_value < -10000 { display_int = false } else { display_int = true }
+                                        } else {
+                                            display_float = true;
+                                            if int_value < -10000 { display_int = false } else { display_int = true }
+                                        }
+                                        if display_int { write!(output, " int: {}", int_value)?; }
+                                        if display_float { write!(output, " float: {}", float_value)?; }
+                                    }
+                                    write!(output, " {}", hex_value)?;
+                                }
+                                _ => {write!(output, " {}", hex_value)?;}
+                            }
+                        }
+                    }
+                    write!(output, " */")?;
+                },
+            }
+            Ok(())
+        }
+
         for type_info in type_infos {
+            writeln!(output, "/// $Base_Type_Instance_Index[{:?}]", type_info.ti_base)?;
             let full_name = &type_info.full_name;
 
             #[allow(clippy::collapsible_if)]
@@ -2168,7 +2376,7 @@ impl Tdb {
             }
 
             let calc_hash = hash_as_utf8(full_name);
-            writeln!(output, "/// % {:08X}", type_info.hash)?;
+            writeln!(output, "/// % {:08X} {:08X}", type_info.hash, type_info.crc)?; //mmh3utf8
             if !type_info.attributes.is_empty() {
                 print_attributes(&type_info.attributes, false, &mut output)?;
                 writeln!(output,)?;
@@ -2181,10 +2389,12 @@ impl Tdb {
             } else {
                 ""
             };
-            writeln!(output, "class {}: {}", full_name, base_name)?;
+            writeln!(output, "{}: {}", full_name, base_name)?;
+
+            let is_enum = base_name.eq_ignore_ascii_case("System.Enum");
 
             if calc_hash != type_info.hash {
-                bail!("Mismatched hash for {}", full_name)
+                bail!("Mismatched hash for {}", full_name) // base type instance id in previous version
             }
 
             for interface in &type_info.interfaces {
@@ -2213,7 +2423,7 @@ impl Tdb {
                 continue;
             }
 
-            writeln!(output, "    // Special = {}", type_info.system_type)?;
+            writeln!(output, "    // Special(systemTypeId) = {}", type_info.system_type)?;
 
             match &type_info.generics {
                 None => (),
@@ -2240,6 +2450,11 @@ impl Tdb {
                 }
             }
 
+            writeln!(output,
+               "    // fieldSize={}, staticFieldSize={}, native_vtable_size={}, vtable_size={}, runtime_len={}",
+               type_info.len, type_info.static_len, type_info.native_vtable_size, type_info.vtable_size,type_info.runtime_len
+            )?;
+    
             writeln!(output,)?;
             writeln!(output, "    /*** Method ***/")?;
             writeln!(output,)?;
@@ -2259,7 +2474,7 @@ impl Tdb {
 
                 writeln!(
                     output,
-                    "    {}{}{}\n    {} {} (",
+                    "    {}{}{}{} {} (",
                     display_param_modifier(method.ret.modifier, true),
                     display_method_impl_flag(method.impl_flags),
                     display_method_attributes(method.flags),
@@ -2281,7 +2496,11 @@ impl Tdb {
                         param.name
                     )?;
 
+
+                    let param_type = &type_infos[param.ti].full_name;
+
                     print_constant(&param.default, &mut output)?;
+                    print_constant_optional_text(&param.default, param_type, &mut output)?;
                     writeln!(output, ",")?;
                 }
 
@@ -2313,6 +2532,10 @@ impl Tdb {
                 )?;
 
                 print_constant(&field.value, &mut output)?;
+                let field_type = &type_infos[field.ti].full_name;
+                if !is_enum {
+                    print_constant_optional_text(&field.value, field_type, &mut output)?;
+                }
 
                 writeln!(output, ";")?;
             }
