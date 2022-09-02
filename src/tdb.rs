@@ -807,6 +807,7 @@ struct TypeInfo {
     parent: Option<TypeParent>,
     len: usize,
     static_len: usize,
+    ti_index: u64,
     ti_base: Option<usize>,
     ti_array: Option<usize>,
     ti_dearray: Option<usize>,
@@ -1009,6 +1010,7 @@ impl Tdb {
 
         #[derive(Debug)]
         struct TypeInstance {
+            index: u64,
             base_type_instance_index: usize,
             parent_type_instance_index: usize,
             element_type: u8,
@@ -1082,6 +1084,7 @@ impl Tdb {
                 let vtable = file.read_u64()?;
 
                 Ok(TypeInstance {
+                    index: index,
                     base_type_instance_index: base_type_instance_index.try_into()?,
                     parent_type_instance_index: parent_type_instance_index.try_into()?,
                     element_type: element_type.try_into()?,
@@ -1978,6 +1981,7 @@ impl Tdb {
                     parent,
                     len: ty.len,
                     static_len: ty.static_len as usize,
+                    ti_index: instance.index,
                     ti_base: to_ti_opt(instance.base_type_instance_index)?,
                     ti_array: to_ti_opt(instance.arrayize_type_instance_index)?,
                     ti_dearray: to_ti_opt(instance.dearrayize_type_instance_index)?,
@@ -2422,7 +2426,7 @@ impl Tdb {
         }
 
         for type_info in type_infos {
-            writeln!(output, "/// $Base_Type_Instance_Index[{:?}]", type_info.ti_base)?;
+            writeln!(output, "/// $Type_Instance[{:?}]", type_info.ti_index)?;
             let full_name = &type_info.full_name;
 
             #[allow(clippy::collapsible_if)]
@@ -2449,7 +2453,7 @@ impl Tdb {
                 writeln!(output,)?;
             }
             if !options.no_type_flag {
-                writeln!(output, "{}", display_type_flags(type_info.flags))?;
+                write!(output, "{}", display_type_flags(type_info.flags))?;
             }
             let base_name = if let Some(ti_base) = type_info.ti_base {
                 &type_infos[ti_base].full_name
