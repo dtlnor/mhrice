@@ -807,6 +807,7 @@ struct TypeInfo {
     parent: Option<TypeParent>,
     len: usize,
     static_len: usize,
+    #[serde(skip)]
     ti_index: u64,
     ti_base: Option<usize>,
     ti_array: Option<usize>,
@@ -829,7 +830,9 @@ struct TypeInfo {
     flags: TypeFlag,
 
     hash: u32,
+    #[serde(skip)]
     runtime_len: u32,
+    #[serde(skip)]
     crc: u32,
     assembly: usize,
     mi_default_ctor: Option<usize>,
