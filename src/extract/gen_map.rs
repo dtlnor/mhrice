@@ -1,5 +1,6 @@
 use super::gen_common::*;
 use super::gen_item::*;
+use super::gen_monster::*;
 use super::gen_website::*;
 use super::pedia::*;
 use super::prepare_map::*;
@@ -213,7 +214,7 @@ fn gen_map(
                     //let rotate = format!("transform:rotate({}rad);", angle);
                     html!(<div class="mh-icon-container">
                         <img alt="Wirebug jump point" src="/resources/item/115.png"
-                        class="mh-wire-long-jump-icon" /*style={rotate}*/ draggable=false/></div>)
+                        class="mh-wire-long-jump-icon undraggable" /*style={rotate}*/ draggable=false/></div>)
                 });
 
                 explain_inner = html!(<div class="mh-reward-tables">
@@ -227,10 +228,10 @@ fn gen_map(
                     html!(<div class="mh-icon-container"> {
                         if behavior.camp_type == rsz::CampType::BaseCamp {
                             html!(<img alt="Main camp" src="/resources/main_camp.png"
-                                class="mh-main-camp" draggable=false/>)
+                                class="mh-main-camp undraggable" draggable=false/>)
                         } else {
                             html!(<img alt="Sub camp" src="/resources/sub_camp.png"
-                                class="mh-sub-camp" draggable=false/>)
+                                class="mh-sub-camp undraggable" draggable=false/>)
                         }
                     } </div>)
                 });
@@ -259,7 +260,7 @@ fn gen_map(
                 icon_inner = Box::new(|| {
                     html!(<div class="mh-icon-container">
                         <img alt="Recon point" src="/resources/recon.png"
-                            class="mh-recon" draggable=false/>
+                            class="mh-recon undraggable" draggable=false/>
                     </div>)
                 });
 
@@ -293,6 +294,27 @@ fn gen_map(
         html!(<span>{ text!("Map {:02}", id) }</span>)
     };
 
+    let discovery_map_index = rsz::DISCOVER_MAP_LIST.iter().position(|&i| i == id);
+
+    let discovery = discovery_map_index.map(|discovery_map_index| {
+        html!(
+            <section>
+            <h2>"Monsters in tour"</h2>
+            <ul class="mh-item-list">{
+                pedia_ex.monsters.iter().filter(|(_, monster)|
+                    if let Some(discovery) = &monster.discovery {
+                        discovery.map_flag[discovery_map_index]
+                    } else {
+                        false
+                    }
+                ).map(|(&em, _)|
+                    html!(<li>{gen_monster_tag(pedia_ex, em, false, false, false)}</li>)
+                )
+            }</ul>
+            </section>
+        )
+    });
+
     let doc: DOMTree<String> = html!(
         <html>
             <head>
@@ -324,9 +346,9 @@ fn gen_map(
                     <div class="mh-map" id="mh-map">
                     {(0..map.layer_count).map(|j| {
                         let c = if j == 0 {
-                            "mh-map-layer"
+                            "mh-map-layer undraggable"
                         } else {
-                            "mh-map-layer mh-hidden"
+                            "mh-map-layer undraggable mh-hidden"
                         };
                         let html_id = format!("mh-map-layer-{}", j);
                         html!(
@@ -366,6 +388,8 @@ fn gen_map(
             </div> // right column
 
             </div> // columns
+
+            {discovery}
 
             </main>
             </body>

@@ -72,9 +72,14 @@ rawFields = [None] * typeCount
 fullName = [None] * typeCount
 dearray = [None] * typeCount
 
-print("First scan...")
+print("First scan, add type def label")
 
 for (i, t) in types():
+    try:
+        createLabel(toAddr(t["type_def_address"]), "TypeDef:"+ t["full_name"], False, USER_DEFINED)
+    except:
+        print("Couldn't create type def label for type " + t["full_name"])
+
     isValType[i] = t["via.clr.VMObjType"] == 5
     if isValType[i]:
         typeSize[i] = t["len"]
@@ -159,8 +164,8 @@ for i in range(typeCount):
             break
 
     if not isValType[i]:
-        fields.append((0, PointerDataType(void, 8, typeManager), 8, "$vta"))
-        fields.append((8, PointerDataType(void, 8, typeManager), 8, "$vtb"))
+        fields.append((0, PointerDataType(void, 8, typeManager), 8, "$vtable"))
+        fields.append((8, PointerDataType(void, 8, typeManager), 8, "$lock"))
 
     def fieldPos(f):
         return f[0]

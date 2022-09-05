@@ -804,6 +804,7 @@ struct VtableSlot {
 struct TypeInfo {
     name: String,
     full_name: String,
+    type_def_address: u64,
     parent: Option<TypeParent>,
     len: usize,
     static_len: usize,
@@ -1014,6 +1015,7 @@ impl Tdb {
         #[derive(Debug)]
         struct TypeInstance {
             index: u64,
+            type_def_address: u64,
             base_type_instance_index: usize,
             parent_type_instance_index: usize,
             element_type: u8,
@@ -1047,6 +1049,7 @@ impl Tdb {
         file.seek_assert_align_up(type_instance_offset, 16)?;
         let type_instances = (0..type_instance_count)
             .map(|i| {
+                let type_def_address = file.tell()?;
                 let (index, base_type_instance_index, parent_type_instance_index, element_type) =
                     file.read_u64()?.bit_split((19, 19, 19, 7));
 
@@ -1088,6 +1091,7 @@ impl Tdb {
 
                 Ok(TypeInstance {
                     index: index,
+                    type_def_address,
                     base_type_instance_index: base_type_instance_index.try_into()?,
                     parent_type_instance_index: parent_type_instance_index.try_into()?,
                     element_type: element_type.try_into()?,
@@ -1981,6 +1985,7 @@ impl Tdb {
                 Ok(TypeInfo {
                     name,
                     full_name: String::new(),
+                    type_def_address: instance.type_def_address,
                     parent,
                     len: ty.len,
                     static_len: ty.static_len as usize,
@@ -2659,10 +2664,7 @@ impl Tdb {
 }
 
 pub fn print<F: Read + Seek>(file: F, base_address: u64, options: crate::TdbOptions) -> Result<()> {
-    if options.json.is_none()
-        && options.json_split.is_none()
-        && options.cs.is_none()
-    {
+    if options.json.is_none() && options.json_split.is_none() && options.cs.is_none() {
         eprintln!("Please specify at least one of --json, --json-split, --map, --cs");
         return Ok(());
     }
