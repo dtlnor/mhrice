@@ -13,6 +13,12 @@ pub struct ColliderMapping {
 }
 
 #[derive(Debug, Serialize)]
+pub struct AttackCollider {
+    pub is_shell: bool,
+    pub data: EmBaseHitAttackRSData,
+}
+
+#[derive(Debug, Serialize)]
 pub struct Monster {
     pub id: u32,
     pub sub_id: u32,
@@ -28,6 +34,7 @@ pub struct Monster {
     pub collider_mapping: ColliderMapping,
     pub drop_item: EnemyDropItemInfoData,
     pub parts_break_reward: Option<EnemyPartsBreakRewardData>,
+    pub atk_colliders: Vec<AttackCollider>,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,6 +88,8 @@ pub struct Pedia {
     pub fixed_hyakuryu_quest: HyakuryuQuestDataTbl,
     pub mystery_reward_item: MysteryRewardItemUserData,
     pub quest_servant: QuestServantDataList,
+    pub supply_data: SupplyDataLrHr,
+    pub supply_data_mr: SupplyDataMr,
     pub quest_hall_msg: Msg,
     pub quest_hall_msg_mr: Msg,
     pub quest_hall_msg_mr2: Msg,
@@ -233,6 +242,7 @@ pub struct Pedia {
 
     pub random_mystery_difficulty: Option<RandomMysteryDifficultyRateListData>,
     pub random_mystery_enemy: Option<RandomMysteryLotEnemyData>,
+    pub random_mystery_rank_release: Option<RandomMysteryMonsterRankReleaseData>,
 }
 
 pub struct QuestReward<'a> {
@@ -436,7 +446,7 @@ pub struct WeaponCustomBuildup<'a> {
 }
 
 pub struct PediaEx<'a> {
-    pub monsters: HashMap<EmTypes, MonsterEx<'a>>,
+    pub monsters: BTreeMap<EmTypes, MonsterEx<'a>>,
     pub sizes: HashMap<EmTypes, &'a SizeInfo>,
     pub size_dists: HashMap<i32, &'a [ScaleAndRateData]>,
     pub quests: Vec<Quest<'a>>,
@@ -475,4 +485,6 @@ pub struct PediaEx<'a> {
 
     pub armor_custom_buildup: HashMap<u32, ArmorCustomBuildup<'a>>,
     pub weapon_custom_buildup: HashMap<u32, WeaponCustomBuildup<'a>>,
+
+    pub supply: HashMap<i32, &'a SupplyDataParam>,
 }

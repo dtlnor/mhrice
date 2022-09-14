@@ -857,6 +857,7 @@ struct TypeInfo {
 
     runtime_info: u64,
     runtime_vtable: u64,
+    runtime_len: usize,
 }
 
 #[derive(Serialize)]
@@ -1025,7 +1026,7 @@ impl Tdb {
             system_type: u64,
 
             flags: TypeFlag,
-            runtime_len: u32,
+            runtime_len: usize,
             hash: u32,
             crc: u32,
 
@@ -1102,7 +1103,7 @@ impl Tdb {
                     system_type,
 
                     flags: TypeFlag::from_bits(flags).context("Unknown type flag")?,
-                    runtime_len,
+                    runtime_len: runtime_len.try_into()?,
                     hash,
                     crc,
 
@@ -2021,6 +2022,7 @@ impl Tdb {
                     cycle_map: ty.cycle_map,
                     runtime_info: instance.runtime_info,
                     runtime_vtable: instance.vtable,
+                    runtime_len: instance.runtime_len,
                 })
             })
             .collect::<Result<_>>()?;

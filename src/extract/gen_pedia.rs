@@ -91,6 +91,102 @@ fn gen_ems_collider_path(id: u32, sub_id: u32) -> String {
     )
 }
 
+fn gen_em_atk_collider_path(id: u32, sub_id: u32) -> String {
+    format!(
+        "enemy/em{0:03}/{1:02}/collision/em{0:03}_{1:02}_atk_colliders.rcol",
+        id, sub_id
+    )
+}
+
+fn gen_ems_atk_collider_path(id: u32, sub_id: u32) -> String {
+    format!(
+        "enemy/ems{0:03}/{1:02}/collision/ems{0:03}_{1:02}_atk_colliders.rcol",
+        id, sub_id
+    )
+}
+
+fn gen_em_shell_collider_path(id: u32, sub_id: u32) -> Vec<String> {
+    let folder = format!("enemy/em{id:03}/{sub_id:02}/shell/collision/");
+    let mut paths = vec![format!("{folder}em{id:03}_{sub_id:02}_shell_collider.rcol",)];
+
+    if id == 27 && sub_id == 0 {
+        paths.push(format!("{folder}em027_00_shell_collider_id_0.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_1.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_10.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_11.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_12.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_13.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_14.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_15.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_16.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_17.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_18.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_19.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_22_30.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_24.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_25.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_26.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_27.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_28.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_2_29.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_4.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_5.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_6.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_7.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_8.rcol"));
+        paths.push(format!("{folder}em027_00_shell_collider_id_9.rcol"));
+    }
+
+    if id == 94 && sub_id == 1 {
+        paths.push(format!("{folder}em094_01_shell_collider_id_0.rcol"));
+        paths.push(format!("{folder}em094_01_shell_collider_id_500.rcol"));
+        paths.push(format!("{folder}em094_01_shell_collider_id_501.rcol"));
+        paths.push(format!("{folder}em094_01_shell_collider_id_502.rcol"));
+        paths.push(format!("{folder}em094_01_shell_collider_id_503.rcol"));
+    }
+
+    if id == 118 && sub_id == 0 {
+        paths.push(format!("{folder}em118_00_shell_collider_id_0.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_1.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_10.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_100.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_2_10.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_3_10.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_5.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_6.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_7.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_8.rcol"));
+        paths.push(format!("{folder}em118_00_shell_collider_id_9.rcol"));
+    }
+
+    if id == 118 && sub_id == 5 {
+        paths.push(format!("{folder}em118_05_shell_collider_id_0.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_1.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_10.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_100.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_2_10.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_3_10.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_5.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_500.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_510.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_520.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_530.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_6.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_7.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_8.rcol"));
+        paths.push(format!("{folder}em118_05_shell_collider_id_9.rcol"));
+    }
+
+    paths
+}
+
+fn gen_ems_shell_collider_path(id: u32, sub_id: u32) -> Vec<String> {
+    vec![format!(
+        "enemy/ems{0:03}/{1:02}/shell/collision/ems{0:03}_{1:02}_shell_collider.rcol",
+        id, sub_id
+    )]
+}
+
 pub fn gen_collider_mapping(rcol: Rcol) -> Result<ColliderMapping> {
     let mut meat_map: BTreeMap<usize, BTreeSet<String>> = BTreeMap::new();
     let mut part_map: BTreeMap<usize, BTreeSet<String>> = BTreeMap::new();
@@ -138,6 +234,8 @@ pub fn gen_monsters(
     boss_init_path_gen: fn(u32, u32) -> Option<String>,
     collider_path_gen: fn(u32, u32) -> String,
     data_tune_path_gen: fn(u32, u32) -> String,
+    atk_collider_path_gen: fn(u32, u32) -> String,
+    shell_collider_path_gen: fn(u32, u32) -> Vec<String>,
     is_large: bool,
 ) -> Result<Vec<Monster>> {
     let mut monsters = vec![];
@@ -216,6 +314,50 @@ pub fn gen_monsters(
 
             let em_type = if is_large { EmTypes::Em } else { EmTypes::Ems }(id | (sub_id << 8));
 
+            let mut atk_colliders = vec![];
+
+            let mut add_atk_colliders = |rcol: Rcol| {
+                let mut dedup = HashSet::new();
+                for group in &rcol.group_attachments {
+                    let (data, is_shell) =
+                        if let Some(data) = group.user_data.downcast_ref::<EmHitAttackRsData>() {
+                            (&data.base.0, false)
+                        } else if let Some(data) =
+                            group.user_data.downcast_ref::<EmShellHitAttackRsData>()
+                        {
+                            (&data.base.0, true)
+                        } else {
+                            continue;
+                        };
+                    if !dedup.insert(data) {
+                        continue;
+                    }
+                    atk_colliders.push(AttackCollider {
+                        is_shell,
+                        data: data.clone(),
+                    })
+                }
+            };
+
+            let atk_collider_path = atk_collider_path_gen(id, sub_id);
+            if let Ok(index) = pak.find_file(&atk_collider_path) {
+                let rcol = Rcol::new(Cursor::new(pak.read_file(index)?), true)
+                    .context(atk_collider_path)?;
+                add_atk_colliders(rcol);
+            } else {
+                eprintln!("Attack collider file not found {atk_collider_path}")
+            }
+
+            for shell_collider_path in shell_collider_path_gen(id, sub_id) {
+                if let Ok(index) = pak.find_file(&shell_collider_path) {
+                    let rcol = Rcol::new(Cursor::new(pak.read_file(index)?), true)
+                        .context(shell_collider_path)?;
+                    add_atk_colliders(rcol);
+                } else {
+                    eprintln!("Shell collider file not found {shell_collider_path}")
+                }
+            }
+
             monsters.push(Monster {
                 id,
                 sub_id,
@@ -231,6 +373,7 @@ pub fn gen_monsters(
                 collider_mapping,
                 drop_item,
                 parts_break_reward,
+                atk_colliders,
             })
         }
     }
@@ -369,6 +512,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
                 id, sub_id
             )
         },
+        gen_em_atk_collider_path,
+        gen_em_shell_collider_path,
         true,
     )
     .context("Generating large monsters")?;
@@ -389,6 +534,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
                 id, sub_id
             )
         },
+        gen_ems_atk_collider_path,
+        gen_ems_shell_collider_path,
         false,
     )
     .context("Generating small monsters")?;
@@ -715,6 +862,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         fixed_hyakuryu_quest: get_singleton(pak)?,
         mystery_reward_item: get_singleton(pak)?,
         quest_servant: get_singleton(pak)?,
+        supply_data: get_singleton(pak)?,
+        supply_data_mr: get_singleton(pak)?,
         quest_hall_msg,
         quest_hall_msg_mr,
         quest_hall_msg_mr2,
@@ -855,6 +1004,7 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         custom_buildup_wep_table: get_singleton_opt(pak)?,
         random_mystery_difficulty,
         random_mystery_enemy: get_singleton_opt(pak)?,
+        random_mystery_rank_release: get_singleton_opt(pak)?,
     })
 }
 
@@ -896,7 +1046,7 @@ fn gen_monster_hitzones(
             // pre-check a glitchy thing
             for attachment in &collider.group_attachments {
                 if let Some(data) = attachment.user_data.downcast_ref::<EmHitDamageRsData>() {
-                    if data.base.is_none() {
+                    if data.parent_user_data.is_none() {
                         eprintln!(
                             "Found glitch collider '{}' for em{}_{}",
                             data.name, index, sub_id
@@ -2698,8 +2848,8 @@ fn prepeare_ot_equip(pedia: &Pedia) -> Result<BTreeMap<OtEquipSeriesId, OtEquipS
 fn prepare_monsters<'a>(
     pedia: &'a Pedia,
     reward_lot: &'_ HashMap<u32, &'a RewardIdLotTableUserDataParam>,
-) -> Result<HashMap<EmTypes, MonsterEx<'a>>> {
-    let mut result = HashMap::new();
+) -> Result<BTreeMap<EmTypes, MonsterEx<'a>>> {
+    let mut result = BTreeMap::new();
 
     let names = pedia.monster_names.get_name_map();
     let names_mr = pedia.monster_names_mr.get_name_map();
@@ -3029,6 +3179,19 @@ pub fn prepare_weapon_custom_buildup<'a>(
     Ok(result)
 }
 
+pub fn prepare_supply(pedia: &Pedia) -> Result<HashMap<i32, &SupplyDataParam>> {
+    hash_map_unique(
+        pedia
+            .supply_data
+            .param
+            .iter()
+            .chain(&pedia.supply_data_mr.param)
+            .filter(|p| p.id != 0),
+        |p| (p.id, p),
+        false,
+    )
+}
+
 pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
     let monster_order = pedia
         .monster_list
@@ -3117,5 +3280,7 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
 
         armor_custom_buildup,
         weapon_custom_buildup,
+
+        supply: prepare_supply(pedia)?,
     })
 }

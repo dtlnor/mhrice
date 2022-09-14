@@ -8,6 +8,7 @@ use nalgebra_glm::*;
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::rc::*;
 
 pub enum UserData {
     RszRootIndex(usize),
@@ -30,9 +31,9 @@ impl UserData {
         }
     }
 
-    pub fn downcast<T: 'static>(self) -> Option<Box<T>> {
+    pub fn downcast<T: 'static>(self) -> Option<T> {
         if let UserData::Data(data) = self {
-            data.downcast().ok()
+            Rc::try_unwrap(data.downcast().ok()?).ok()
         } else {
             panic!();
         }
@@ -76,6 +77,7 @@ pub struct Collider {
     pub shape: Shape,
     pub user_data: UserData,
     pub ignore_tag_bits: u32,
+    pub y: u32,
 }
 pub struct ColliderGroup {
     pub name: String,
@@ -215,7 +217,7 @@ impl Rcol {
                         if x != 0xFFFFFFFF {
                             bail!("Expected FFFFFFFF");
                         }
-                        let _y = file.read_u32()?;
+                        let y = file.read_u32()?;
                         let ignore_tag_bits = file.read_u32()?;
                         if ignore_tag_bits >= 1 << ignore_tag_count {
                             bail!("ignore_tag out of bound")
@@ -307,6 +309,7 @@ impl Rcol {
                             shape,
                             user_data: UserData::RszRootIndex(rsz_root_index.try_into()?),
                             ignore_tag_bits,
+                            y,
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;
@@ -455,9 +458,12 @@ impl Rcol {
                     collider.user_data.accept(&mut roots)?;
                 }
             }
-            if roots.iter().any(Option::is_some) {
-                bail!("Left over user data")
-            }
+            // TODO: What are these leftover node?
+            //for (i, root) in roots.into_iter().enumerate() {
+            //    if let Some(root) = root {
+            //        eprintln!("Left over node @ [{i}]: {root:?}")
+            //    }
+            //}
         }
 
         Ok(Rcol {
@@ -478,8 +484,12 @@ impl Rcol {
             println!("[{}] {}", i, collider_group.name);
             for collider in &collider_group.colliders {
                 println!(
-                    " - {}, {}, {}, /** {} **/",
-                    collider.name, collider.bone_a, collider.bone_b, collider.ignore_tag_bits
+                    " - {}, {}, {}, /** {} **/, !{}",
+                    collider.name,
+                    collider.bone_a,
+                    collider.bone_b,
+                    collider.ignore_tag_bits,
+                    collider.y
                 );
                 if let UserData::Data(data) = &collider.user_data {
                     print_user_data(data)?;
@@ -617,7 +627,7 @@ impl Rcol {
                             if let Some(data) =
                                 attachment.user_data.downcast_ref::<EmHitDamageRsData>()
                             {
-                                if data.base.is_none() {
+                                if data.parent_user_data.is_none() {
                                     // seen in magmadron, seems incorrect attachment. skipping
                                     continue;
                                 }

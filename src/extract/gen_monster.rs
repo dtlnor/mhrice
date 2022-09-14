@@ -1091,7 +1091,9 @@ pub fn gen_monster(
         </section>
     ) });
 
-    if let Some(random_quest) = monster_ex.random_quest {
+    if let (Some(random_quest), Some(rank_release)) =
+        (monster_ex.random_quest, &pedia.random_mystery_rank_release)
+    {
         let diff_table = format!(
             "/quest/anomaly_difficulty_0_{}.html",
             random_quest.difficulty_table_type
@@ -1108,8 +1110,11 @@ pub fn gen_monster(
             <div class="mh-kvlist">
             <p class="mh-kv"><span>"Appear at"</span>
             {
+                let release = rank_release.release_level_data[0].param_data.iter().find(
+                    |p|p.monster_rank == random_quest.mystery_rank
+                ).map(|p|format!("(Lv{})", p.release_level)).unwrap_or_default();
                 let rank = (random_quest.mystery_rank.0 != 12).then(||
-                    text!("A{}", random_quest.mystery_rank.0));
+                    text!("A{} {}", random_quest.mystery_rank.0, release));
                 let level = (random_quest.release_level != -1).then(||
                     text!("Lv{}", random_quest.release_level));
                 let or = (rank.is_some() && level.is_some()).then(||text!(" Or "));
@@ -1119,8 +1124,11 @@ pub fn gen_monster(
             </p>
             <p class="mh-kv"><span>"Appear as sub target at"</span>
             {
+                let release = rank_release.release_level_data[1].param_data.iter().find(
+                    |p|p.monster_rank == random_quest.normal_rank
+                ).map(|p|format!("(Lv{})", p.release_level)).unwrap_or_default();
                 let rank = (random_quest.normal_rank.0 != 12).then(||
-                    text!("A{}", random_quest.normal_rank.0));
+                    text!("\"A{}\" {}", random_quest.normal_rank.0, release));
                 let level = (random_quest.release_level_normal != -1).then(||
                     text!("Lv{}", random_quest.release_level_normal));
                 let or = (rank.is_some() && level.is_some()).then(||text!(" Or "));
@@ -1186,6 +1194,10 @@ pub fn gen_monster(
                 <input type="checkbox" id="mh-invalid-meat-check"/>
                 <label for="mh-invalid-meat-check">"Display invalid parts"</label>
             </div>
+            <div>
+                <input type="checkbox" id="mh-hitzone-internal-check"/>
+                <label for="mh-hitzone-internal-check">"Display internal name"</label>
+            </div>
             <div class="mh-table"><table>
                 <thead>
                 <tr>
@@ -1210,7 +1222,7 @@ pub fn gen_monster(
                         let part_name = if let Some(names) = collider_mapping.meat_map.get(&part) {
                             names.iter().map(|s|s.as_str()).collect::<Vec<&str>>().join(", ")
                         } else {
-                            format!("{}", part)
+                            "".to_owned()
                         };
 
                         let part_color = format!("mh-part mh-part-{}", part);
@@ -1219,7 +1231,8 @@ pub fn gen_monster(
                         let mut part_common: Option<Vec<Box<td<String>>>> = Some(vec![
                             html!(<td rowspan={span}>
                                 <span class=part_color.as_str()/>
-                                { text!("{}", part_name) }
+                                {text!("[{}]", part)}
+                                <span lang="ja" class="mh-hitzone-internal">{ text!("{}", part_name) }</span>
                             </td>),
                         ]);
 
@@ -1313,6 +1326,10 @@ pub fn gen_monster(
             <input type="checkbox" id="mh-invalid-part-check"/>
             <label for="mh-invalid-part-check">"Display invalid parts"</label>
         </div>
+        <div>
+            <input type="checkbox" id="mh-part-internal-check"/>
+            <label for="mh-part-internal-check">"Display internal name"</label>
+        </div>
         <div class="mh-table"><table>
             <thead>
                 <tr>
@@ -1328,7 +1345,7 @@ pub fn gen_monster(
                     let part_name = if let Some(names) = collider_mapping.part_map.get(&index) {
                         names.iter().map(|s|s.as_str()).collect::<Vec<&str>>().join(", ")
                     } else {
-                        format!("{}", index)
+                        "".to_owned()
                     };
 
                     let part_color = format!("mh-part-group mh-part-{}", index);
@@ -1376,7 +1393,7 @@ pub fn gen_monster(
                         <td>
                             <span class=part_color.as_str()/>
                             { text!("[{}]", index) }
-                            { text!("{}", part_name) }
+                            <span lang="ja" class="mh-part-internal">{ text!("{}", part_name) }</span>
                         </td>
                         <td>{ if part.master_vital == -1 {
                             text!("{}", part.vital)
@@ -1615,6 +1632,185 @@ pub fn gen_monster(
             title,
         });
     }
+
+    sections.push(Section {
+        title: "Move set".to_owned(),
+        content: html!(<section id="s-moveset">
+        <h2>"Move set"</h2>
+        <div class="mh-table"><table>
+            <thead><tr>
+                <th>"Internal name"</th>
+                <th>"Damage"</th>
+                <th>"Status"</th>
+                <th>"Guarding"</th>
+                <th>"Power"</th>
+                <th>"Type"</th>
+                <th>"Type value"</th>
+                <th>"To object"</th>
+                <th>"To other monster"</th>
+                <th>"Flags"</th>
+                //<th>"Riding"</th>
+            </tr></thead>
+            <tbody> {
+                monster.atk_colliders.iter().map(|atk| {
+                    let mut damages = vec![];
+                    if atk.data.base_damage != 0 {
+                        damages.push(html!(<li>{text!("Raw {}", atk.data.base_damage)}</li>))
+                    }
+                    if atk.data.base_attack_element_value != 0 || atk.data.base_attack_element != AttackElement::None {
+                        damages.push(html!(<li>{text!("{:?} {}",
+                            atk.data.base_attack_element, atk.data.base_attack_element_value)}</li>))
+                    }
+
+                    let mut statuss = vec![];
+
+                    if atk.data.base_piyo_value != 0 {
+                        statuss.push(html!(<li>{text!("Stun {}", atk.data.base_piyo_value)}</li>))
+                    }
+
+                    let mut add_debuff = |t: DebuffType, v: u8, s: MeqF32| {
+                        if t != DebuffType::None || v != 0 || s.0 != 0.0 {
+                            statuss.push(html!(<li>
+                                { text!("{:?}", t) }
+                                { (v != 0).then(||text!(" {}", v)) }
+                                { (s.0 != 0.0).then(||text!(" {}sec", s)) }
+                            </li>))
+                        }
+                    };
+
+                    add_debuff(atk.data.base_debuff_type, atk.data.base_debuff_value, atk.data.base_debuff_sec);
+                    add_debuff(atk.data.base_debuff_type2, atk.data.base_debuff_value2, atk.data.base_debuff_sec2);
+                    add_debuff(atk.data.base_debuff_type3, atk.data.base_debuff_value3, atk.data.base_debuff_sec3);
+
+                    if atk.data.is_mystery_debuff {
+                        statuss.push(html!(<li>{text!("Bloodblight {}sec", atk.data.mystery_debuff_sec)}</li>))
+                    }
+
+                    let mut flags = vec![];
+                    if atk.is_shell {
+                        flags.push(html!(<span class="tag">"Shell"</span>));
+                    }
+
+                    if atk.data.hit_attr.contains(HitAttr::CALC_HIT_DIRECTION) {
+                        flags.push(html!(<span class="tag">"CalcHitDirection"</span>));
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::CALC_HIT_DIRECTION_BASED_ROOT_POS) {
+                        flags.push(html!(<span class="tag">"CalcHitDirectionBasedRootPos"</span>));
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::ALL_DIR_GUARDABLE) {
+                        flags.push(html!(<span class="tag">"AllDirGuardable"</span>));
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::USE_HIT_STOP) {
+                        flags.push(html!(<span class="tag">"HitStop"</span>));
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::USE_HIT_SLOW) {
+                        flags.push(html!(<span class="tag">"HitSlow"</span>));
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::ABS_HIT_STOP) {
+                        flags.push(html!(<span class="tag">"AbsHitStop"</span>));
+
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::USE_CYCLE_HIT) {
+                        flags.push(html!(<span class="tag">"CycleHit"</span>));
+
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::CHECK_RAY_CAST) {
+                        flags.push(html!(<span class="tag">"CheckRayCast"</span>));
+
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::IGNORE_END_DELAY) {
+                        flags.push(html!(<span class="tag">"IgnoreEndDelay"</span>));
+
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::USE_DIRECTION_OBJECT) {
+                        flags.push(html!(<span class="tag">"DirectionObject"</span>));
+
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::OVERRIDE_COLLISION_RESULT_BY_RAY) {
+                        flags.push(html!(<span class="tag">"OverrideCollisionResultByRay"</span>));
+
+                    }
+                    if atk.data.hit_attr.contains(HitAttr::HIT_POS_CORRECTION) {
+                        flags.push(html!(<span class="tag">"HitPosCorrection"</span>));
+                    }
+
+                    if atk.data.base_attack_attr.contains(AttackAttr::ELEMENT_S) {
+                        flags.push(html!(<span class="tag">"ElementS"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::BOMB) {
+                        flags.push(html!(<span class="tag">"Bomb"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::ENSURE_DEBUFF) {
+                        flags.push(html!(<span class="tag">"EnsureDebuff"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::TRIGGER_MARIONETTE_START) {
+                        flags.push(html!(<span class="tag">"TriggerRidingStart"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::FORCE_KILL) {
+                        flags.push(html!(<span class="tag">"ForceKill"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::KOYASHI) {
+                        flags.push(html!(<span class="tag">"Kayoshi"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::ALLOW_DISABLED) {
+                        flags.push(html!(<span class="tag">"AllowDisabled"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::PREVENT_CHEEP_TECH) {
+                        flags.push(html!(<span class="tag">"PreventCheepTech"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::HYAKURYU_BOSS_ANGER_END_SP_STOP) {
+                        flags.push(html!(<span class="tag">"RampageBossAngerEndSpStop"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::FORCE_PARTS_LOSS_PERMIT_DAMAGE_ATTR_SLASH) {
+                        flags.push(html!(<span class="tag">"ForcePartsLossPermitDamageAttrSlash"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::KEEP_RED_DAMAGE) {
+                        flags.push(html!(<span class="tag">"KeepRedDamage"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::CREATURE_NET_SEND_DAMAGE) {
+                        flags.push(html!(<span class="tag">"CreatureNetSendDamage"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::EM_HP_STOP1) {
+                        flags.push(html!(<span class="tag">"EmHpStop1"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::RESTRAINT_PL_ONLY) {
+                        flags.push(html!(<span class="tag">"RestraintPlOnly"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::RESTRAINT_ALL) {
+                        flags.push(html!(<span class="tag">"RestraintAll"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::SUCK_BLOOD) {
+                        flags.push(html!(<span class="tag">"SuckBlood"</span>))
+                    }
+                    if atk.data.base_attack_attr.contains(AttackAttr::FORCE_PARTS_LOSS_PERMIT_DAMAGE_ATTR_STRIKE) {
+                        flags.push(html!(<span class="tag">"ForcePartsLossPermistDamageAttrStrike"</span>))
+                    }
+
+                    html!(<tr>
+                        <td lang="ja">{text!("{}", atk.data.name)}</td>
+                        <td><ul class="mh-damages">{damages}</ul></td>
+                        <td><ul class="mh-damages">{statuss}</ul></td>
+                        <td>{text!("{:?}", atk.data.guardable_type)}</td>
+                        <td>{text!("{}", atk.data.power)}</td>
+                        <td>{text!("{:?}", atk.data.damage_type)}</td>
+                        <td>{text!("{}", atk.data.damage_type_value)}</td>
+                        <td>{text!("{:?}", atk.data.object_break_type)}</td>
+                        <td>{text!("{:?}", atk.data.base_em2em_damage_type)}</td>
+                        <td>{flags}</td>
+                        /*<td>{text!("{:?} {}//{}/{}/{}//{:?}",
+                            atk.data.marionette_enemy_damage_type,
+                            atk.data.marionette_enemy_base_damage,
+                            atk.data.marionette_enemy_base_damage_s,
+                            atk.data.marionette_enemy_base_damage_m,
+                            atk.data.marionette_enemy_base_damage_l,
+                            atk.data.marionette_unique_damage_list
+                        )}</td>*/
+                    </tr>)
+                })
+            } </tbody>
+        </table></div>
+        </section>),
+    });
 
     let doc: DOMTree<String> = html!(
         <html>

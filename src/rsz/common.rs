@@ -118,7 +118,9 @@ macro_rules! rsz_sumtype {
                 let child = rsz.get_child_any()?;
                 $(
                     if child.symbol() == <$variant_type>::SYMBOL {
-                        return Ok($enum_name::$variant(child.downcast().unwrap()))
+                        let v = child.downcast().unwrap();
+                        let v = Rc::try_unwrap(v).map_err(|_|anyhow!("Shared node"))?;
+                        return Ok($enum_name::$variant(v))
                     }
                 )*
                 bail!("Unknown type {} for sum type {}", child.symbol(), stringify!($enum_name))
@@ -328,6 +330,52 @@ impl FieldFromRsz for f32 {
     fn field_from_rsz(rsz: &mut RszDeserializer) -> Result<Self> {
         rsz.cursor.seek_align_up(4)?;
         rsz.read_f32()
+    }
+}
+
+// A wrapper of f32 that has bit-equality semantics
+#[derive(Clone, Copy)]
+pub struct MeqF32(pub f32);
+
+impl FieldFromRsz for MeqF32 {
+    fn field_from_rsz(rsz: &mut RszDeserializer) -> Result<Self> {
+        rsz.cursor.seek_align_up(4)?;
+        Ok(MeqF32(rsz.read_f32()?))
+    }
+}
+
+impl std::cmp::PartialEq for MeqF32 {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl std::cmp::Eq for MeqF32 {}
+
+impl std::hash::Hash for MeqF32 {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
+
+impl std::fmt::Display for MeqF32 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl std::fmt::Debug for MeqF32 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl Serialize for MeqF32 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
     }
 }
 
