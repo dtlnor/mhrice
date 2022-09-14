@@ -832,8 +832,6 @@ struct TypeInfo {
 
     hash: u32,
     #[serde(skip)]
-    runtime_len: u32,
-    #[serde(skip)]
     crc: u32,
     assembly: usize,
     mi_default_ctor: Option<usize>,
@@ -2001,7 +1999,6 @@ impl Tdb {
                     system_type: instance.system_type,
                     element_type: instance.element_type,
                     flags: instance.flags,
-                    runtime_len: instance.runtime_len,
                     hash: instance.hash,
                     crc: instance.crc,
                     assembly: ty.assembly_index,
