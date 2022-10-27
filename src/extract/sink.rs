@@ -1,5 +1,7 @@
+use super::hash_store::*;
 use anyhow::{anyhow, Context, Result};
-use futures::{StreamExt, TryStreamExt};
+use bytes::Bytes;
+use futures::{stream, StreamExt, TryStreamExt};
 use md5::{Digest, Md5};
 use rusoto_core::{ByteStream, Region};
 use rusoto_s3::*;
@@ -106,6 +108,38 @@ impl<'a> Drop for TocSink<'a> {
     }
 }
 
+pub struct FileWithHash<'a, File> {
+    inner: File,
+    file_tag: FileTag,
+    md5: Md5,
+    hash_store: &'a mut HashStore,
+}
+
+impl<'a, File: Write> Write for FileWithHash<'a, File> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let len = self.inner.write(buf)?;
+        self.md5.update(&buf[0..len]);
+        Ok(len)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<'a, File> Drop for FileWithHash<'a, File> {
+    fn drop(&mut self) {
+        let digest = std::mem::replace(&mut self.md5, Md5::new()).finalize();
+        self.hash_store.add(
+            self.file_tag,
+            format!(
+                "{:02x}{:02x}{:02x}{:02x}",
+                digest[0], digest[1], digest[2], digest[3]
+            ),
+        )
+    }
+}
+
 pub trait Sink: Sync {
     type File: Write;
     fn create(&self, name: &str) -> Result<Self::File>;
@@ -134,6 +168,21 @@ pub trait Sink: Sync {
                 title: vec![],
             },
         ))
+    }
+
+    fn create_with_hash<'a>(
+        &self,
+        name: &str,
+        file_tag: FileTag,
+        hash_store: &'a mut HashStore,
+    ) -> Result<FileWithHash<'a, Self::File>> {
+        let file = self.create(name)?;
+        Ok(FileWithHash {
+            inner: file,
+            file_tag,
+            md5: Md5::new(),
+            hash_store,
+        })
     }
 
     fn finalize(self) -> Result<()>;
@@ -302,19 +351,39 @@ impl S3SinkInner {
                             _ => panic!("Unknown extension"),
                         };
                         let content_length = Some(i64::try_from(data.len()).unwrap());
+                        let bucket = &bucket;
+                        let client = &client;
+                        async move {
+                            let byte = Bytes::from(data);
+                            let mut result = Ok(());
+                            for retry in 0..3 {
+                                let byte_clone = byte.clone();
+                                let request = PutObjectRequest {
+                                    bucket: bucket.clone(),
+                                    key: name.clone(),
+                                    body: Some(ByteStream::new_with_size(
+                                        stream::once(async move { Ok(byte_clone) }),
+                                        byte.len(),
+                                    )),
+                                    content_length,
+                                    content_type: Some(mime.to_owned()),
+                                    ..PutObjectRequest::default()
+                                };
 
-                        let request = PutObjectRequest {
-                            bucket: bucket.clone(),
-                            key: name,
-                            body: Some(ByteStream::from(data)),
-                            content_length,
-                            content_type: Some(mime.to_owned()),
-                            ..PutObjectRequest::default()
-                        };
+                                let future = client.put_object(request);
+                                if let Err(e) = future.await {
+                                    eprintln!(
+                                        "Failed to upload object {name} on attempt {retry}: {e}"
+                                    );
+                                    result = Err(e);
+                                } else {
+                                    result = Ok(());
+                                    break;
+                                }
+                            }
 
-                        let future = client.put_object(request);
-
-                        async { future.await.map(|_| ()).context("Failed to upload object") }
+                            result.with_context(|| format!("Failed to upload object {name}"))
+                        }
                     })
                     .buffer_unordered(10)
                     .try_collect::<()>()

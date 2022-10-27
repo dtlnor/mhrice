@@ -33,6 +33,7 @@ mod tex;
 mod user;
 mod uvs;
 
+use extract::hash_store::*;
 use extract::sink::*;
 use file_ext::*;
 use gui::*;
@@ -529,7 +530,8 @@ fn gen_website_to_sink(pak: Vec<String>, sink: impl Sink) -> Result<()> {
     let pedia_ex = extract::gen_pedia_ex(&pedia)?;
     sink.create("mhrice.json")?
         .write_all(serde_json::to_string_pretty(&pedia)?.as_bytes())?;
-    extract::gen_website(&pedia, &pedia_ex, &sink)?;
+    let mut hash_store = HashStore::new();
+    extract::gen_website(&mut hash_store, &pedia, &pedia_ex, &sink)?;
     extract::gen_resources(&mut pak, &sink.sub_sink("resources")?)?;
     sink.finalize()?;
     Ok(())
@@ -1314,10 +1316,11 @@ fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: Strin
 }
 
 fn main() -> Result<()> {
+    
     // disable this as I don't have a display on my wsl,
     // and don't want to download too many package
     // gpu::gpu_init();
-    match Mhrice::from_args() {
+    match Mhrice::parse() {
         Mhrice::Dump { pak, name, output } => dump(pak, name, output),
         Mhrice::DumpIndex {
             pak,

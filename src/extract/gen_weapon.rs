@@ -3,6 +3,7 @@ use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_monster::*;
 use super::gen_website::*;
+use super::hash_store::*;
 use super::pedia::*;
 use super::sink::*;
 use crate::rsz::*;
@@ -143,6 +144,7 @@ fn display_bullet_type(bullet: BulletType) -> &'static str {
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 fn gen_weapon<Param>(
+    hash_store: &HashStore,
     weapon: &Weapon<Param>,
     weapon_tree: &WeaponTree<'_, Param>,
     pedia: &Pedia,
@@ -530,8 +532,23 @@ where
                         &process.base, Some((&process.output_item, &process.output_item_num)))
                 })}
                 {weapon.change.as_ref().map(|change| {
-                    gen_craft_row(pedia_ex, html!(<td>"As layered"</td>), None,
+                    gen_craft_row(pedia_ex, html!(<td>"As layered (rampage weapon)"</td>), None,
                         &change.base, None)
+                })}
+                {weapon.overwear.as_ref().map(|data| {
+                    let category = gen_category(pedia_ex, data.material_category, data.material_category_num);
+                    let materials = gen_materials(pedia_ex, &data.item, &data.item_num, data.item_flag);
+                    html!(<tr>
+                        <td>"As layered"</td>
+                        <td>{gen_progress(data.progress_flag, pedia_ex)}</td>
+                        <td>{(data.enemy_flag != EmTypes::Em(0)).then(
+                            ||gen_monster_tag(pedia_ex, data.enemy_flag, false, false, false)
+                        )}</td>
+                        <td>{text!("{}z", data.price)}</td>
+                        {category}
+                        {materials}
+                        <td></td>
+                    </tr>)
                 })}
             </tbody>
         </table></div>
@@ -640,7 +657,7 @@ where
         <html>
             <head>
                 <title>"Weapon - MHRice"</title>
-                { head_common() }
+                { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
@@ -681,6 +698,7 @@ where
 }
 
 fn gen_tree<Param>(
+    hash_store: &HashStore,
     weapon_tree: &WeaponTree<Param>,
     weapon_path: &impl Sink,
     tag: &str,
@@ -695,7 +713,7 @@ where
         <html>
             <head>
                 <title>{text!("{} - MHRice", name)}</title>
-                { head_common() }
+                { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
@@ -766,6 +784,7 @@ fn heavy_bowgun(param: &HeavyBowgunBaseUserDataParam) -> Vec<Box<p<String>>> {
 }
 
 pub fn gen_weapons(
+    hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
     output: &impl Sink,
@@ -796,11 +815,12 @@ pub fn gen_weapons(
                     <span>{text!("{}", $name)}</span>
                 </a>
             </li>));
-            gen_tree(&pedia_ex.$label, &path, stringify!($label), $name)?;
+            gen_tree(hash_store, &pedia_ex.$label, &path, stringify!($label), $name)?;
             for (weapon_id, weapon) in &pedia_ex.$label.weapons {
                 let (file_path, toc_sink) =
                     path.create_html_with_toc(&format!("{}.html", weapon_id.to_tag()), toc)?;
                 gen_weapon(
+                    hash_store,
                     weapon,
                     &pedia_ex.$label,
                     pedia,
@@ -993,7 +1013,7 @@ pub fn gen_weapons(
         <html>
             <head>
                 <title>{text!("Weapons - MHRice")}</title>
-                { head_common() }
+                { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
