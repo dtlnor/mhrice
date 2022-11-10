@@ -1,9 +1,49 @@
 use super::gen_quest::*;
 use super::gen_website::*;
 use super::pedia::*;
+use crate::msg::MsgEntry;
 use typed_html::{elements::*, html, text};
 
 const WEBSITE_VERSIONS: &[&str] = &["10.0.2", "10.0.3", "11.0.1", "11.0.2", "12.0.0", "12.0.1"];
+
+pub fn open_graph(
+    title: Option<&MsgEntry>,
+    title_plan: &str,
+    description: Option<&MsgEntry>,
+    description_plan: &str,
+    image: Option<&str>,
+    path: &str,
+    config: &WebsiteConfig,
+) -> Vec<Box<dyn MetadataContent<String>>> {
+    let Some(origin) = &config.origin else {return vec![]};
+    let mut title = if let Some(title) = title {
+        translate_msg_plain(&title.content[1])
+    } else {
+        title_plan.to_owned()
+    };
+    if title.is_empty() {
+        title = "MHRice".to_owned()
+    }
+    let mut description = if let Some(description) = description {
+        translate_msg_plain(&description.content[1]).replace("\r\n", " ")
+    } else {
+        description_plan.to_owned()
+    };
+    if description.is_empty() {
+        description = " ".to_owned(); // avoid empty meta attribute
+    }
+    let image = image.unwrap_or("/favicon.png");
+    let image = origin.clone() + image;
+    let url = origin.clone() + path;
+    vec![
+        html!(<meta property="og:type" content="website" />),
+        html!(<meta property="og:title" content={title} />),
+        html!(<meta property="og:description" content={description} />),
+        html!(<meta property="og:image" content={image} />),
+        html!(<meta property="og:url" content={url} />),
+        html!(<meta property="og:site_name" content="MHRice" />),
+    ]
+}
 
 pub struct Section {
     pub title: String,
@@ -123,7 +163,7 @@ pub fn gen_slot(decorations_num_list: &[u32], is_rampage_slot: bool) -> Box<span
                 <span class="mh-slot-outer">
                     <img alt={alt.as_str()}
                         src={format!("/resources/slot_{}.png", s).as_str()} class={class} />
-                    { is_rampage_slot.then(||html!(<img class="mh-slot-rampage"
+                    { is_rampage_slot.then(||html!(<img alt="Rampage slot" class="mh-slot-rampage"
                         src="/resources/slot_rampage.png" />)) }
                 </span>
             )

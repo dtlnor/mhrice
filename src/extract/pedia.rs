@@ -154,9 +154,9 @@ pub struct Pedia {
     pub hyakuryu_decos_product: HyakuryuDecoProductUserData,
     pub hyakuryu_decos_name_msg: Msg,
 
-    /*pub alchemy_pattern: AlchemyPatturnUserData,
+    //pub alchemy_pattern: AlchemyPatturnUserData,
     pub alchemy_pl_skill: AlchemyPlSkillTableUserData,
-    pub alchemy_grade_worth: GradeWorthTableUserData,
+    /*pub alchemy_grade_worth: GradeWorthTableUserData,
     pub alchemy_rare_type: RareTypeTableUserData,
     pub alchemy_second_skill_lot: SecondSkillLotRateTableUserData,
     pub alchemy_skill_grade_lot: SkillGradeLotRateTableUserData,
@@ -247,6 +247,9 @@ pub struct Pedia {
     pub random_mystery_rank_release: Option<RandomMysteryMonsterRankReleaseData>,
 
     pub progress: ProgressCheckerUserData,
+
+    pub enemy_rank: EnemyRankData,
+    pub species: SystemEnemyDragonSpeciesData,
 }
 
 pub struct QuestReward<'a> {
@@ -284,6 +287,8 @@ pub struct Skill<'a> {
     pub icon_color: i32,
     pub decos: Vec<Deco<'a>>,
     pub custom_buildup_cost: Option<u32>,
+    pub alchemy: BTreeMap<AlchemyPatturnTypes, &'a AlchemyPlSkillTableUserDataParam>,
+    pub alchemy_grade: Option<GradeTypes>,
 }
 
 pub struct HyakuryuDeco<'a> {
@@ -411,6 +416,9 @@ pub struct MonsterEx<'a> {
     pub mystery_reward: Vec<MysteryReward<'a>>,
     pub random_quest: Option<&'a LotEnemyData>,
     pub discovery: Option<&'a DiscoverEmSetDataParam>,
+    pub rank: Option<u8>,
+    pub species: Option<&'a EmSpeciesData>,
+    pub family: Option<&'a MsgEntry>,
 }
 
 pub struct Servant<'a> {

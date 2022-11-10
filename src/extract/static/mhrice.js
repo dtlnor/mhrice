@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initFilter("item");
     initFilter("armor");
     initFilter("skill");
+    initFilter("main")
 
     autoSearch();
 });
@@ -69,6 +70,7 @@ function addEventListensers() {
     addEventListenerToClass("mh-item-filter-button", "click", changeItemFilter);
     addEventListenerToClass("mh-armor-filter-button", "click", changeArmorFilter);
     addEventListenerToClass("mh-skill-filter-button", "click", changeSkillFilter);
+    addEventListenerToClass("mh-main-filter-button", "click", changeMainFilter);
     addEventListenerToClass("mh-scombo", "change", onChangeSort);
 
     addEventListenerToClass("mh-map-filter-item", "click", onShowMapExplain);
@@ -316,6 +318,11 @@ function switchLanguage() {
     document.getElementById("mh-lang-style").innerHTML =
         `.mh-lang:not([lang="${g_language_code}"]) { display:none; }`;
 
+    const title_meta = document.head.querySelector(`meta[itemprop="title-${g_language_code}"]`);
+    if (title_meta) {
+        document.title = title_meta.content + " - MHRice";
+    }
+
     for (const l of g_supported_mh_lang) {
         const menu_option = document.getElementById(`mh-lang-menu-${l}`);
         if (menu_option) {
@@ -437,6 +444,10 @@ function changeArmorFilter(e) {
 
 function changeSkillFilter(e) {
     changeFilter(e, 'skill');
+}
+
+function changeMainFilter(e) {
+    changeFilter(e, 'main');
 }
 
 function filterStyle(category, filter) {

@@ -2,7 +2,7 @@ use super::gen_common::*;
 use super::gen_item::*;
 use super::gen_map::*;
 use super::gen_quest::*;
-use super::gen_website::{gen_multi_lang, head_common, navbar};
+use super::gen_website::*;
 use super::hash_store::*;
 use super::pedia::*;
 use super::sink::*;
@@ -536,9 +536,9 @@ fn gen_grouped_reward_table<'a>(
                 .enumerate()
                 .map(move |(i, ((&item, &num), &probability))| {
                     let item = if let Some(item) = pedia_ex.items.get(&item) {
-                        html!(<span>{gen_item_label(item)}</span>)
+                        html!(<div class="il">{gen_item_label(item)}</div>)
                     } else {
-                        html!(<span>{text!("{:?}", item)}</span>)
+                        html!(<div class="il">{text!("{:?}", item)}</div>)
                     };
 
                     let reward_type: Vec<_> = drop_dictionary
@@ -680,9 +680,9 @@ pub fn gen_lot(
                             .enumerate()
                             .map(move |(i, ((&item, &num), &probability))|{
                                 let item = if let Some(item) = pedia_ex.items.get(&item) {
-                                    html!(<span>{gen_item_label(item)}</span>)
+                                    html!(<div class="il">{gen_item_label(item)}</div>)
                                 } else {
-                                    html!(<span>{text!("{:?}", item)}</span>)
+                                    html!(<div class="il">{text!("{:?}", item)}</div>)
                                 };
 
                                 let part_name = if let Some(name) =
@@ -845,12 +845,14 @@ pub fn gen_multipart<'a>(
     </table></div>)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn gen_monster(
     hash_store: &HashStore,
     is_large: bool,
     monster: &Monster,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
@@ -943,6 +945,50 @@ pub fn gen_monster(
                 </span>))}
             </span>
         </p>))}
+        <p class="mh-kv"><span>"Threat level"</span>
+        <span> {
+            if let Some(rank) = monster_ex.rank {
+                text!("{}", rank)
+            } else {
+                text!("-")
+            }
+        } </span>
+        </p>
+        <p class="mh-kv"><span>"Type"</span>
+        <span>
+        {if let Some(family) = monster_ex.family {
+            gen_multi_lang(family)
+        } else {
+            html!(<span>"-"</span>)
+        }}
+        {
+            if let Some(species) = monster_ex.species {
+                let base = if species.is_fang_beast_species {
+                    "Fanged beast"
+                } else {
+                    match species.em_dragon_species {
+                        EmDragonSpecies::BirdDragon => "Bird wyvern",
+                        EmDragonSpecies::FlyingDragon => "Flying wyvern",
+                        EmDragonSpecies::BeastDragon => "Brute wyvern",
+                        EmDragonSpecies::SeaDragon => "Leviathan",
+                        EmDragonSpecies::FishDragon => "Piscine wyvern",
+                        EmDragonSpecies::FangDragon => "Fanged wyvern",
+                        EmDragonSpecies::Max => "Max",
+                        EmDragonSpecies::Invalid => "Other",
+                    }
+                };
+                let habitat = match species.em_habitat_species {
+                    EmHabitatSpecies::Arial => ", Arial",
+                    EmHabitatSpecies::Aquatic => ", Aquatic",
+                    EmHabitatSpecies::Max => "Max",
+                    EmHabitatSpecies::Invalid => ""
+                };
+                text!(", (internal){}{}", base, habitat)
+            } else {
+                text!(", (internal)-", )
+            }
+        } </span>
+        </p>
         <p class="mh-kv"><span>"GimmickVital"</span>
             <span>{text!("(S) {} / (M) {} / (L) {} / (KB) {}",
                 monster.data_tune.gimmick_vital_data.vital_s,
@@ -1814,15 +1860,24 @@ pub fn gen_monster(
         </section>),
     });
 
+    let plain_title = format!("Monster {:03}_{:02} - MHRice", monster.id, monster.sub_id);
+
+    let (mut output, mut toc_sink) = output.create_html_with_toc(
+        &format!("{:03}_{:02}.html", monster.id, monster.sub_id),
+        toc,
+    )?;
+
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
-                <title>{text!("Monster {:03}_{:02} - MHRice", monster.id, monster.sub_id)}</title>
+        <html lang="en">
+            <head itemscope=true>
+                <title>{text!("{}", plain_title)}</title>
                 { head_common(hash_store) }
+                { monster_alias.iter().flat_map(|&alias|title_multi_lang(alias)) }
+                { open_graph(monster_alias, &plain_title,
+                    monster_ex.explain1, "", Some(&icon), toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 { gen_menu(&sections) }
                 <main>
                 <header class="mh-monster-header">
@@ -1839,14 +1894,11 @@ pub fn gen_monster(
                 { sections.into_iter().map(|s|s.content) }
 
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
 
-    let (mut output, mut toc_sink) = output.create_html_with_toc(
-        &format!("{:03}_{:02}.html", monster.id, monster.sub_id),
-        toc,
-    )?;
     output.write_all(doc.to_string().as_bytes())?;
 
     if let Some(monster_alias) = monster_alias {
@@ -1860,20 +1912,20 @@ pub fn gen_monsters(
     hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
     let mut monsters_path = output.create_html("monster.html")?;
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Monsters - MHRice")}</title>
                 { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
 
                 <main>
                 <header><h1>"Monsters"</h1></header>
@@ -1930,6 +1982,7 @@ pub fn gen_monsters(
                 }</ul>
                 </section>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -1944,6 +1997,7 @@ pub fn gen_monsters(
             monster,
             pedia,
             pedia_ex,
+            config,
             &monster_path,
             toc,
         )?;
@@ -1957,6 +2011,7 @@ pub fn gen_monsters(
             monster,
             pedia,
             pedia_ex,
+            config,
             &monster_path,
             toc,
         )?;

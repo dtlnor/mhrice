@@ -62,21 +62,21 @@ pub fn gen_materials(
     pedia_ex: &PediaEx,
     item: &[ItemId],
     item_num: &[u32],
-    item_flag: ItemId,
+    item_flag: &[ItemId],
 ) -> Box<td<String>> {
     html!(<td><ul class="mh-armor-skill-list"> {
         item.iter().zip(item_num)
-            .filter(|&(&item, _)| item != ItemId::None)
-            .map(|(&item, num)|{
-            let key = if item == item_flag {
+            .filter(|&(&item, _)| item != ItemId::None && item != ItemId::Null)
+            .map(|(item, num)|{
+            let key = if item_flag.contains(item) {
                 Some(html!(<span class="tag is-primary">"Key"</span>))
             } else {
                 None
             };
-            let item = if let Some(item) = pedia_ex.items.get(&item) {
-                html!(<span>{gen_item_label(item)}</span>)
+            let item = if let Some(item) = pedia_ex.items.get(item) {
+                html!(<div class="il">{gen_item_label(item)}</div>)
             } else {
-                html!(<span>{text!("{:?}", item)}</span>)
+                html!(<div class="il">{text!("{:?}", item)}</div>)
             };
             html!(<li>
                 {text!("{}x ", num)}
@@ -84,7 +84,26 @@ pub fn gen_materials(
                 {key}
             </li>)
         })
-    } </ul></td>)
+    } {
+        item_flag.iter()
+        .filter(|&&item_f|
+            item_f != ItemId::None && item_f != ItemId::Null && !item.contains(&item_f)
+        )
+        .map(|item| {
+            let item = if let Some(item) = pedia_ex.items.get(item) {
+                html!(<div class="il">{gen_item_label(item)}</div>)
+            } else {
+                html!(<div class="il">{text!("{:?}", item)}</div>)
+            };
+            html!(<li>
+                "("
+                {item}
+                <span class="tag is-primary">"Key"</span>
+                ")"
+            </li>)
+        })
+    }
+    </ul></td>)
 }
 
 pub fn gen_category(
@@ -620,6 +639,7 @@ pub fn gen_item(
     item: &Item,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     mut output: impl Write,
     mut toc_sink: TocSink<'_>,
 ) -> Result<()> {
@@ -643,7 +663,9 @@ pub fn gen_item(
     sections.push(Section {
         title: "Description".to_owned(),
         content: html!(
-            <section id="s-description"><pre>
+            <section id="s-description">
+            <h2 >"Description"</h2>
+            <pre>
                 {gen_multi_lang(item.explain)}
             </pre></section>
         ),
@@ -727,14 +749,16 @@ pub fn gen_item(
     });
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>"Item - MHRice"</title>
                 { head_common(hash_store) }
+                { title_multi_lang(item.name) }
+                { open_graph(Some(item.name), "",
+                    Some(item.explain), "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 { gen_menu(&sections) }
                 <main>
                 <header>
@@ -747,6 +771,7 @@ pub fn gen_item(
                 { sections.into_iter().map(|s|s.content) }
 
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -761,15 +786,14 @@ pub fn gen_item_list(
     output: &impl Sink,
 ) -> Result<()> {
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Items - MHRice")}</title>
                 { head_common(hash_store) }
                 <style id="mh-item-list-style">""</style>
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"Item"</h1></header>
                 <div class="mh-filters"><ul>
@@ -805,6 +829,7 @@ pub fn gen_item_list(
                 }
                 </ul>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -819,13 +844,14 @@ pub fn gen_items(
     hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
     let item_path = output.sub_sink("item")?;
     for (&id, item) in &pedia_ex.items {
         let (path, toc_sink) = item_path.create_html_with_toc(&item_page(id), toc)?;
-        gen_item(hash_store, item, pedia, pedia_ex, path, toc_sink)?
+        gen_item(hash_store, item, pedia, pedia_ex, config, path, toc_sink)?
     }
     Ok(())
 }
@@ -842,9 +868,9 @@ pub fn gen_reward_table<'a>(
         .filter(|&((&item, _), _)| item != ItemId::None)
         .map(move |((&item, &num), probability)| {
             let item = if let Some(item) = pedia_ex.items.get(&item) {
-                html!(<span>{gen_item_label(item)}</span>)
+                html!(<div class="il">{gen_item_label(item)}</div>)
             } else {
-                html!(<span>{text!("{:?}", item)}</span>)
+                html!(<div class="il">{text!("{:?}", item)}</div>)
             };
 
             html!(<tr>

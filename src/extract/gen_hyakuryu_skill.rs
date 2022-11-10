@@ -34,15 +34,14 @@ pub fn gen_hyakuryu_skill_list(
     output: &impl Sink,
 ) -> Result<()> {
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Rampage skills - MHRice")}</title>
                 { head_common(hash_store) }
                 <style id="mh-skill-list-style">""</style>
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"Rampage skills"</h1></header>
 
@@ -86,6 +85,7 @@ pub fn gen_hyakuryu_skill_list(
                 }
                 </ul>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -161,6 +161,7 @@ pub fn gen_hyakuryu_skill(
     hash_store: &HashStore,
     skill: &HyakuryuSkill,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     mut output: impl Write,
     mut toc_sink: TocSink<'_>,
 ) -> Result<()> {
@@ -172,6 +173,7 @@ pub fn gen_hyakuryu_skill(
         title: "Description".to_owned(),
         content: html!(
             <section id="s-description">
+            <h2 >"Description"</h2>
             <pre>{gen_multi_lang(skill.explain)}</pre>
             </section>
         ),
@@ -191,7 +193,7 @@ pub fn gen_hyakuryu_skill(
                     <tr>
                         <td>{ text!("{}z", recipe.cost) }</td>
                         { gen_materials(pedia_ex, &recipe.recipe_item_id_list,
-                            &recipe.recipe_item_num_list, ItemId::None) }
+                            &recipe.recipe_item_num_list, &[]) }
                     </tr>
                     </tbody>
                 </table></div>
@@ -232,7 +234,7 @@ pub fn gen_hyakuryu_skill(
                             { gen_category(pedia_ex, deco.product.material_category,
                                 deco.product.point) }
                             { gen_materials(pedia_ex, &deco.product.item_id_list,
-                                &deco.product.item_num_list, deco.product.item_flag) }
+                                &deco.product.item_num_list, &[deco.product.item_flag]) }
                         </tr>
                     </tbody>
                 </table></div>
@@ -242,14 +244,16 @@ pub fn gen_hyakuryu_skill(
     }
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Rampage skill - MHRice")}</title>
                 { head_common(hash_store) }
+                { title_multi_lang(skill.name) }
+                { open_graph(Some(skill.name), "",
+                    Some(skill.explain), "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 { gen_menu(&sections) }
                 <main>
                 <header>
@@ -262,6 +266,7 @@ pub fn gen_hyakuryu_skill(
                 { sections.into_iter().map(|s|s.content) }
 
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -274,13 +279,14 @@ pub fn gen_hyakuryu_skill(
 pub fn gen_hyakuryu_skills(
     hash_store: &HashStore,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
     let skill_path = output.sub_sink("hyakuryu_skill")?;
     for (&id, skill) in &pedia_ex.hyakuryu_skills {
         let (output, toc_sink) = skill_path.create_html_with_toc(&hyakuryu_skill_page(id), toc)?;
-        gen_hyakuryu_skill(hash_store, skill, pedia_ex, output, toc_sink)?
+        gen_hyakuryu_skill(hash_store, skill, pedia_ex, config, output, toc_sink)?
     }
     Ok(())
 }

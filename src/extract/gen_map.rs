@@ -80,6 +80,7 @@ fn gen_map(
     map: &GameMap,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     mut output: impl Write,
     mut toc_sink: TocSink<'_>,
 ) -> Result<()> {
@@ -103,12 +104,12 @@ fn gen_map(
                     let item_id = get_fish_item_id(f.fish_id);
                     let item = if let Some(item) = item_id {
                         if let Some(item) = pedia_ex.items.get(&item) {
-                            html!(<span>{gen_item_label(item)}</span>)
+                            html!(<div class="il">{gen_item_label(item)}</div>)
                         } else {
-                            html!(<span>{text!("{:?}", item)}</span>)
+                            html!(<div class="il">{text!("{:?}", item)}</div>)
                         }
                     } else {
-                        html!(<span>{text!("Unknown fish {}", f.fish_id)}</span>)
+                        html!(<div class="il">{text!("Unknown fish {}", f.fish_id)}</div>)
                     };
 
                     html!(<tr>
@@ -390,15 +391,17 @@ fn gen_map(
     };
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Map {:02}", id)}</title>
                 { head_common(hash_store) }
+                { open_graph(name, "",
+                    None, "", None, toc_sink.path(), config) }
+                { name.iter().flat_map(|&name|title_multi_lang(name)) }
                 <style id="mh-map-list-style">""</style>
             </head>
             <body>
             { navbar() }
-            { right_aside() }
             { gen_menu(&sections) }
             <main>
 
@@ -407,6 +410,7 @@ fn gen_map(
             { sections.into_iter().map(|s|s.content) }
 
             </main>
+            { right_aside() }
             </body>
         </html>
     );
@@ -420,27 +424,27 @@ pub fn gen_maps(
     hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
     let map_path = output.sub_sink("map")?;
     for (&id, map) in &pedia.maps {
         let (path, toc_sink) = map_path.create_html_with_toc(&map_page(id), toc)?;
-        gen_map(hash_store, id, map, pedia, pedia_ex, path, toc_sink)?
+        gen_map(hash_store, id, map, pedia, pedia_ex, config, path, toc_sink)?
     }
     Ok(())
 }
 
 pub fn gen_map_list(hash_store: &HashStore, pedia: &Pedia, output: &impl Sink) -> Result<()> {
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Maps - MHRice")}</title>
                 { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"Maps"</h1></header>
                 <ul>
@@ -453,6 +457,7 @@ pub fn gen_map_list(hash_store: &HashStore, pedia: &Pedia, output: &impl Sink) -
                 }
                 </ul>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );

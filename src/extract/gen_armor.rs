@@ -38,15 +38,14 @@ pub fn gen_armor_list(
     output: &impl Sink,
 ) -> Result<()> {
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Armors - MHRice")}</title>
                 { head_common(hash_store) }
                 <style id="mh-armor-list-style">""</style>
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"Armors"</h1></header>
                 <div class="mh-filters"><ul>
@@ -98,6 +97,7 @@ pub fn gen_armor_list(
                     })
                 }</ul>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -114,6 +114,7 @@ fn gen_armor(
     series: &ArmorSeries,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     mut output: impl Write,
     mut toc_sink: TocSink<'_>,
 ) -> Result<()> {
@@ -176,13 +177,13 @@ fn gen_armor(
                             .filter(|&(&skill, _)| skill != PlEquipSkillId::None)
                             .map(|(&skill, lv)| {
                             let name = if let Some(skill_data) = pedia_ex.skills.get(&skill) {
-                                html!(<span><a href={format!("/skill/{}", skill_page(skill))}
+                                html!(<div class="il"><a href={format!("/skill/{}", skill_page(skill))}
                                     class="mh-icon-text">
                                     {gen_colored_icon(skill_data.icon_color, "/resources/skill", &[])}
                                     {gen_multi_lang(skill_data.name)}
-                                </a></span>)
+                                </a></div>)
                             } else {
-                                html!(<span>"<UNKNOWN>"</span>)
+                                html!(<div class="il">"<UNKNOWN>"</div>)
                             };
                             html!(<li>
                                 {name}
@@ -377,7 +378,7 @@ fn gen_armor(
                         <td>"Enable"</td>
                         <td>{text!("{}z", m.price)}</td>
                         {gen_category(pedia_ex, m.material_category, m.material_category_num)}
-                        {gen_materials(pedia_ex, &m.item, &m.item_num, ItemId::Null)}
+                        {gen_materials(pedia_ex, &m.item, &m.item_num, &[])}
                     </tr>))) }
                     { pedia.custom_buildup_armor_material.as_ref().and_then(
                         |m|m.param.iter().find(|m|m.rare == key.rare).map(|m|html!(<tr>
@@ -471,10 +472,10 @@ fn gen_armor(
                             product.material_category_num);
 
                         let materials = gen_materials(pedia_ex, &product.item,
-                            &product.item_num, product.item_flag);
+                            &product.item_num, &[product.item_flag]);
 
                         let output = gen_materials(pedia_ex, &product.output_item,
-                            &product.output_item_num, ItemId::None);
+                            &product.output_item_num, &[]);
 
                         html!(<tr>
                             <td>{gen_armor_label(Some(armor))}</td>
@@ -513,7 +514,7 @@ fn gen_armor(
                     let product = if let Some(Armor{overwear_product: Some(product), ..}) = &piece {
                         product
                     } else {
-                        return html!(<tr><td colspan="3">"-"</td></tr>)
+                        return html!(<tr><td colspan="5">"-"</td></tr>)
                     };
                     let armor = piece.as_ref().unwrap();
 
@@ -521,7 +522,7 @@ fn gen_armor(
                         product.material_category_num);
 
                     let materials = gen_materials(pedia_ex, &product.item,
-                        &product.item_num, product.item_flag);
+                        &product.item_num, &[product.item_flag]);
 
                     html!(<tr>
                         <td>{gen_armor_label(Some(armor))}</td>
@@ -567,14 +568,16 @@ fn gen_armor(
     }
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Armor {:03}", series.series.armor_series.0)}</title>
                 { head_common(hash_store) }
+                { title_multi_lang(series.name) }
+                { open_graph(Some(series.name), "",
+                    None, "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 { gen_menu(&sections) }
                 <main>
                 <header>
@@ -589,6 +592,7 @@ fn gen_armor(
                 { sections.into_iter().map(|s|s.content) }
 
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -601,6 +605,7 @@ pub fn gen_armors(
     hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
@@ -608,7 +613,9 @@ pub fn gen_armors(
     for series in &pedia_ex.armors {
         let (output, toc_sink) = armor_path
             .create_html_with_toc(&format!("{:03}.html", series.series.armor_series.0), toc)?;
-        gen_armor(hash_store, series, pedia, pedia_ex, output, toc_sink)?
+        gen_armor(
+            hash_store, series, pedia, pedia_ex, config, output, toc_sink,
+        )?
     }
     Ok(())
 }

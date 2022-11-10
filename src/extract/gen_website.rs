@@ -19,6 +19,10 @@ use chrono::prelude::*;
 use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text, types::*};
 
+pub struct WebsiteConfig {
+    pub origin: Option<String>, // e.g. https://mhrice.info
+}
+
 pub const LANGUAGE_MAP: [Option<(&str, &str)>; 32] = [
     Some(("Japanese", "ja")),
     Some(("English", "en")),
@@ -123,7 +127,7 @@ pub fn navbar() -> Box<nav<String>> {
                     "Skills"
                 </a>
                 <div class="navbar-item has-dropdown is-hoverable navbar-expanded">
-                <a class="navbar-link">
+                <a class="navbar-link" href="/skill.html">
                     "Skills"
                 </a>
                 <div class="navbar-dropdown">
@@ -144,7 +148,7 @@ pub fn navbar() -> Box<nav<String>> {
                     "Weapons"
                 </a>
                 <div class="navbar-item has-dropdown is-hoverable navbar-expanded">
-                <a class="navbar-link">
+                <a class="navbar-link" href="/weapon.html">
                     "Weapons"
                 </a>
                 <div class="navbar-dropdown">
@@ -169,7 +173,7 @@ pub fn navbar() -> Box<nav<String>> {
                     "Buddy"
                 </a>
                 <div class="navbar-item has-dropdown is-hoverable navbar-expanded">
-                <a class="navbar-link">
+                <a class="navbar-link" href="/airou.html">
                     "Buddy"
                 </a>
                 <div class="navbar-dropdown">
@@ -190,22 +194,23 @@ pub fn navbar() -> Box<nav<String>> {
     </div></nav>)
 }
 
-pub fn translate_msg(content: &str) -> (Box<span<String>>, bool) {
+struct Tag<'a> {
+    tag: &'a str,
+    arg: &'a str,
+    seq: Seq<'a>,
+}
+enum Node<'a> {
+    Raw(&'a str),
+    Tagged(Tag<'a>),
+}
+
+struct Seq<'a> {
+    nodes: Vec<Node<'a>>,
+}
+
+fn parse_msg(content: &str) -> (Seq, bool) {
     let mut msg = content;
     let mut has_warning = false;
-    struct Tag<'a> {
-        tag: &'a str,
-        arg: &'a str,
-        seq: Seq<'a>,
-    }
-    enum Node<'a> {
-        Raw(&'a str),
-        Tagged(Tag<'a>),
-    }
-
-    struct Seq<'a> {
-        nodes: Vec<Node<'a>>,
-    }
 
     let mut root = Seq { nodes: vec![] };
     let mut stack: Vec<Tag> = vec![];
@@ -305,6 +310,12 @@ pub fn translate_msg(content: &str) -> (Box<span<String>>, bool) {
         }
     }
 
+    (root, has_warning)
+}
+
+pub fn translate_msg(content: &str) -> (Box<span<String>>, bool) {
+    let (root, has_warning) = parse_msg(content);
+
     fn translate_rec(node: &Node<'_>) -> Box<dyn PhrasingContent<String>> {
         match node {
             Node::Raw(s) => Box::new(TextNode::<String>::new(*s)),
@@ -359,6 +370,25 @@ pub fn translate_msg(content: &str) -> (Box<span<String>>, bool) {
     (result, has_warning)
 }
 
+pub fn translate_msg_plain(content: &str) -> String {
+    let (root, _) = parse_msg(content);
+    fn translate_rec(result: &mut String, node: &Node<'_>) {
+        match node {
+            Node::Raw(s) => *result += *s,
+            Node::Tagged(t) => {
+                for inner in &t.seq.nodes {
+                    translate_rec(result, inner)
+                }
+            }
+        }
+    }
+    let mut result = String::new();
+    for node in &root.nodes {
+        translate_rec(&mut result, node)
+    }
+    result
+}
+
 pub fn gen_multi_lang(msg: &MsgEntry) -> Box<span<String>> {
     html!(<span> {
         (0..32).filter_map(|i|{
@@ -378,6 +408,24 @@ pub fn gen_multi_lang(msg: &MsgEntry) -> Box<span<String>> {
             </span>))
         })
     } </span>)
+}
+
+#[allow(clippy::vec_box)]
+pub fn title_multi_lang(msg: &MsgEntry) -> Vec<Box<meta<String>>> {
+    LANGUAGE_MAP
+        .iter()
+        .zip(&msg.content)
+        .filter_map(|(language, entry)| {
+            let &(_, language_code) = if let Some(language) = language {
+                language
+            } else {
+                return None;
+            };
+            let title = translate_msg_plain(entry);
+            let itemprop = format!("title-{language_code}");
+            Some(html!(<meta itemprop={itemprop} content={title}/>))
+        })
+        .collect()
 }
 
 pub fn gen_colored_icon(color: i32, icon: &str, addons: &[&str]) -> Box<div<String>> {
@@ -406,14 +454,13 @@ fn gen_colored_icon_inner(color_class: &str, icon: &str, addons: &[&str]) -> Box
 
 pub fn gen_search(hash_store: &HashStore, output: &impl Sink) -> Result<()> {
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Monsters - MHRice")}</title>
                 { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"Search"</h1></header>
                 <div class="control has-icons-left">
@@ -425,6 +472,7 @@ pub fn gen_search(hash_store: &HashStore, output: &impl Sink) -> Result<()> {
                 <ul id="mh-search-result">
                 </ul>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -438,14 +486,13 @@ pub fn gen_search(hash_store: &HashStore, output: &impl Sink) -> Result<()> {
 
 pub fn gen_about(hash_store: &HashStore, output: &impl Sink) -> Result<()> {
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Monsters - MHRice")}</title>
                 { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"About MHRice"</h1></header>
                 <section>
@@ -495,6 +542,7 @@ pub fn gen_about(hash_store: &HashStore, output: &impl Sink) -> Result<()> {
                 </ul>
                 </section>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -548,26 +596,27 @@ pub fn gen_website(
     hash_store: &mut HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     output: &impl Sink,
 ) -> Result<()> {
     let mut toc = Toc::new();
     gen_static(hash_store, output)?;
     gen_part_color_css(hash_store, output)?;
-    gen_quests(hash_store, pedia, pedia_ex, output, &mut toc)?;
+    gen_quests(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
     gen_quest_list(hash_store, &pedia_ex.quests, output)?;
-    gen_skills(hash_store, pedia_ex, output, &mut toc)?;
+    gen_skills(hash_store, pedia_ex, config, output, &mut toc)?;
     gen_skill_list(hash_store, &pedia_ex.skills, output)?;
-    gen_hyakuryu_skills(hash_store, pedia_ex, output, &mut toc)?;
+    gen_hyakuryu_skills(hash_store, pedia_ex, config, output, &mut toc)?;
     gen_hyakuryu_skill_list(hash_store, &pedia_ex.hyakuryu_skills, output)?;
-    gen_armors(hash_store, pedia, pedia_ex, output, &mut toc)?;
+    gen_armors(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
     gen_armor_list(hash_store, &pedia_ex.armors, output)?;
-    gen_monsters(hash_store, pedia, pedia_ex, output, &mut toc)?;
-    gen_items(hash_store, pedia, pedia_ex, output, &mut toc)?;
+    gen_monsters(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
+    gen_items(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
     gen_item_list(hash_store, pedia_ex, output)?;
-    gen_weapons(hash_store, pedia, pedia_ex, output, &mut toc)?;
-    gen_maps(hash_store, pedia, pedia_ex, output, &mut toc)?;
+    gen_weapons(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
+    gen_maps(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
     gen_map_list(hash_store, pedia, output)?;
-    gen_otomo_equips(hash_store, pedia_ex, output, &mut toc)?;
+    gen_otomo_equips(hash_store, pedia_ex, config, output, &mut toc)?;
     gen_otomo_equip_list(hash_store, pedia_ex, output)?;
     gen_about(hash_store, output)?;
     gen_search(hash_store, output)?;

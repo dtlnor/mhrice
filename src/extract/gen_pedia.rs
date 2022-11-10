@@ -947,9 +947,9 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         hyakuryu_decos: get_singleton(pak)?,
         hyakuryu_decos_product: get_singleton(pak)?,
         hyakuryu_decos_name_msg,
-        /*alchemy_pattern: get_singleton(pak)?,
+        //alchemy_pattern: get_singleton(pak)?,
         alchemy_pl_skill: get_singleton(pak)?,
-        alchemy_grade_worth: get_singleton(pak)?,
+        /*alchemy_grade_worth: get_singleton(pak)?,
         alchemy_rare_type: get_singleton(pak)?,
         alchemy_second_skill_lot: get_singleton(pak)?,
         alchemy_skill_grade_lot: get_singleton(pak)?,
@@ -1033,6 +1033,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         random_mystery_enemy: get_singleton_opt(pak)?,
         random_mystery_rank_release: get_singleton_opt(pak)?,
         progress: get_singleton(pak)?,
+        enemy_rank: get_singleton(pak)?,
+        species: get_singleton(pak)?,
     })
 }
 
@@ -1823,6 +1825,8 @@ fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> 
                 icon_color: skill.icon_color,
                 decos: vec![],
                 custom_buildup_cost: custom_buildup_costs.get(&skill.id).copied(),
+                alchemy: BTreeMap::new(),
+                alchemy_grade: None,
             },
         );
     }
@@ -1879,6 +1883,45 @@ fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> 
 
     if !deco_products.is_empty() {
         bail!("Leftover deco product")
+    }
+
+    for al_skill in &pedia.alchemy_pl_skill.param {
+        if al_skill.skill_id == PlEquipSkillId::None {
+            continue;
+        }
+        if al_skill.pick_rate == 0
+            && al_skill.skill1_rate_list.iter().all(|&x| x == 0)
+            && al_skill.skill2_rate_list.iter().all(|&x| x == 0)
+            && al_skill.miss_rate_list.iter().all(|&x| x == 0)
+        {
+            // Crapcom: dummy data?
+            continue;
+        }
+
+        let skill = result
+            .get_mut(&al_skill.skill_id)
+            .with_context(|| format!("Alchemy skill {:?} not found", al_skill.skill_id))?;
+        if skill.alchemy.insert(al_skill.patturn, al_skill).is_some() {
+            bail!(
+                "Multiple alchemy data defined for skill {:?} pattern {:?}",
+                al_skill.skill_id,
+                al_skill.patturn
+            )
+        }
+    }
+
+    for skill in result.values_mut() {
+        if skill.alchemy.is_empty() {
+            continue;
+        }
+        skill.alchemy_grade = Some(skill.alchemy.values().next().unwrap().grade);
+        if skill
+            .alchemy
+            .values()
+            .any(|a| a.grade != skill.alchemy_grade.unwrap())
+        {
+            bail!("Inconsistent skill grade {:?}", skill.alchemy)
+        }
     }
 
     Ok(result)
@@ -2957,6 +3000,26 @@ fn prepare_monsters<'a>(
         false,
     )?;
 
+    let ranks: HashMap<EmTypes, u8> = hash_map_unique(
+        pedia
+            .enemy_rank
+            .rank_info_list
+            .iter()
+            .filter(|p| p.em_type != EmTypes::Em(0)),
+        |p| (p.em_type, p.rank),
+        false,
+    )?;
+
+    let speciess: HashMap<EmTypes, &EmSpeciesData> = hash_map_unique(
+        pedia
+            .species
+            .em_species_list
+            .iter()
+            .filter(|p| p.em_type != EmTypes::Em(0)),
+        |p| (p.em_type, p),
+        false,
+    )?;
+
     let mut mystery_rewards: HashMap<EmTypes, Vec<MysteryReward>> = HashMap::new();
 
     for mystery_reward in &pedia.mystery_reward_item.param {
@@ -3037,12 +3100,33 @@ fn prepare_monsters<'a>(
             })
     }
 
+    let hn_msgs: HashMap<_, _> = pedia.hunter_note_msg.get_name_map();
+    let hn_msgs_mr: HashMap<_, _> = pedia.hunter_note_msg_mr.get_name_map();
+    let monster_list = hash_map_unique(
+        pedia.monster_list.data_list.iter(),
+        |p| (p.em_type, p),
+        false,
+    )?;
+
     let monsters = pedia.monsters.iter().chain(&pedia.small_monsters);
     for monster in monsters {
         let mut mystery_reward = mystery_rewards.remove(&monster.em_type).unwrap_or_default();
         mystery_reward.sort_by_key(|m| m.lv_lower_limit);
         let random_quest = random_quests.get(&monster.em_type).copied();
         let discovery = discoveries.get(&monster.em_type).copied();
+        let rank = ranks.get(&monster.em_type).copied();
+        let species = speciess.get(&monster.em_type).copied();
+        let family = monster_list
+            .get(&monster.em_type)
+            .and_then(|p| match p.family_type {
+                FamilyType::Species(i) => hn_msgs
+                    .get(&format!("HN_Hunternote_ML_Tab_01_Spec_M{i:02}"))
+                    .copied(),
+                FamilyType::MrSpecies(0) => hn_msgs_mr
+                    .get(&"HN_Hunternote_ML_Tab_01_Spec_M1_MR".to_owned())
+                    .copied(),
+                _ => None,
+            });
         let entry = if let Some(index) = monster.enemy_type {
             let name = names
                 .get(&format!("EnemyIndex{index:03}"))
@@ -3082,6 +3166,9 @@ fn prepare_monsters<'a>(
                 mystery_reward,
                 random_quest,
                 discovery,
+                rank,
+                species,
+                family,
             }
         } else {
             MonsterEx {
@@ -3093,6 +3180,9 @@ fn prepare_monsters<'a>(
                 mystery_reward,
                 random_quest,
                 discovery,
+                rank,
+                species,
+                family,
             }
         };
         result.insert(monster.em_type, entry);

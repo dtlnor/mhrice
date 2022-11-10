@@ -102,14 +102,13 @@ pub fn gen_quest_list(
     }
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Quests - MHRice")}</title>
                 { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1>"Quests"</h1></header>
                 {
@@ -152,6 +151,7 @@ pub fn gen_quest_list(
                 }
                 </section>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -416,6 +416,7 @@ fn gen_quest(
     quest: &Quest,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     mut output: impl Write,
     mut toc_sink: TocSink<'_>,
 ) -> Result<()> {
@@ -475,6 +476,7 @@ fn gen_quest(
         title: "Description".to_owned(),
         content: html!(
             <section id="s-description">
+            <h2 >"Description"</h2>
             <p><span>"Objective: "</span><span> {
                 quest.target.map_or(
                     html!(<span>"-"</span>),
@@ -560,9 +562,9 @@ fn gen_quest(
             .filter(|&(&item, _)| item != ItemId::None)
             .map(|(&item, num)|{
             let item = if let Some(item) = pedia_ex.items.get(&item) {
-                html!(<span>{gen_item_label(item)}</span>)
+                html!(<div class="il">{gen_item_label(item)}</div>)
             } else {
-                html!(<span>{text!("{:?}", item)}</span>)
+                html!(<div class="il">{text!("{:?}", item)}</div>)
             };
             html!(<li>
                 {text!("{}x ", num)}
@@ -880,9 +882,9 @@ fn gen_quest(
                 supply.item_id.iter().zip(&supply.num).filter(|(&item, _)| item != ItemId::Null && item != ItemId::None )
                 .map(|(item, &num)| {
                     let item = if let Some(item) = pedia_ex.items.get(item) {
-                        html!(<span>{gen_item_label(item)}</span>)
+                        html!(<div class="il">{gen_item_label(item)}</div>)
                     } else {
-                        html!(<span>{text!("{:?}", item)}</span>)
+                        html!(<div class="il">{text!("{:?}", item)}</div>)
                     };
                     html!(<li>
                         {text!("{}x ", num)}
@@ -1003,15 +1005,18 @@ fn gen_quest(
         ),
     });
 
+    let plain_title = format!("Quest {:06}", quest.param.quest_no);
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
-                <title>{text!("Quest {:06}", quest.param.quest_no)}</title>
+        <html lang="en">
+            <head itemscope=true>
+                <title>{text!("{}", plain_title)}</title>
                 { head_common(hash_store) }
+                { quest.name.iter().flat_map(|&name|title_multi_lang(name)) }
+                { open_graph(quest.name, &plain_title,
+                    quest.target, "", Some(&img), toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 { gen_menu(&sections) }
                 <main>
                 <header>
@@ -1046,6 +1051,7 @@ fn gen_quest(
                 { sections.into_iter().map(|s|s.content) }
 
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -1070,14 +1076,13 @@ pub fn gen_random_mystery_difficulty(
             return Ok(());
         };
     let doc: DOMTree<String> = html!(
-        <html>
-        <head>
+        <html lang="en">
+        <head itemscope=true>
             <title>{text!("Anomaly investigation stat table")}</title>
             { head_common(hash_store) }
         </head>
         <body>
             { navbar() }
-            { right_aside() }
             <main>
             <header><h1>{
                 let category = match category {
@@ -1146,6 +1151,7 @@ pub fn gen_random_mystery_difficulty(
             </ul>
             </section>
             </main>
+            { right_aside() }
         </body>
         </html>
     );
@@ -1157,6 +1163,7 @@ pub fn gen_quests(
     hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
@@ -1164,7 +1171,7 @@ pub fn gen_quests(
     for quest in pedia_ex.quests.values() {
         let (path, toc_sink) =
             quest_path.create_html_with_toc(&format!("{:06}.html", quest.param.quest_no), toc)?;
-        gen_quest(hash_store, quest, pedia, pedia_ex, path, toc_sink)?;
+        gen_quest(hash_store, quest, pedia, pedia_ex, config, path, toc_sink)?;
     }
 
     if let Some(table) = &pedia.random_mystery_difficulty {

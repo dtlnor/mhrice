@@ -63,10 +63,10 @@ fn gen_craft_row(
     };
     let category = gen_category(pedia_ex, data.material_category, data.material_category_num);
 
-    let materials = gen_materials(pedia_ex, &data.item, &data.item_num, data.item_flag);
+    let materials = gen_materials(pedia_ex, &data.item, &data.item_num, &[data.item_flag]);
 
     let output = if let Some((output_item, output_item_num)) = output {
-        gen_materials(pedia_ex, output_item, output_item_num, ItemId::None)
+        gen_materials(pedia_ex, output_item, output_item_num, &[])
     } else {
         html!(<td>"-"</td>)
     };
@@ -149,6 +149,7 @@ fn gen_weapon<Param>(
     weapon_tree: &WeaponTree<'_, Param>,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     mut output: impl Write,
     mut toc_sink: TocSink<'_>,
     has_element: fn(&Param) -> Option<&ElementWeaponBaseData>,
@@ -304,7 +305,9 @@ where
     sections.push(Section {
         title: "Description".to_owned(),
         content: html!(
-            <section id="s-description"><pre>
+            <section id="s-description">
+            <h2 >"Description"</h2>
+            <pre>
             {weapon.explain.as_ref().map(|e|gen_multi_lang(e))}
             </pre></section>
         ),
@@ -488,7 +491,7 @@ where
 
     sections.push(Section {
         title: "Crafting".to_owned(),
-        content: html!(<section id="s-bottle">
+        content: html!(<section id="s-crafting">
         <h2 >"Crafting"</h2>
         { weapon.update.map(|update| {
             html!(<p>{text!("Unlock at: {} {} {}",
@@ -537,7 +540,7 @@ where
                 })}
                 {weapon.overwear.as_ref().map(|data| {
                     let category = gen_category(pedia_ex, data.material_category, data.material_category_num);
-                    let materials = gen_materials(pedia_ex, &data.item, &data.item_num, data.item_flag);
+                    let materials = gen_materials(pedia_ex, &data.item, &data.item_num, &[data.item_flag]);
                     html!(<tr>
                         <td>"As layered"</td>
                         <td>{gen_progress(data.progress_flag, pedia_ex)}</td>
@@ -592,7 +595,7 @@ where
                     <td/>
                     <td>{text!("{}z", m.price)}</td>
                     {gen_category(pedia_ex, m.material_category, m.material_category_num)}
-                    {gen_materials(pedia_ex, &m.item, &m.item_num, ItemId::Null)}
+                    {gen_materials(pedia_ex, &m.item, &m.item_num, &[])}
                 </tr>))) }
                 {
                 table.categories.iter().flat_map(|(&category_id, category)| {
@@ -631,7 +634,7 @@ where
                         </td>
                         <td>{text!("{}z", piece.material.price)}</td>
                         {gen_category(pedia_ex, piece.material.material_category, piece.material.material_category_num)}
-                        {gen_materials(pedia_ex, &piece.material.item, &piece.material.item_num, ItemId::Null)}
+                        {gen_materials(pedia_ex, &piece.material.item, &piece.material.item_num, &[])}
 
                         </tr>)
                     })
@@ -654,14 +657,16 @@ where
     }
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>"Weapon - MHRice"</title>
                 { head_common(hash_store) }
+                { title_multi_lang(weapon.name) }
+                { open_graph(Some(weapon.name), "",
+                    weapon.explain, "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 { gen_menu(&sections) }
                 <main>
                 <header>
@@ -674,6 +679,7 @@ where
                 { sections.into_iter().map(|s|s.content) }
 
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -689,8 +695,21 @@ where
     html!(<ul> {
         list.iter().map(|id| {
             let weapon = weapon_tree.weapons.get(id).unwrap();
+            let mut filter_tags = vec![];
+            if weapon.children.is_empty() {
+                filter_tags.push("final");
+            }
+            if weapon.overwear.is_some() {
+                filter_tags.push("layer");
+            }
+            if weapon.change.is_some() {
+                filter_tags.push("rampage");
+            }
+            let filter = filter_tags.join(" ");
             html!(<li>
-                { gen_weapon_label(weapon) }
+                <div class="mh-main-filter-item" data-filter={filter}>{
+                    gen_weapon_label(weapon)
+                }</div>
                 { gen_tree_rec(weapon_tree, &weapon.children) }
             </li>)
         })
@@ -710,14 +729,14 @@ where
     let mut list_path = weapon_path.create_html(&format!("{}.html", tag))?;
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("{} - MHRice", name)}</title>
                 { head_common(hash_store) }
+                <style id="mh-main-list-style">""</style>
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1> {text!("{}", name)} </h1></header>
                 <div>
@@ -728,10 +747,21 @@ where
                     <span>"go to other weapon classes"</span>
                     </span></a>
                 </div>
+                <div class="mh-filters"><ul>
+                    <li id="mh-main-filter-button-all" class="is-active mh-main-filter-button">
+                        <a>"All"</a></li>
+                    <li id="mh-main-filter-button-final" class="mh-main-filter-button">
+                        <a>"Final upgrade"</a></li>
+                    <li id="mh-main-filter-button-layer" class="mh-main-filter-button">
+                        <a>"Layered"</a></li>
+                    <li id="mh-main-filter-button-rampage" class="mh-main-filter-button">
+                        <a>"Layered for rampage"</a></li>
+                </ul></div>
                 <div class="mh-weapon-tree">
                 { gen_tree_rec(weapon_tree, &weapon_tree.roots) }
                 </div>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
@@ -787,6 +817,7 @@ pub fn gen_weapons(
     hash_store: &HashStore,
     pedia: &Pedia,
     pedia_ex: &PediaEx,
+    config: &WebsiteConfig,
     output: &impl Sink,
     toc: &mut Toc,
 ) -> Result<()> {
@@ -825,6 +856,7 @@ pub fn gen_weapons(
                     &pedia_ex.$label,
                     pedia,
                     pedia_ex,
+                    config,
                     file_path,
                     toc_sink,
                     $element,
@@ -1010,20 +1042,20 @@ pub fn gen_weapons(
     );
 
     let doc: DOMTree<String> = html!(
-        <html>
-            <head>
+        <html lang="en">
+            <head itemscope=true>
                 <title>{text!("Weapons - MHRice")}</title>
                 { head_common(hash_store) }
             </head>
             <body>
                 { navbar() }
-                { right_aside() }
                 <main>
                 <header><h1> "Weapons" </h1></header>
                 <ul class="mh-item-list">
                 {entry_label}
                 </ul>
                 </main>
+                { right_aside() }
             </body>
         </html>
     );
