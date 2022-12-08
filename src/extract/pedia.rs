@@ -107,6 +107,7 @@ pub struct Pedia {
     pub overwear: PlOverwearBaseUserData,
     pub overwear_product: PlOverwearProductUserData,
     pub armor_buildup: ArmorBuildupTableUserData,
+    pub armor_pair: ArmorSeriesPairUserData,
     pub armor_head_name_msg: Msg,
     pub armor_chest_name_msg: Msg,
     pub armor_arm_name_msg: Msg,
@@ -188,6 +189,8 @@ pub struct Pedia {
     pub horn_melody: Msg,
     pub horn_melody_mr: Msg,
     pub hyakuryu_weapon_buildup: HyakuryuWeaponHyakuryuBuildupUserData,
+    pub weapon_chaos_critical: Option<WeaponChaosCriticalUserData>,
+
     pub maps: BTreeMap<i32, GameMap>,
     pub map_name: Msg,
     pub map_name_mr: Msg,
@@ -364,6 +367,7 @@ pub struct Weapon<'a, Param> {
     pub parent: Option<WeaponId>,
     pub hyakuryu_weapon_buildup: BTreeMap<i32, &'a HyakuryuWeaponHyakuryuBuildupUserDataParam>,
     pub update: Option<&'a WeaponUpdateTreeUserDataParam>,
+    pub chaos: Option<&'a WeaponChaosCriticalUserDataParam>,
 }
 
 pub struct WeaponTree<'a, Param> {
@@ -465,7 +469,7 @@ pub struct PediaEx<'a> {
     pub quests: BTreeMap<i32, Quest<'a>>,
     pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
     pub hyakuryu_skills: BTreeMap<PlHyakuryuSkillId, HyakuryuSkill<'a>>,
-    pub armors: Vec<ArmorSeries<'a>>,
+    pub armors: BTreeMap<PlArmorSeriesTypes, ArmorSeries<'a>>,
     pub armor_buildup: HashMap<i32, Vec<&'a ArmorBuildupTableUserDataParam>>,
     pub meat_names: HashMap<MeatKey, Vec<&'a MsgEntry>>,
 
