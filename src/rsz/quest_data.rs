@@ -190,7 +190,7 @@ rsz_enum! {
 // snow.QuestManager.SwapSetCondition
 rsz_enum! {
     #[rsz(u32)]
-    #[derive(Debug, Serialize, Clone, Copy)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
     pub enum SwapSetCondition {
         None = 0,
         QuestTimer = 1,
@@ -295,18 +295,18 @@ rsz_struct! {
         pub time_limit: u32,
         pub quest_life: u32,
         pub order_type: Vec<QuestOrderType>,
-        pub target_type: Vec<QuestTargetType>,
-        pub tgt_em_type: Vec<EmTypes>,
-        pub tgt_item_id: Vec<ItemId>,
-        pub tgt_num: Vec<u32>,
+        pub target_type: [QuestTargetType; 2],
+        pub tgt_em_type: [EmTypes; 2],
+        pub tgt_item_id: [ItemId; 2],
+        pub tgt_num: [u32; 2],
         pub boss_em_type: Vec<EmTypes>,
         pub init_extra_em_num: u8,
-        pub swap_em_rate: Vec<u8>,
+        pub swap_em_rate: [u8; 2],
         pub boss_set_condition: Vec<BossSetCondition>,
         pub boss_set_param: Vec<u32>,
-        pub swap_set_condition: Vec<SwapSetCondition>,
-        pub swap_set_param: Vec<u8>,
-        pub swap_exit_time: Vec<u8>,
+        pub swap_set_condition: [SwapSetCondition; 2],
+        pub swap_set_param: [u8; 2],
+        pub swap_exit_time: [u8; 2],
         pub is_swap_exit_marionette: bool,
         pub swap_stop_type: SwapStopType,
         pub swap_stop_param: u8,
@@ -466,7 +466,6 @@ rsz_enum! {
 }
 
 pub trait EnemyParam {
-    // fn sub_type(&self, i: usize) -> Option<u8>;
     fn vital_tbl(&self, i: usize) -> Option<u16>;
     fn attack_tbl(&self, i: usize) -> Option<u16>;
     fn parts_tbl(&self, i: usize) -> Option<u16>;
@@ -481,9 +480,6 @@ pub trait EnemyParam {
 macro_rules! impl_enemy_param {
     ($t:ty) => {
         impl EnemyParam for $t {
-            /*fn sub_type(&self, i: usize) -> Option<u8> {
-                unimplemented!()
-            }*/
             fn vital_tbl(&self, i: usize) -> Option<u16> {
                 self.vital_tbl.get(i).copied().map(Into::into)
             }
@@ -548,6 +544,18 @@ rsz_struct! {
 }
 
 impl_enemy_param!(NormalQuestDataForEnemyParam);
+
+impl NormalQuestDataForEnemyParam {
+    pub fn sub_type(&self, i: usize) -> Option<u8> {
+        if let Some(s) = &self.sub_type.0 {
+            s.get(i).cloned()
+        } else if let Some(s) = &self.sub_type_v11.0 {
+            s.get(i).cloned()
+        } else {
+            None
+        }
+    }
+}
 
 rsz_struct! {
     #[rsz("snow.quest.NormalQuestDataForEnemy",

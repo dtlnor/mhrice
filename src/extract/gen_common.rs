@@ -83,9 +83,9 @@ pub fn right_aside() -> Box<aside<String>> {
         (0..32).filter_map(|i| {
             let (language_name, language_code) = LANGUAGE_MAP[i]?;
             let id_string = format!("mh-lang-menu-{language_code}");
-            Some(html!{ <li><a class="mh-lang-menu" id={id_string.as_str()}> {
+            Some(html!{<li><button type="button" class="mh-lang-menu" id={id_string.as_str()}> {
                 text!("{}", language_name)
-            }</a></li>})
+            }</button></li>})
         })
     }
     </ul>
@@ -200,7 +200,7 @@ pub fn gen_progress(progress_flag: i32, pedia_ex: &PediaEx) -> Box<div<String>> 
     }
     if progress.quest_no != -1 {
         if let Some(quest) = pedia_ex.quests.get(&progress.quest_no) {
-            flags.push(html!(<div>"Quest:"{gen_quest_tag(quest, false, false, false)}</div>));
+            flags.push(html!(<div>"Quest:"{gen_quest_tag(quest, false, false, None, None)}</div>));
         } else {
             flags.push(html!(<div>{text!("Quest:{}", progress.quest_no)}</div>));
         }

@@ -347,7 +347,7 @@ fn gen_armor(
                             let mut probability_cell = Some(html!(<td rowspan={rowspan}>
                                 { if category_id != 15 {text!("{}%", category.lot)} else {text!("")} }
                             </td>));
-                            category.pieces.iter().map(move |(_, piece)| {
+                            category.pieces.values().map(move |piece| {
                                 html!(<tr>
                                     {category_cell.take()}
                                     {probability_cell.take()}
@@ -569,7 +569,7 @@ fn gen_armor(
                             <td>{gen_armor_label(Some(armor))}</td>
                             <td>{gen_progress(product.progress_flag, pedia_ex)}</td>
                             <td>{(product.enemy_flag != EmTypes::Em(0)).then(
-                                ||gen_monster_tag(pedia_ex, product.enemy_flag, false, false, false)
+                                ||gen_monster_tag(pedia_ex, product.enemy_flag, false, false, None, None)
                             )}</td>
                             <td>{text!("{}z", armor.data.value)}</td>
                             {category}
@@ -616,7 +616,7 @@ fn gen_armor(
                         <td>{gen_armor_label(Some(armor))}</td>
                         <td>{gen_progress(product.progress_flag, pedia_ex)}</td>
                         <td>{(product.enemy_flag != EmTypes::Em(0)).then(
-                            ||gen_monster_tag(pedia_ex, product.enemy_flag, false, false, false)
+                            ||gen_monster_tag(pedia_ex, product.enemy_flag, false, false, None, None)
                         )}</td>
                         {category}
                         {materials}

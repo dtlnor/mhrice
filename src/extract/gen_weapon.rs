@@ -75,7 +75,7 @@ fn gen_craft_row(
         {label}
         <td>{gen_progress(data.progress_flag, pedia_ex)}</td>
         <td>{(data.enemy_flag != EmTypes::Em(0)).then(
-            ||gen_monster_tag(pedia_ex, data.enemy_flag, false, false, false)
+            ||gen_monster_tag(pedia_ex, data.enemy_flag, false, false, None, None)
         )}</td>
         {cost}
         {category}
@@ -547,7 +547,7 @@ where
                         <td>"As layered"</td>
                         <td>{gen_progress(data.progress_flag, pedia_ex)}</td>
                         <td>{(data.enemy_flag != EmTypes::Em(0)).then(
-                            ||gen_monster_tag(pedia_ex, data.enemy_flag, false, false, false)
+                            ||gen_monster_tag(pedia_ex, data.enemy_flag, false, false, None, None)
                         )}</td>
                         <td>{text!("{}z", data.price)}</td>
                         {category}
@@ -617,7 +617,7 @@ where
                     let mut category_cell = Some(html!(<td rowspan={rowspan}>
                         { category_name }
                     </td>));
-                    category.pieces.iter().map(move |(_, piece)| {
+                    category.pieces.values().map(move |piece| {
                         html!(<tr>
                         {category_cell.take()}
                         <td>{text!("{}", piece.data.lv)}</td>
