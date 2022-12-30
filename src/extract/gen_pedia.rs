@@ -922,6 +922,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         quest_servant: get_singleton(pak)?,
         supply_data: get_singleton(pak)?,
         supply_data_mr: get_singleton(pak)?,
+        arena_quest: get_singleton(pak)?,
+        quest_unlock: get_singleton(pak)?,
         quest_hall_msg,
         quest_hall_msg_mr,
         quest_hall_msg_mr2,
@@ -1653,7 +1655,21 @@ fn prepare_quests<'a>(
         true,
     )?;
 
-    pedia
+    let arena = hash_map_unique(
+        pedia
+            .arena_quest
+            .param
+            .iter()
+            .chain(&pedia.arena_quest.param1)
+            .chain(&pedia.arena_quest.param2)
+            .chain(&pedia.arena_quest.param3)
+            .chain(&pedia.arena_quest.param_mr)
+            .chain(&pedia.arena_quest.param_mr1),
+        |p| (p.quest_no, p),
+        true,
+    )?;
+
+    let mut result = pedia
         .normal_quest_data
         .param
         .iter()
@@ -1775,10 +1791,86 @@ fn prepare_quests<'a>(
                     reward,
                     hyakuryu: hyakuryus.get(&param.quest_no).cloned(),
                     servant: servant.get(&param.quest_no).cloned(),
+                    arena: arena.get(&param.quest_no).cloned(),
+                    unlock: vec![],
+                    random_group: None,
                 },
             ))
         })
-        .collect::<Result<BTreeMap<_, _>>>()
+        .collect::<Result<BTreeMap<_, _>>>()?;
+
+    for p in &pedia.quest_unlock.relation {
+        for &release in &p.release_group_idx {
+            let release_group = pedia
+                .quest_unlock
+                .quest_group
+                .get(usize::try_from(release)?)
+                .with_context(|| format!("Release group index {} out of bound", release))?;
+            for &quest_no in &release_group.quest_no_array {
+                result
+                    .get_mut(&quest_no)
+                    .with_context(|| format!("Unknown quest {} for group unlock", quest_no))?
+                    .unlock
+                    .push(QuestUnlock::Group(p))
+            }
+        }
+    }
+
+    for p in &pedia.quest_unlock.quest_unlock_by_talk_flag {
+        result
+            .get_mut(&p.quest_no)
+            .with_context(|| format!("Unknown quest {} for talk flag unlock", p.quest_no))?
+            .unlock
+            .push(QuestUnlock::Talk(p))
+    }
+
+    for p in &pedia.quest_unlock.quest_unlock_by_quest_clear {
+        for quest in &p.unlock_quest_no_list {
+            result
+                .get_mut(&quest.unlock_quest)
+                .with_context(|| {
+                    format!(
+                        "Unknown quest {} for clear quest unlock",
+                        quest.unlock_quest
+                    )
+                })?
+                .unlock
+                .push(QuestUnlock::Clear(p))
+        }
+    }
+
+    for p in &pedia.quest_unlock.random_quest_unlock_by_quest_clear {
+        for quest in &p.random_group {
+            let random_group = &mut result
+                .get_mut(&quest.random_quest)
+                .with_context(|| {
+                    format!(
+                        "Unknown quest {} for random clear quest unlock",
+                        quest.random_quest
+                    )
+                })?
+                .random_group;
+            if random_group.is_some() {
+                bail!(
+                    "Multiple random group specified for quest {}. Previous {:?}. Current {:?}",
+                    quest.random_quest,
+                    random_group,
+                    p
+                )
+            }
+            *random_group = Some(p)
+        }
+    }
+
+    for p in &pedia.quest_unlock.quest_unlock_by_hunt_enemy {
+        result
+            .get_mut(&p.unlock_quest_no)
+            .with_context(|| format!("Unknown quest {} for enemy unlock", p.unlock_quest_no))?
+            .unlock
+            .push(QuestUnlock::Enemy(p))
+    }
+
+    Ok(result)
 }
 
 fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> {

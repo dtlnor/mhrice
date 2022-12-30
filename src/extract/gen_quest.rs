@@ -1,7 +1,11 @@
+use super::gen_armor::*;
 use super::gen_common::*;
+use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_map::*;
 use super::gen_monster::*;
+use super::gen_skill::*;
+use super::gen_weapon::*;
 use super::gen_website::*;
 use super::hash_store::*;
 use super::pedia::*;
@@ -590,6 +594,104 @@ fn gen_quest(
         ),
     });
 
+    if !quest.unlock.is_empty() {
+        sections.push(Section {
+            title: "Unlock".to_owned(),
+            content: html!(<section id="s-unlock"><h2>"Unlock"</h2>
+            {
+                quest.unlock.iter().map(|unlock|
+                match unlock {
+                    QuestUnlock::Group(relation) => {
+                        html!(<div class="mh-unlock-section">
+                            {(!relation.request_group_idx.is_empty()).then(||html!(<div>
+                                {text!("Unlock quest group by completing {} of following quests", relation.request_count)}
+                                <ul>
+                                {relation.request_group_idx.iter().flat_map(|&group_idx| {
+                                    if let Some(group) = pedia.quest_unlock.quest_group.get(group_idx as usize) {
+                                        group.quest_no_array.iter().map(|q|
+                                            if let Some(quest) = pedia_ex.quests.get(q) {
+                                                html!(<li>{gen_quest_tag(quest, false, false, None, None)}</li>)
+                                            } else {
+                                                html!(<li>{text!("Unknown quest {}", q)}</li>)
+                                            }
+                                        ).collect::<Vec<_>>()
+                                    } else {
+                                        vec![html!(<li>{text!("Unknown group {}", group_idx)}</li>)]
+                                    }
+                                })}
+                                </ul>
+                            </div>))}
+                            {text!("Unlock quest group by NPC dialog {:?}", relation.request_talk_flag)}
+                        </div>)
+                    }
+                    QuestUnlock::Talk(talk) => {
+                        html!(<div>{text!("Unlock by NPC dialog {}. Auto-clear: {}", talk.talk_flag, talk.is_clear)}</div>)
+                    },
+                    QuestUnlock::Clear(clear) => {
+                        let quest = clear.unlock_quest_no_list.iter().find(|q|q.unlock_quest == quest.param.quest_no).unwrap();
+                        html!(<div>{text!("Unlock by clearing following quests. Auto-clear: {}", quest.is_clear)}
+                        <ul>{ clear.clear_quest_no_list.iter().map(|q| {
+                            if let Some(quest) = pedia_ex.quests.get(q) {
+                                html!(<li>{gen_quest_tag(quest, false, false, None, None)}</li>)
+                            } else {
+                                html!(<li>{text!("Unknown quest {}", q)}</li>)
+                            }
+                        }) }</ul>
+                        </div>)
+                    },
+                    QuestUnlock::Enemy(enemy) => {
+                        // TODO: faster monster lookup
+                        let em = pedia.monsters.iter().find(|m|m.enemy_type == Some(enemy.hunt_em_type));
+                        let em_tag = if let Some(em) = em {
+                            gen_monster_tag(pedia_ex, em.em_type, false, false, None, None)
+                        } else {
+                            html!(<div>{text!("Unknown monster {}", enemy.hunt_em_type)}</div>)
+                        };
+                        let rank = match enemy.enemy_rank {
+                            EnemyRank::None => "any rank",
+                            EnemyRank::Village => "village",
+                            EnemyRank::Low => "low rank",
+                            EnemyRank::High => "high rank",
+                            EnemyRank::Master => "master rank",
+                        };
+                        html!(<div>
+                            {text!("Unlock after hunting in {}", rank)}
+                            {em_tag}
+                            {text!("Auto-clear: {}", enemy.is_clear)}
+                        </div>)
+                    }
+                })
+            }
+            </section>),
+        });
+    }
+
+    if let Some(random) = quest.random_group {
+        sections.push(Section {
+            title: "Random rotation".to_owned(),
+            content: html!(<section id="s-random"><h2>"Random rotation"</h2>
+            {
+                let self_quest = random.random_group.iter().find(|q|q.random_quest == quest.param.quest_no).unwrap();
+                html!(<div>{text!("This is a random quest in the following group. Auto-clear: {}", self_quest.is_clear)}
+                <ul>{ random.random_group.iter().map(|q| {
+                    let rate = text!("{}% ", q.rate);
+                    let trigger = q.is_triger.then(||html!(<span class="tag is-primary">"Key"</span>));
+                    if let Some(quest) = pedia_ex.quests.get(&q.random_quest) {
+                        html!(<li class="mh-quest-inline">{rate}{gen_quest_tag(quest, false, false, None, None)}
+                        {trigger}
+                        </li>)
+                    } else {
+                        html!(<li>{rate}{text!("Unknown quest {}", q.random_quest)}
+                        {trigger}
+                        </li>)
+                    }
+                }) }</ul>
+                </div>)
+            }
+            </section>)
+        });
+    }
+
     if let Some(servants) = quest.servant {
         sections.push(Section {
             title: "Fixed followers".to_owned(),
@@ -953,6 +1055,194 @@ fn gen_quest(
             {content}
             </section>),
         })
+    }
+
+    if let Some(arena) = quest.arena {
+        sections.push(Section {
+            title: "Arena".to_owned(),
+            content: html!(
+                <section id="s-arena">
+                <h2 >"Arena"</h2>
+                <div class="mh-kvlist">
+                <p class="mh-kv"><span>"Rank time (S/A/B)"</span>
+                    <span>{ text!("{}s / {}s / {}s", arena.rank_time_s, arena.rank_time_a, arena.rank_time_b) }</span></p>
+                <p class="mh-kv"><span>"Point modifier for rank (S/A)"</span>
+                    <span>{ text!("x{} / x{}", arena.rank_point_rate_s, arena.rank_point_rate_a) }</span></p>
+                <p class="mh-kv"><span>"Enemy-to-enemy attack"</span>
+                    <span>{ text!("{}", arena.em2em_adjust_data) }</span></p>
+                //<p class="mh-kv"><span>"dodge_blocking_damage_rate (s/m)"</span>
+                //    <span>{ text!("{}/{}", arena.dodge_blocking_damage_rate_s, arena.dodge_blocking_damage_rate_m) }</span></p>
+                <p class="mh-kv"><span>"Wall slam damage"</span> // TODO: ?
+                    <span>{ text!("{:?}", arena.shoot_wall_hit_damage_rate_list) }</span></p>
+                // TODO: what's these?
+                //<p class="mh-kv"><span>"fapabtedmhr"</span>
+                //    <span>{ text!("{}", arena.final_attack_point_add_by_target_enemy_damage_max_hp_rate) }</span></p>
+                //<p class="mh-kv"><span>"start_wait_loop_sub_time_max_hp_rate"</span>
+                //    <span>{ text!("{}", arena.start_wait_loop_sub_time_max_hp_rate) }</span></p>
+                <p class="mh-kv"><span>"Base gimmick damage"</span>
+                    <span>{ text!("{}", arena.base_gimmik_damage) }</span></p>
+                </div>
+
+                { arena.arena_pl.iter().enumerate().map(|(i, pl)|{
+                    let weapon_action = |actions: &[i32]| {
+                        html!(<span>{text!("{:?}", actions)}</span>) // TODO
+                    };
+
+                    let deco_label_li = |id: DecorationsId| {
+                        // TODO: fast lookup table
+                        for (&skill_id, skill) in &pedia_ex.skills {
+                            for deco in &skill.decos {
+                                if deco.data.id == id {
+                                    return html!(<li>
+                                        <a href={format!("/skill/{}", skill_page(skill_id))}>
+                                        { gen_deco_label(deco) }
+                                        </a>
+                                    </li>)
+                                }
+                            }
+                        }
+                        html!(<li>{text!("Unknown deco {:?}", id)}</li>)
+                    };
+
+                    let armor_label_td = |id: PlArmorId| {
+                        // TODO: fast lookup table
+                        for series in pedia_ex.armors.values() {
+                            for piece in series.pieces.iter().flatten() {
+                                if piece.data.pl_armor_id == id {
+                                    return html!(<td><a href={format!("/armor/{:03}.html", series.series.armor_series.0)}>
+                                        {gen_armor_label(Some(piece))}
+                                    </a></td>)
+                                }
+                            }
+                        }
+                        html!(<td>{text!("Unknown armor {:?}", id)}</td>)
+                    };
+
+                    let items_list = |items: &[ItemWork]| {
+                        html!(<ul class="mh-item-list-arena-set"> {
+                            items.iter().filter(|item_work| item_work.item != ItemId::Null && item_work.item != ItemId::None )
+                            .map(|item_work| {
+                                let item = if let Some(item) = pedia_ex.items.get(&item_work.item) {
+                                    html!(<div class="il">{gen_item_label(item)}</div>)
+                                } else {
+                                    html!(<div class="il">{text!("{:?}", item_work.item)}</div>)
+                                };
+                                html!(<li>
+                                    {text!("{}x ", item_work.num)}
+                                    {item}
+                                </li>)
+                            })
+                        } </ul>)
+                    };
+
+                    html!(<section class="mh-arena-set">
+                    <h3>{text!("Set {}", i + 1)}</h3>
+                    <div class="mh-table"><table>
+                    <thead><tr>
+                        <th/>
+                        <th>"Equipment"</th>
+                        <th>"Detail"</th>
+                        <th>"Decortion"</th>
+                    </tr></thead>
+                    <tbody>
+
+                    <tr>
+                        <td>"Weapon"</td>
+                        <td>{ gen_weapon_label_from_id(pedia_ex, pl.wep_id) }</td>
+                        <td><ul class="mh-armor-skill-list">{ pl.hyakuryu_skill.iter()
+                            .filter(|&&s|s != PlHyakuryuSkillId::None).map(|s|
+                            if let Some(skill) = pedia_ex.hyakuryu_skills.get(s) {
+                                html!(<li>{gen_hyakuryu_skill_label(skill)}</li>)
+                            } else {
+                                html!(<li>{text!("Unknown skill {:?}", s)}</li>)
+                            }
+                        ) }
+                        { (pl.wep_action2.is_empty()).then(|| {
+                            html!(<li>"Switch skills: "{weapon_action(&pl.wep_action)}</li>)
+                        }) }
+                        { (!pl.wep_action2.is_empty()).then(|| {
+                            [html!(<li>"Switch skills A: "{weapon_action(&pl.wep_action)}</li>),
+                            html!(<li>"Switch skills B: "{weapon_action(&pl.wep_action2)}</li>)]
+                        }).into_iter().flatten() }
+                        </ul></td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_wep.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Helm"</td>
+                        { armor_label_td(pl.armor_helm) }
+                        <td>{ text!("Lv{}", pl.armor_lv_helm) }</td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_helm.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Chest"</td>
+                        { armor_label_td(pl.armor_body) }
+                        <td>{ text!("Lv{}", pl.armor_lv_body) }</td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_body.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Arm"</td>
+                        { armor_label_td(pl.armor_arm) }
+                        <td>{ text!("Lv{}", pl.armor_lv_arm) }</td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_arm.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Waist"</td>
+                        { armor_label_td(pl.armor_waist) }
+                        <td>{ text!("Lv{}", pl.armor_lv_waist) }</td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_waist.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Leg"</td>
+                        { armor_label_td(pl.armor_leg) }
+                        <td>{ text!("Lv{}", pl.armor_lv_leg) }</td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_leg.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Petalace"</td>
+                        <td>{text!("{}", pl.lv_buff_cage_id)}</td> // TODO
+                        <td/>
+                        <td/>
+                    </tr>
+                    <tr>
+                        <td>"Talisman"</td>
+                        <td/>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.talisman_skill.iter().filter(|s|s.id != PlEquipSkillId::None).map(|s|
+                            gen_skill_lv_label(pedia_ex, s.id, s.lv)
+                        ) }</ul></td>
+                        <td><ul class="mh-armor-skill-list">{
+                            pl.deco_talisman.iter().filter(|&&d|d != DecorationsId::None).map(|&d|deco_label_li(d))
+                        }</ul></td>
+                    </tr>
+                    <tr>
+                        <td>"Pouch"</td>
+                        <td colspan=3>{items_list(&pl.pouch)}</td>
+                    </tr>
+                    <tr>
+                        <td>"Gunner pouch"</td>
+                        <td colspan=3>{items_list(&pl.ganner_pouch)}</td>
+                    </tr>
+                    </tbody>
+                    </table></div>
+
+                    </section>)
+                }) }
+
+                </section>
+            ),
+        });
     }
 
     sections.push(Section {

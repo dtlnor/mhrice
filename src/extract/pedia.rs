@@ -92,6 +92,8 @@ pub struct Pedia {
     pub quest_servant: QuestServantDataList,
     pub supply_data: SupplyDataLrHr,
     pub supply_data_mr: SupplyDataMr,
+    pub arena_quest: ArenaQuestData,
+    pub quest_unlock: QuestUnlockRequestListUserData,
     pub quest_hall_msg: Msg,
     pub quest_hall_msg_mr: Msg,
     pub quest_hall_msg_mr2: Msg,
@@ -263,6 +265,14 @@ pub struct QuestReward<'a> {
     pub cloth_ticket: Option<&'a RewardIdLotTableUserDataParam>,
 }
 
+#[derive(Debug)]
+pub enum QuestUnlock<'a> {
+    Group(&'a QuestUnlockRelation),
+    Talk(&'a QuestUnlockByTalkFlag),
+    Clear(&'a QuestUnlockByQuestClear),
+    Enemy(&'a QuestUnlockByHuntEnemy),
+}
+
 pub struct Quest<'a> {
     pub param: &'a NormalQuestDataParam,
     pub enemy_param: Option<&'a NormalQuestDataForEnemyParam>,
@@ -275,6 +285,9 @@ pub struct Quest<'a> {
     pub reward: Option<QuestReward<'a>>,
     pub hyakuryu: Option<&'a HyakuryuQuestData>,
     pub servant: Option<&'a QuestServantData>,
+    pub arena: Option<&'a ArenaQuestDataParam>,
+    pub unlock: Vec<QuestUnlock<'a>>,
+    pub random_group: Option<&'a RandomQuestUnlockByQuestClear>,
 }
 
 pub struct Deco<'a> {

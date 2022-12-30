@@ -156,10 +156,6 @@ aside {
     }
 }
 
-#cookie-consent {
-    padding-left: 2rem;
-}
-
 #left-aside {
     left: 0;
     box-shadow: 2px 0px 3px lightgray;
@@ -243,6 +239,11 @@ main {
         padding-bottom: 1rem;
         padding-left: 1rem;
         border-bottom: solid 2px $border;
+
+        >section.mh-arena-set {
+            padding-top: 1rem;
+            padding-left: 2rem;
+        }
     }
 
 }
@@ -431,6 +432,15 @@ ul.mh-item-list {
         margin-top: 0.5rem;
         margin-right: 1rem;
     }
+}
+
+/** Item pouch for arena set **/
+ul.mh-item-list-arena-set {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    margin-left: 0;
+    margin-top: 0;
 }
 
 /** Table horizontal scroll **/
@@ -1005,4 +1015,13 @@ ul.mh-custom-lot {
 
 .il {
     display: inline-block;
+}
+
+/** Quest unlock **/
+.mh-quest-inline>div {
+    display: inline-block;
+}
+
+.mh-unlock-section {
+    margin-bottom: 1rem;
 }
