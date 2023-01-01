@@ -1303,7 +1303,7 @@ fn gen_quest(
                     html!(<div class="mh-reward-box">
                     <div class="mh-table"><table>
                         <thead><tr>
-                            <th>"Addtional rewards"<br/>{
+                            <th>"Quest bonus rewards"<br/>{
                                 translate_rule(additional_quest_reward.lot_rule)
                             }</th>
                             <th>"Probability"</th>
@@ -1336,6 +1336,32 @@ fn gen_quest(
                 } else {
                     html!(<div></div>)
                 }}
+
+                {
+                    quest.time_attack_reward.iter().map(|ta| {
+                        let rank = match ta.rank.rank {
+                            RewardRank::RankSS => "SS",
+                            RewardRank::RankS => "S",
+                            RewardRank::RankA => "A",
+                            RewardRank::RankB => "B",
+                        };
+                        html!(<div class="mh-reward-box">
+                        <div class="mh-table"><table>
+                        <thead><tr>
+                            <th>{text!("Reward for rank {} ({}s)", rank, ta.rank.clear_time)}
+                                <br/>{translate_rule(ta.reward.lot_rule)}</th>
+                            <th>"Probability"</th>
+                        </tr></thead>
+                        <tbody> {
+                            gen_reward_table(pedia_ex,
+                                &ta.reward.item_id_list,
+                                &ta.reward.num_list,
+                                &ta.reward.probability_list)
+                        } </tbody>
+                        </table></div>
+                        </div>)
+                    })
+                }
 
                 </div>
                 </div>)
