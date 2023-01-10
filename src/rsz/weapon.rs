@@ -42,6 +42,29 @@ macro_rules! impl_tobase {
     };
 }
 
+pub trait MaybeToBase<Base> {
+    fn maybe_to_base(&self) -> Option<&Base>;
+}
+
+impl<T, Base> MaybeToBase<Base> for T
+where
+    T: ToBase<Base>,
+{
+    fn maybe_to_base(&self) -> Option<&Base> {
+        Some(self.to_base())
+    }
+}
+
+macro_rules! impl_maybetobase_none {
+    ($name:ty, $base:ty) => {
+        impl MaybeToBase<$base> for $name {
+            fn maybe_to_base(&self) -> Option<&$base> {
+                None
+            }
+        }
+    };
+}
+
 macro_rules! params {
     ($outer:ty, $inner:ty) => {
         impl Deref for $outer {
@@ -56,7 +79,7 @@ macro_rules! params {
 // snow.equip.PlWeaponElementTypes
 rsz_enum! {
     #[rsz(i32)]
-    #[derive(Debug, Serialize)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
     pub enum PlWeaponElementTypes {
         None = 0,
         Fire = 1,
@@ -227,6 +250,7 @@ rsz_struct! {
 }
 
 melee!(GreatSwordBaseUserDataParam);
+impl_maybetobase_none!(GreatSwordBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.GreatSwordBaseUserData",
@@ -253,6 +277,7 @@ rsz_struct! {
 }
 
 melee!(ShortSwordBaseUserDataParam);
+impl_maybetobase_none!(ShortSwordBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.ShortSwordBaseUserData",
@@ -279,6 +304,7 @@ rsz_struct! {
 }
 
 melee!(HammerBaseUserDataParam);
+impl_maybetobase_none!(HammerBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.HammerBaseUserData",
@@ -305,6 +331,7 @@ rsz_struct! {
 }
 
 melee!(LanceBaseUserDataParam);
+impl_maybetobase_none!(LanceBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.LanceBaseUserData",
@@ -331,6 +358,7 @@ rsz_struct! {
 }
 
 melee!(LongSwordBaseUserDataParam);
+impl_maybetobase_none!(LongSwordBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.LongSwordBaseUserData",
@@ -359,6 +387,7 @@ rsz_struct! {
 }
 
 melee!(SlashAxeBaseUserDataParam);
+impl_maybetobase_none!(SlashAxeBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.SlashAxeBaseUserData",
@@ -387,6 +416,7 @@ rsz_struct! {
 }
 
 melee!(GunLanceBaseUserDataParam);
+impl_maybetobase_none!(GunLanceBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.GunLanceBaseUserData",
@@ -442,6 +472,7 @@ rsz_struct! {
 }
 
 melee!(HornBaseUserDataParam);
+impl_maybetobase_none!(HornBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.HornBaseUserData",
@@ -469,6 +500,7 @@ rsz_struct! {
 }
 
 melee!(InsectGlaiveBaseUserDataParam);
+impl_maybetobase_none!(InsectGlaiveBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.InsectGlaiveBaseUserData",
@@ -496,6 +528,7 @@ rsz_struct! {
 }
 
 melee!(ChargeAxeBaseUserDataParam);
+impl_maybetobase_none!(ChargeAxeBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.ChargeAxeBaseUserData",
@@ -524,6 +557,24 @@ rsz_enum! {
     }
 }
 
+impl std::fmt::Display for Fluctuation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                Fluctuation::None => "None",
+                Fluctuation::LeftLittle => "L Mild",
+                Fluctuation::LeftMuch => "L Severe",
+                Fluctuation::RightLittle => "R Mild",
+                Fluctuation::RightMuch => "R Severe",
+                Fluctuation::RightAndLeftLittle => "LR Mild",
+                Fluctuation::RightAndLeftMuch => "LR Severe",
+            }
+        )
+    }
+}
+
 // snow.data.GameItemEnum.KakusanType
 rsz_enum! {
     #[rsz(i32)]
@@ -531,6 +582,44 @@ rsz_enum! {
     pub enum KakusanType {
         CloseAttack = 0,
         HorizontalAttack = 1,
+    }
+}
+
+impl std::fmt::Display for KakusanType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                KakusanType::CloseAttack => "Arc Shot",
+                KakusanType::HorizontalAttack => "Level Shot",
+            }
+        )
+    }
+}
+
+// snow.data.BowWeaponBaseData.CurveTypes
+rsz_enum! {
+    #[rsz(i32)]
+    #[derive(Debug, Serialize)]
+    pub enum CurveTypes {
+        Curve00 = 0,
+        Curve01 = 1,
+        Curve02 = 2,
+    }
+}
+
+impl std::fmt::Display for CurveTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                CurveTypes::Curve00 => "Recovery",
+                CurveTypes::Curve01 => "Affinity",
+                CurveTypes::Curve02 => "Brace",
+            }
+        )
     }
 }
 
@@ -646,6 +735,8 @@ impl_tobase!(
     WeaponBaseData
 );
 impl_base!(LightBowgunBaseUserDataParam, BulletWeaponBaseUserDataParam);
+impl_maybetobase_none!(LightBowgunBaseUserDataParam, ElementWeaponBaseData);
+impl_maybetobase_none!(LightBowgunBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.LightBowgunBaseUserData",
@@ -678,6 +769,8 @@ impl_tobase!(
     WeaponBaseData
 );
 impl_base!(HeavyBowgunBaseUserDataParam, BulletWeaponBaseUserDataParam);
+impl_maybetobase_none!(HeavyBowgunBaseUserDataParam, ElementWeaponBaseData);
+impl_maybetobase_none!(HeavyBowgunBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.HeavyBowgunBaseUserData",
@@ -704,7 +797,7 @@ rsz_struct! {
         pub bow_bottle_equip_flag_list: [bool; 7],
         pub bow_default_charge_lv_limit: BowChageStartLvTypes,
         pub bow_charge_type_list: [BowChargeTypes; 4],
-        pub bow_curve_type: i32, // snow.data.BowWeaponBaseData.CurveTypes
+        pub bow_curve_type: CurveTypes,
     }
 }
 impl_tobase!(
@@ -714,6 +807,7 @@ impl_tobase!(
     WeaponBaseData
 );
 impl_base!(BowBaseUserDataParam, ElementWeaponBaseData);
+impl_maybetobase_none!(BowBaseUserDataParam, DualBladesBaseUserDataParam);
 
 rsz_struct! {
     #[rsz("snow.equip.BowBaseUserData",

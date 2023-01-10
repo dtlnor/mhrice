@@ -31,7 +31,7 @@ pub fn gen_armor_label(piece: Option<&Armor>) -> Box<div<String>> {
             piece.data.pl_armor_id.icon_index()
         );
         html!(<div class="mh-icon-text">
-            { gen_rared_icon(piece.data.rare, &icon) }
+            { gen_rared_icon(piece.data.rare, &icon, []) }
             <span>{ gen_multi_lang(piece.name) }</span>
             { gen_sex_tag(piece.data.sexual_equipable) }
         </div>)
@@ -44,6 +44,23 @@ pub fn gen_armor_label(piece: Option<&Armor>) -> Box<div<String>> {
     html!(<div>
         { piece_name }
     </div>)
+}
+
+// snow.data.CustomBuildupResultData.get_RegElement
+fn custom_buildup_element(id: u16) -> Option<Box<div<String>>> {
+    let (tag, name) = match id {
+        89..=98 => ("fire", "Fire"),
+        99..=108 => ("water", "Water"),
+        109..=118 => ("thunder", "Thunder"),
+        119..=128 => ("ice", "Ice"),
+        129..=138 => ("dragon", "Dragon"),
+        _ => return None,
+    };
+    let url = format!("/resources/{tag}.png");
+    Some(html!(<div>
+        <img src={url.as_str()} alt={name} class="mh-small-icon"/>
+        {text!("{}", name)}
+    </div>))
 }
 
 pub fn gen_armor_list(
@@ -171,11 +188,11 @@ fn gen_armor(
                 <th>"Name"</th>
                 <th>"Buying cost"</th>
                 <th>"Defense"</th>
-                <th>"Fire"</th>
-                <th>"Water"</th>
-                <th>"Ice"</th>
-                <th>"Thunder"</th>
-                <th>"Dragon"</th>
+                <th><img alt="Fire" src="/resources/fire.png" class="mh-small-icon"/>"Fire"</th>
+                <th><img alt="Water" src="/resources/water.png" class="mh-small-icon"/>"Water"</th>
+                <th><img alt="Ice" src="/resources/ice.png" class="mh-small-icon"/>"Ice"</th>
+                <th><img alt="Thunder" src="/resources/thunder.png" class="mh-small-icon"/>"Thunder"</th>
+                <th><img alt="Dragon" src="/resources/dragon.png" class="mh-small-icon"/>"Dragon"</th>
                 <th>"Slots"</th>
                 <th>"Skills"</th>
             </tr></thead>
@@ -322,7 +339,7 @@ fn gen_armor(
                             let category_name = match category_id {
                                 13 => text!("Defense"),
                                 14 => text!("Element resistance"),
-                                15 => text!("?"),
+                                15 => text!("Element res down for Skills+"),
                                 19 => text!("Slot"),
                                 20 => text!("Skill"),
                                 c => text!("{}", c)
@@ -349,6 +366,7 @@ fn gen_armor(
                                             {text!("Pt{} skill", piece.data.cost)}
                                         </span></a>)}
                                     ) }
+                                    { custom_buildup_element(piece.data.id) }
                                     <ul class="mh-custom-lot"> {
                                         piece.data.value_table.iter().zip(&piece.data.lot_table)
                                         .filter(|(_, lot)| **lot != 0)
@@ -656,7 +674,7 @@ fn gen_armor(
                 <main>
                 <header class="mh-armor-header">
                     <div class="mh-title-icon"> {
-                        gen_rared_icon(rarity, "/resources/equip/006")
+                        gen_rared_icon(rarity, "/resources/equip/006", [])
                     } </div>
                     <h1>
                     { gen_multi_lang(series.name) }

@@ -248,6 +248,13 @@ main {
 
 }
 
+/** small icons before text **/
+.mh-small-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    vertical-align: middle;
+}
+
 /** common interactive helper **/
 .mh-hidden {
     display: none;
@@ -356,6 +363,63 @@ main {
             left: 1rem;
             top: 0rem;
             background-image: url('/resources/slot_rampage.png');
+        }
+
+        >.mh-addon-el {
+            width: 1rem;
+            height: 1rem;
+            left: 0rem;
+            top: 1rem;
+        }
+
+        >.mh-addon-el1 {
+            width: 1rem;
+            height: 1rem;
+            left: 0rem;
+            top: 1rem;
+        }
+
+        >.mh-addon-el2 {
+            width: 1rem;
+            height: 1rem;
+            left: 1rem;
+            top: 1rem;
+        }
+
+        >.mh-addon-fire {
+            background-image: url('/resources/fire.png');
+        }
+
+        >.mh-addon-water {
+            background-image: url('/resources/water.png');
+        }
+
+        >.mh-addon-thunder {
+            background-image: url('/resources/thunder.png');
+        }
+
+        >.mh-addon-ice {
+            background-image: url('/resources/ice.png');
+        }
+
+        >.mh-addon-dragon {
+            background-image: url('/resources/dragon.png');
+        }
+
+        >.mh-addon-poison {
+            background-image: url('/resources/poison.png');
+        }
+
+        >.mh-addon-sleep {
+            background-image: url('/resources/sleep.png');
+        }
+
+        >.mh-addon-para {
+            background-image: url('/resources/para.png');
+        }
+
+        >.mh-addon-blast {
+            background-image: url('/resources/blast.png');
         }
     }
 }
@@ -697,12 +761,6 @@ ul.mh-list-monster {
 }
 
 /** Quest list **/
-section.mh-quest-list {
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    padding-left: 1rem;
-}
-
 ul.mh-quest-list {
     list-style: none;
     display: grid;
@@ -871,6 +929,10 @@ ul.mh-damages {
     margin-left: 0;
     margin-top: 0;
     list-style: none;
+
+    >li {
+        white-space: nowrap;
+    }
 }
 
 /** Weapon list **/
@@ -1024,4 +1086,12 @@ ul.mh-custom-lot {
 
 .mh-unlock-section {
     margin-bottom: 1rem;
+}
+
+/** Buddy gear table **/
+
+ul.mh-buddy-gear-stat {
+    margin-left: 0;
+    margin-top: 0;
+    list-style: none;
 }

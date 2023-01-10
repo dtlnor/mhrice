@@ -213,7 +213,7 @@ fn gen_condition_paralyze(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Paralyze"</td>
+            <td><img src="/resources/para.png" alt="Paralyze" class="mh-small-icon"/>"Paralyze"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Preset={}", data.preset_type)} </td>
         </tr>
@@ -227,7 +227,7 @@ fn gen_condition_sleep(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Sleep"</td>
+            <td><img src="/resources/sleep.png" alt="Sleep" class="mh-small-icon"/>"Sleep"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Preset = {}", data.preset_type)} </td>
         </tr>
@@ -241,7 +241,7 @@ fn gen_condition_stun(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Stun"</td>
+            <td><img src="/resources/stun.png" alt="Stun" class="mh-small-icon"/>"Stun"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Preset = {}", data.preset_type)} </td>
         </tr>
@@ -255,7 +255,7 @@ fn gen_condition_stamina(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Exhaust"</td>
+            <td><img src="/resources/exhaust.png" alt="Exhaust" class="mh-small-icon"/>"Exhaust"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Stamina reduction = {}, Preset={}", data.sub_stamina, data.preset_type)} </td>
         </tr>
@@ -326,7 +326,7 @@ fn gen_condition_poison(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Poison"</td>
+            <td><img src="/resources/poison.png" alt="Poison" class="mh-small-icon"/>"Poison"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Preset = {}", data.preset_type)} </td>
         </tr>
@@ -340,7 +340,7 @@ fn gen_condition_blast(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Blast"</td>
+            <td><img src="/resources/blast.png" alt="Blast" class="mh-small-icon"/>"Blast"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Blast damage = {}, Preset = {}", data.blast_damage, data.preset_type)} </td>
         </tr>
@@ -371,7 +371,7 @@ fn gen_condition_water(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Water"</td>
+            <td><img src="/resources/water.png" alt="Water" class="mh-small-icon"/>"Water"</td>
             { gen_condition_base(&data.base) }
             <td>
             {text!("Melee hzv adjust: hard = {}, soft = {}, judge = {}",
@@ -399,7 +399,7 @@ fn gen_condition_fire(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Fire"</td>
+            <td><img src="/resources/fire.png" alt="Fire" class="mh-small-icon"/>"Fire"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Hit-damage rate = {}, Preset = {}", data.hit_damage_rate, data.preset_type)} </td>
         </tr>
@@ -413,7 +413,7 @@ fn gen_condition_ice(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Ice"</td>
+            <td><img src="/resources/ice.png" alt="Ice" class="mh-small-icon"/>"Ice"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Motion speed rate = {}, Preset = {}", data.motion_speed_rate, data.preset_type)} </td>
         </tr>
@@ -427,7 +427,7 @@ fn gen_condition_thunder(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Thunder"</td>
+            <td><img src="/resources/thunder.png" alt="Thunder" class="mh-small-icon"/>"Thunder"</td>
             { gen_condition_base(&data.base) }
             <td>
             {text!("Stun hzv adjust: rate = {}, min = {}, max = {}, default = {}",
@@ -543,7 +543,7 @@ fn gen_condition_dung(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Dung"</td>
+            <td><img src="/resources/dung.png" alt="Dung" class="mh-small-icon"/>"Dung"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Preset = {}", data.preset_type)} </td>
         </tr>
@@ -557,7 +557,7 @@ fn gen_condition_steel_fang(
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Steel fang"</td>
+            <td><img src="/resources/steelfang.png" alt="Steel fang" class="mh-small-icon"/>"Steel fang"</td>
             { gen_condition_base(&data.base) }
             <td> {text!("Active limit = {}, Preset = {}, Unique target param = {}",
                 data.active_limit_count, data.preset_type, data.is_unique_target_param)}
@@ -594,7 +594,7 @@ fn gen_grouped_reward_table<'a>(
                     let item = if let Some(item) = pedia_ex.items.get(&item) {
                         html!(<div class="il">{gen_item_label(item)}</div>)
                     } else {
-                        html!(<div class="il">{text!("{:?}", item)}</div>)
+                        html!(<div class="il">{text!("Unknown {:?}", item)}</div>)
                     };
 
                     let reward_type: Vec<_> = drop_dictionary
@@ -738,14 +738,14 @@ pub fn gen_lot(
                                 let item = if let Some(item) = pedia_ex.items.get(&item) {
                                     html!(<div class="il">{gen_item_label(item)}</div>)
                                 } else {
-                                    html!(<div class="il">{text!("{:?}", item)}</div>)
+                                    html!(<div class="il">{text!("Unknown {:?}", item)}</div>)
                                 };
 
                                 let part_name = if let Some(name) =
                                     pedia_ex.parts_dictionary.get(&(em_type, part)) {
                                     gen_multi_lang(name)
                                 } else {
-                                    html!(<span>{text!("{:?}", part)}</span>)
+                                    html!(<span>{text!("Unknown {:?}", part)}</span>)
                                 };
 
                                 let parts_list = html!(<div class="mh-part-rule"> {
@@ -1319,12 +1319,12 @@ pub fn gen_monster(
                     <th>"Slash"</th>
                     <th>"Impact"</th>
                     <th>"Shot"</th>
-                    <th>"Fire"</th>
-                    <th>"Water"</th>
-                    <th>"Ice"</th>
-                    <th>"Thunder"</th>
-                    <th>"Dragon"</th>
-                    <th>"Dizzy"</th>
+                    <th><img src="/resources/fire.png" alt="Fire" class="mh-small-icon"/>"Fire"</th>
+                    <th><img src="/resources/water.png" alt="Water" class="mh-small-icon"/>"Water"</th>
+                    <th><img src="/resources/ice.png" alt="Ice" class="mh-small-icon"/>"Ice"</th>
+                    <th><img src="/resources/thunder.png" alt="Thunder" class="mh-small-icon"/>"Thunder"</th>
+                    <th><img src="/resources/dragon.png" alt="Dragon" class="mh-small-icon"/>"Dragon"</th>
+                    <th><img src="/resources/stun.png" alt="Stun" class="mh-small-icon"/>"Dizzy"</th>
                 </tr>
                 </thead>
                 {
@@ -1770,21 +1770,68 @@ pub fn gen_monster(
                         damages.push(html!(<li>{text!("Raw {}", atk.data.base_damage)}</li>))
                     }
                     if atk.data.base_attack_element_value != 0 || atk.data.base_attack_element != AttackElement::None {
-                        damages.push(html!(<li>{text!("{:?} {}",
-                            atk.data.base_attack_element, atk.data.base_attack_element_value)}</li>))
+                        let image = match atk.data.base_attack_element {
+                            AttackElement::None => None,
+                            AttackElement::Fire => Some(("fire", "Fire")),
+                            AttackElement::Thunder => Some(("thunder", "Thunder")),
+                            AttackElement::Water => Some(("water", "Water")),
+                            AttackElement::Ice => Some(("ice", "Ice")),
+                            AttackElement::Dragon => Some(("dragon", "Dragon")),
+                            AttackElement::Heal => Some(("heal", "Heal")),
+                        };
+                        let image = image.map(|(file, alt)| {
+                            let path = format!("/resources/{file}.png");
+                            html!(<img src={path.as_str()} class="mh-small-icon" alt={alt}/>)
+                        });
+                        damages.push(html!(<li>{image}
+                            {text!("{}", atk.data.base_attack_element_value)}</li>))
                     }
 
                     let mut statuss = vec![];
 
                     if atk.data.base_piyo_value != 0 {
-                        statuss.push(html!(<li>{text!("Stun {}", atk.data.base_piyo_value)}</li>))
+                        statuss.push(html!(<li>
+                            <img src="/resources/stun.png" class="mh-small-icon" alt="Stunt"/>
+                            {text!("{}", atk.data.base_piyo_value)}</li>))
                     }
 
                     let mut add_debuff = |t: DebuffType, v: u8, s: MeqF32| {
                         if t != DebuffType::None || v != 0 || s.0 != 0.0 {
+                            let (image, text): (&[(&str, &str)], &str) = match t {
+                                DebuffType::None => (&[], ""),
+                                DebuffType::Fire => (&[("fire", "Fire")], ""),
+                                DebuffType::Thunder =>(&[("thunder", "Thunder")], ""),
+                                DebuffType::Water => (&[("water", "Water")], ""),
+                                DebuffType::Ice => (&[("ice", "Ice")], ""),
+                                DebuffType::Dragon => (&[("dragon", "Dragon")], ""),
+                                DebuffType::Sleep => (&[("sleep", "Sleep")], ""),
+                                DebuffType::Paralyze => (&[("para", "Paralyze")], ""),
+                                DebuffType::Poison => (&[("poison", "Poison")], ""),
+                                DebuffType::NoxiousPoison => (&[("noxious", "Venom")], ""),
+                                DebuffType::Bomb => (&[("blast", "Blast")], ""),
+                                DebuffType::BubbleS => (&[("bubble", "Bubble")], ""),
+                                DebuffType::BubbleRedS => (&[("bubble", "Bubble"), ("attackup", "Attack up")], ""),
+                                DebuffType::RedS => (&[("attackup", "Attack up")], ""),
+                                DebuffType::BubbleL => (&[("bubblel", "Bubble L")], ""),
+                                DebuffType::DefenceDown => (&[("defencedown", "Defense down")], ""),
+                                DebuffType::ResistanceDown =>(&[("resdown", "Resistance down")], ""),
+                                DebuffType::Stink => (&[("dung", "Stink")], ""),
+                                DebuffType::Capture => (&[("capture", "Capture")], ""),
+                                DebuffType::OniBomb => (&[("oni", "Hellfire")], ""),
+                                DebuffType::Kijin => (&[], "Kijin"), // TODO
+                                DebuffType::Kouka => (&[], "Kouka"), // TODO
+                                DebuffType::Bleeding => (&[("bleed", "Bleed")], ""),
+                                DebuffType::ParalyzeShort => (&[("para", "Paralyze")], "(Short)"),
+                                DebuffType::Virus => (&[("frenzy", "Frenzy")], ""),
+                            };
+
                             statuss.push(html!(<li>
-                                { text!("{:?}", t) }
-                                { (v != 0).then(||text!(" {}", v)) }
+                                { image.iter().map(|&(file, alt)| {
+                                    let path = format!("/resources/{file}.png");
+                                    html!(<img src={path.as_str()} class="mh-small-icon" alt={alt}/>)
+                                }) }
+                                { text!("{}", text) }
+                                { (v != 0).then(||text!("{}", v)) }
                                 { (s.0 != 0.0).then(||text!(" {}sec", s)) }
                             </li>))
                         }
@@ -1795,7 +1842,9 @@ pub fn gen_monster(
                     add_debuff(atk.data.base_debuff_type3, atk.data.base_debuff_value3, atk.data.base_debuff_sec3);
 
                     if atk.data.is_mystery_debuff {
-                        statuss.push(html!(<li>{text!("Bloodblight {}sec", atk.data.mystery_debuff_sec)}</li>))
+                        statuss.push(html!(<li>
+                            <img src="/resources/blood.png" class="mh-small-icon" alt="BloodBlight"/>
+                            {text!("{}sec", atk.data.mystery_debuff_sec)}</li>))
                     }
 
                     let mut flags = vec![];

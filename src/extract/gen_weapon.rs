@@ -12,25 +12,62 @@ use std::collections::HashSet;
 use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
-pub fn gen_weapon_icon(weapon: &WeaponBaseData, white: bool) -> Box<div<String>> {
+pub fn gen_weapon_icon(
+    weapon: &WeaponBaseData,
+    white: bool,
+    element: PlWeaponElementTypes,
+    element2: PlWeaponElementTypes,
+) -> Box<div<String>> {
     let icon = format!("/resources/equip/{:03}", weapon.id.icon_index());
     let rare = if white {
         RareTypes(1)
     } else {
         weapon.rare_type
     };
-    gen_rared_icon(rare, &icon)
+
+    let element_to_class = |element| match element {
+        PlWeaponElementTypes::None => None,
+        PlWeaponElementTypes::Fire => Some("mh-addon-fire"),
+        PlWeaponElementTypes::Water => Some("mh-addon-water"),
+        PlWeaponElementTypes::Thunder => Some("mh-addon-thunder"),
+        PlWeaponElementTypes::Ice => Some("mh-addon-ice"),
+        PlWeaponElementTypes::Dragon => Some("mh-addon-dragon"),
+        PlWeaponElementTypes::Poison => Some("mh-addon-poison"),
+        PlWeaponElementTypes::Sleep => Some("mh-addon-sleep"),
+        PlWeaponElementTypes::Paralyze => Some("mh-addon-para"),
+        PlWeaponElementTypes::Bomb => Some("mh-addon-blast"),
+    };
+
+    let e1 = element_to_class(element);
+    let e2 = element_to_class(element2);
+    let addons = match (e1, e2) {
+        (Some(e1), Some(e2)) => vec![format!("{e1} mh-addon-el1"), format!("{e2} mh-addon-el2")],
+        (Some(e), None) | (None, Some(e)) => vec![format!("{e} mh-addon-el")],
+        (None, None) => vec![],
+    };
+
+    gen_rared_icon(rare, &icon, addons.iter().map(|s| s.as_str()))
 }
 
 pub fn gen_weapon_label<Param>(weapon: &Weapon<Param>) -> Box<a<String>>
 where
-    Param: ToBase<MainWeaponBaseData>,
+    Param: ToBase<MainWeaponBaseData>
+        + MaybeToBase<ElementWeaponBaseData>
+        + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     let main = weapon.param.to_base();
+    let element_weapon: Option<&ElementWeaponBaseData> = weapon.param.maybe_to_base();
+    let icon_element = element_weapon
+        .map(|e| e.main_element_type)
+        .unwrap_or(PlWeaponElementTypes::None);
+    let db: Option<&DualBladesBaseUserDataParam> = weapon.param.maybe_to_base();
+    let icon_element2 = db
+        .map(|e| e.sub_element_type)
+        .unwrap_or(PlWeaponElementTypes::None);
     let link = format!("/weapon/{}.html", main.id.to_tag());
     html!(
         <a href={link} class="mh-icon-text">
-            {gen_weapon_icon(main, false)}
+            {gen_weapon_icon(main, false, icon_element, icon_element2)}
             <span>{gen_multi_lang(weapon.name)}</span>
         </a>
     )
@@ -111,52 +148,59 @@ fn gen_craft_row(
     </tr>)
 }
 
+// snow.data.GameItemEnum.convertEnum
+fn bullet_to_item(bullet: BulletType) -> ItemId {
+    match bullet {
+        BulletType::Normal1 => ItemId::Normal(0x001d),
+        BulletType::Normal2 => ItemId::Normal(0x001e),
+        BulletType::Normal3 => ItemId::Normal(0x001f),
+        BulletType::Kantsu1 => ItemId::Normal(0x0020),
+        BulletType::Kantsu2 => ItemId::Normal(0x0021),
+        BulletType::Kantsu3 => ItemId::Normal(0x0022),
+        BulletType::SanW1 => ItemId::Normal(0x0023),
+        BulletType::SanW2 => ItemId::Normal(0x0024),
+        BulletType::SanW3 => ItemId::Normal(0x0025),
+        BulletType::SanO1 => ItemId::Normal(0x008a),
+        BulletType::SanO2 => ItemId::Normal(0x008b),
+        BulletType::SanO3 => ItemId::Normal(0x008c),
+        BulletType::Tekko1 => ItemId::Normal(0x0026),
+        BulletType::Tekko2 => ItemId::Normal(0x0027),
+        BulletType::Tekko3 => ItemId::Normal(0x0098),
+        BulletType::Kakusan1 => ItemId::Normal(0x0028),
+        BulletType::Kakusan2 => ItemId::Normal(0x0029),
+        BulletType::Kakusan3 => ItemId::Normal(0x0099),
+        BulletType::Poison1 => ItemId::Normal(0x002a),
+        BulletType::Poison2 => ItemId::Normal(0x002b),
+        BulletType::Paralyze1 => ItemId::Normal(0x002c),
+        BulletType::Paralyze2 => ItemId::Normal(0x002d),
+        BulletType::Sleep1 => ItemId::Normal(0x002e),
+        BulletType::Sleep2 => ItemId::Normal(0x002f),
+        BulletType::Genki1 => ItemId::Normal(0x0030),
+        BulletType::Genki2 => ItemId::Normal(0x0031),
+        BulletType::Heal1 => ItemId::Normal(0x0032),
+        BulletType::Heal2 => ItemId::Normal(0x009a),
+        BulletType::Kijin => ItemId::Normal(0x009b),
+        BulletType::Kouka => ItemId::Normal(0x009c),
+        BulletType::Fire => ItemId::Normal(0x0033),
+        BulletType::FireKantsu => ItemId::Normal(0x009d),
+        BulletType::Water => ItemId::Normal(0x0034),
+        BulletType::WaterKantsu => ItemId::Normal(0x009e),
+        BulletType::Ice => ItemId::Normal(0x0036),
+        BulletType::IceKantsu => ItemId::Normal(0x009f),
+        BulletType::Thunder => ItemId::Normal(0x0035),
+        BulletType::ThunderKantsu => ItemId::Normal(0x00a0),
+        BulletType::Dragon => ItemId::Normal(0x00a1),
+        BulletType::DragonKantsu => ItemId::Normal(0x00a2),
+        BulletType::Zanretsu => ItemId::Normal(0x0037),
+        BulletType::Ryugeki => ItemId::Normal(0x0038),
+        BulletType::Capture => ItemId::Normal(0x0039),
+        _ => ItemId::None,
+    }
+}
+
 fn display_bullet_type(bullet: BulletType) -> &'static str {
     match bullet {
         BulletType::None => "<None>",
-        BulletType::Normal1 => "Normal Ammo 1",
-        BulletType::Normal2 => "Normal Ammo 2",
-        BulletType::Normal3 => "Normal Ammo 3",
-        BulletType::Kantsu1 => "Pierce Ammo 1",
-        BulletType::Kantsu2 => "Pierce Ammo 2",
-        BulletType::Kantsu3 => "Pierce Ammo 3",
-        BulletType::SanW1 => "Spread Ammo 1",
-        BulletType::SanW2 => "Spread Ammo 2",
-        BulletType::SanW3 => "Spread Ammo 3",
-        BulletType::SanO1 => "Shrapnel Ammo 1",
-        BulletType::SanO2 => "Shrapnel Ammo 2",
-        BulletType::SanO3 => "Shrapnel Ammo 3",
-        BulletType::Tekko1 => "Sticky Ammo 1",
-        BulletType::Tekko2 => "Sticky Ammo 2",
-        BulletType::Tekko3 => "Sticky Ammo 3",
-        BulletType::Kakusan1 => "Cluster Bomb 1",
-        BulletType::Kakusan2 => "Cluster Bomb 2",
-        BulletType::Kakusan3 => "Cluster Bomb 3",
-        BulletType::Poison1 => "Poison Ammo 1",
-        BulletType::Poison2 => "Poison Ammo 2",
-        BulletType::Paralyze1 => "Paralysis Ammo 1",
-        BulletType::Paralyze2 => "Paralysis Ammo 2",
-        BulletType::Sleep1 => "Sleep Ammo 1",
-        BulletType::Sleep2 => "Sleep Ammo 2",
-        BulletType::Genki1 => "Exhaust Ammo 1",
-        BulletType::Genki2 => "Exhaust Ammo 2",
-        BulletType::Heal1 => "Recover Ammo 1",
-        BulletType::Heal2 => "Recover Ammo 2",
-        BulletType::Kijin => "Demon Ammo",
-        BulletType::Kouka => "Amor Ammo",
-        BulletType::Fire => "Flaming Ammo",
-        BulletType::FireKantsu => "Piercing Fire Ammo",
-        BulletType::Water => "Water Ammo",
-        BulletType::WaterKantsu => "Piercing Water Ammo",
-        BulletType::Ice => "Freeze Ammo",
-        BulletType::IceKantsu => "Piercing Ice Ammo",
-        BulletType::Thunder => "Thunder Ammo",
-        BulletType::ThunderKantsu => "Piercing Thunder Ammo",
-        BulletType::Dragon => "Dragon Ammo",
-        BulletType::DragonKantsu => "Piercing Drago Ammo",
-        BulletType::Zanretsu => "Slicing Ammo",
-        BulletType::Ryugeki => "Wyvern Ammo",
-        BulletType::Capture => "Tranq Ammo",
         BulletType::Setti => "<Setti>",
         BulletType::Gatling => "<Gatling>",
         BulletType::Snipe => "<Snipe>",
@@ -165,6 +209,7 @@ fn display_bullet_type(bullet: BulletType) -> &'static str {
         BulletType::WireBullet => "<WireBullet>",
         BulletType::FullAuto => "<FullAuto>",
         BulletType::Max => "<Max>",
+        _ => "?",
     }
 }
 
@@ -189,7 +234,9 @@ fn gen_weapon<Param>(
     special: Option<fn(&Param) -> Vec<Box<p<String>>>>,
 ) -> Result<()>
 where
-    Param: ToBase<MainWeaponBaseData>,
+    Param: ToBase<MainWeaponBaseData>
+        + MaybeToBase<ElementWeaponBaseData>
+        + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     toc_sink.add(weapon.name);
 
@@ -205,14 +252,14 @@ where
 
     let bowgun_param = bullet.into_iter().flat_map(|bullet| {
         [
-            html!(<p class="mh-kv"><span>"Fluctuation"</span>
-            <span>{ text!("{:?}", bullet.fluctuation) }</span></p>),
+            html!(<p class="mh-kv"><span>"Deviation"</span>
+            <span>{ text!("{}", bullet.fluctuation) }</span></p>),
             html!(<p class="mh-kv"><span>"Reload"</span>
             <span>{ text!("{}", bullet.reload) }</span></p>),
             html!(<p class="mh-kv"><span>"Recoil"</span>
             <span>{ text!("{}", bullet.recoil) }</span></p>),
-            html!(<p class="mh-kv"><span>"Kakusan type"</span>
-            <span>{ text!("{:?}", bullet.kakusan_type) }</span></p>),
+            html!(<p class="mh-kv"><span>"Cluster bomb type"</span>
+            <span>{ text!("{}", bullet.kakusan_type) }</span></p>),
         ]
     });
 
@@ -220,15 +267,15 @@ where
         let charge_type: Vec<String> = bow
             .bow_charge_type_list
             .iter()
-            .map(|c| format!("{:?}", c))
+            .map(|c| format!("{}", c))
             .collect();
         [
             html!(<p class="mh-kv"><span>"Default charge lv"</span>
             <span>{ text!("{}", bow.bow_default_charge_lv_limit.0) }</span></p>),
-            html!(<p class="mh-kv"><span>"Charge type"</span>
-            <span>{ text!("{}", charge_type.join("-")) }</span></p>),
-            html!(<p class="mh-kv"><span>"Curve type"</span>
-            <span>{ text!("{:?}", bow.bow_curve_type) }</span></p>),
+            html!(<p class="mh-kv"><span>"Charge shot"</span>
+            <span>{ text!("{}", charge_type.join(", ")) }</span></p>),
+            html!(<p class="mh-kv"><span>"Arc shot"</span>
+            <span>{ text!("{}", bow.bow_curve_type) }</span></p>),
         ]
     });
 
@@ -340,6 +387,26 @@ where
         ),
     });
 
+    let gen_element = |element_type: PlWeaponElementTypes, element_val: i32| {
+        let (img, text) = match element_type {
+            PlWeaponElementTypes::None => return html!(<span>"None"</span>),
+            PlWeaponElementTypes::Fire => ("fire", "Fire"),
+            PlWeaponElementTypes::Water => ("water", "Water"),
+            PlWeaponElementTypes::Thunder => ("thunder", "Thunder"),
+            PlWeaponElementTypes::Ice => ("ice", "Ice"),
+            PlWeaponElementTypes::Dragon => ("dragon", "Dragon"),
+            PlWeaponElementTypes::Poison => ("poison", "Poison"),
+            PlWeaponElementTypes::Sleep => ("sleep", "Sleep"),
+            PlWeaponElementTypes::Paralyze => ("para", "Paralyze"),
+            PlWeaponElementTypes::Bomb => ("blast", "Blast"),
+        };
+        let img = format!("/resources/{img}.png");
+        html!(<span>
+            <img alt={text} src={img.as_str()} class="mh-small-icon"/>
+            {text!("{} {}", text, element_val)}
+        </span>)
+    };
+
     sections.push(Section {
         title: "Stat".to_owned(),
         content: html!(<section id="s-stat">
@@ -361,18 +428,11 @@ where
         {first_element.map(|first_element| html!(
             <p class="mh-kv"><span>"Element"</span>
             <span>
-                <span>{text!("{:?} {}",
-                    first_element.main_element_type,
-                    first_element.main_element_val
-                )}</span>
-                {
-                    second_element.map(|second_element| html!(
-                        <span>{text!(" {:?} {}",
-                            second_element.sub_element_type,
-                            second_element.sub_element_val
-                        )}</span>
-                    ))
-                }
+                { gen_element(first_element.main_element_type, first_element.main_element_val) }
+                { second_element.and_then(|second_element|
+                    (second_element.sub_element_type != PlWeaponElementTypes::None).then(||
+                    gen_element(second_element.sub_element_type, second_element.sub_element_val))
+                ) }
             </span></p>
         ))}
 
@@ -479,16 +539,20 @@ where
                             shoot_types.push("Rapid shot")
                         }
                         let shoot_types = shoot_types.join(", ");
+                        let bullet_item = pedia_ex.items.get(&bullet_to_item(bullet_type));
                         html!(<tr class={class}>
-                            <td>{ text!("{}", display_bullet_type(bullet_type)) }</td>
+                            <td>
+                                { bullet_item.map(gen_item_label) }
+                                { (bullet_item.is_none()).then(|| text!("{}", display_bullet_type(bullet_type))) }
+                            </td>
                             <td>{ text!("{}", num) }</td>
                             <td>{ text!("{}", shoot_types) }</td>
                         </tr>)
                     })
             }
-            { lbg.map(|lbg| {
+            /*{ lbg.map(|lbg| {
                 html!(<tr><td>{ text!("{}", display_bullet_type(lbg.unique_bullet)) }</td></tr>)
-            }) }
+            }) }*/
             </tbody>
             </table></div>
             </section>),
@@ -686,6 +750,15 @@ where
         }
     }
 
+    let element_weapon: Option<&ElementWeaponBaseData> = weapon.param.maybe_to_base();
+    let icon_element = element_weapon
+        .map(|e| e.main_element_type)
+        .unwrap_or(PlWeaponElementTypes::None);
+    let db: Option<&DualBladesBaseUserDataParam> = weapon.param.maybe_to_base();
+    let icon_element2 = db
+        .map(|e| e.sub_element_type)
+        .unwrap_or(PlWeaponElementTypes::None);
+
     let doc: DOMTree<String> = html!(
         <html lang="en">
             <head itemscope=true>
@@ -701,7 +774,7 @@ where
                 <main>
                 <header>
                     <div class="mh-title-icon">
-                        {gen_weapon_icon(main, false)}
+                        {gen_weapon_icon(main, false, icon_element, icon_element2)}
                     </div>
                     <h1> {gen_multi_lang(weapon.name)} </h1>
                 </header>
@@ -720,7 +793,9 @@ where
 
 fn gen_tree_rec<Param>(weapon_tree: &WeaponTree<Param>, list: &[WeaponId]) -> Box<ul<String>>
 where
-    Param: ToBase<MainWeaponBaseData>,
+    Param: ToBase<MainWeaponBaseData>
+        + MaybeToBase<ElementWeaponBaseData>
+        + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     html!(<ul> {
         list.iter().map(|id| {
@@ -754,7 +829,9 @@ fn gen_tree<Param>(
     name: &str,
 ) -> Result<()>
 where
-    Param: ToBase<MainWeaponBaseData>,
+    Param: ToBase<MainWeaponBaseData>
+        + MaybeToBase<ElementWeaponBaseData>
+        + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     let mut list_path = weapon_path.create_html(&format!("{}.html", tag))?;
 
@@ -804,8 +881,8 @@ where
 #[allow(clippy::vec_box)]
 fn slash_axe(param: &SlashAxeBaseUserDataParam) -> Vec<Box<p<String>>> {
     vec![html!(<p class="mh-kv">
-    <span>"Bottle"</span>
-    <span>{text!("{:?} {}", param.slash_axe_bottle_type,
+    <span>"Phial"</span>
+    <span>{text!("{} {}", param.slash_axe_bottle_type,
             param.slash_axe_bottle_element_val)}</span>
     </p>)]
 }
@@ -813,8 +890,8 @@ fn slash_axe(param: &SlashAxeBaseUserDataParam) -> Vec<Box<p<String>>> {
 #[allow(clippy::vec_box)]
 fn gun_lance(param: &GunLanceBaseUserDataParam) -> Vec<Box<p<String>>> {
     vec![html!(<p class="mh-kv">
-    <span>"Type"</span>
-    <span>{text!("{:?} {}", param.gun_lance_fire_type,
+    <span>"Shelling"</span>
+    <span>{text!("{} Lv{}", param.gun_lance_fire_type,
             param.gun_lance_fire_lv.0)}</span>
     </p>)]
 }
@@ -830,16 +907,16 @@ fn insect_glaive(param: &InsectGlaiveBaseUserDataParam) -> Vec<Box<p<String>>> {
 #[allow(clippy::vec_box)]
 fn charge_axe(param: &ChargeAxeBaseUserDataParam) -> Vec<Box<p<String>>> {
     vec![html!(<p class="mh-kv">
-    <span>"Bottle"</span>
-    <span>{text!("{:?}", param.charge_axe_bottle_type)}</span>
+    <span>"Phial"</span>
+    <span>{text!("{}", param.charge_axe_bottle_type)}</span>
     </p>)]
 }
 
 #[allow(clippy::vec_box)]
 fn heavy_bowgun(param: &HeavyBowgunBaseUserDataParam) -> Vec<Box<p<String>>> {
     vec![html!(<p class="mh-kv">
-    <span>"Unique bullet"</span>
-    <span>{text!("{:?}", param.heavy_bowgun_unique_bullet_type)}</span>
+    <span>"Special ammo"</span>
+    <span>{text!("{}", param.heavy_bowgun_unique_bullet_type)}</span>
     </p>)]
 }
 
@@ -871,7 +948,8 @@ pub fn gen_weapons(
                 <a href={entry_link.as_str()} class="mh-icon-text">
                     {
                         pedia_ex.$label.weapons.values().next().map(
-                            |first|gen_weapon_icon(&first.param, true))
+                            |first|gen_weapon_icon(&first.param, true,
+                                PlWeaponElementTypes::None, PlWeaponElementTypes::None))
                     }
                     <span>{text!("{}", $name)}</span>
                 </a>
