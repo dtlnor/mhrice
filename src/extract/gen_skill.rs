@@ -202,6 +202,10 @@ pub fn gen_skill(
     });
 
     if !skill.decos.is_empty() {
+        for deco in &skill.decos {
+            toc_sink.add(deco.name);
+        }
+
         sections.push(Section {
             title: "Decoration".to_owned(),
             content: html!(
@@ -226,7 +230,7 @@ pub fn gen_skill(
                                 <td>{(deco.product.enemy_flag != EmTypes::Em(0)).then(
                                     ||gen_monster_tag(pedia_ex, deco.product.enemy_flag, false, false, None, None)
                                 )}</td>
-                                <td>{text!("{}z", deco.data.base_price)}</td>
+                                <td>{text!("{}z", deco.data.base_price * 2)}</td>
                                 { gen_materials(pedia_ex, &deco.product.item_id_list,
                                     &deco.product.item_num_list, &[deco.product.item_flag]) }
                             </tr>
@@ -279,9 +283,9 @@ pub fn gen_skill(
                 <div class="mh-table"><table>
                 <thead><tr>
                     <th>"Melding type"</th>
-                    <th>"Pick rate"</th>
                     <th>"First skill level"</th>
                     <th>"Second skill level"</th>
+                    <th>"Target skill Pick rate"</th>
                     <th>"Skill level if missed target"</th>
                 </tr></thead>
                 <tbody>{
@@ -298,9 +302,9 @@ pub fn gen_skill(
                         };
                         html!(<tr>
                             <td>{text!("{}", pattern)}</td>
-                            <td>{text!("{}%", data.pick_rate)}</td>
                             <td>{display_rate(&data.skill1_rate_list)}</td>
                             <td>{display_rate(&data.skill2_rate_list)}</td>
+                            <td>{text!("{}%", data.pick_rate)}</td>
                             <td>{display_rate(&data.miss_rate_list)}</td>
                         </tr>)
                     })
