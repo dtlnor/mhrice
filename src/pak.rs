@@ -179,11 +179,6 @@ impl<F: Read + Seek> PakReader<F> {
                         break;
                     }
                 }
-
-                if let Some(index) = self.find_file_internal(path_nsw_l) {
-                    result.push(I18nPakFileIndex { language, index });
-                    continue;
-                }
             }
             if !result.is_empty() {
                 return Ok(result);
