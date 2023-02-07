@@ -40,10 +40,11 @@ pub fn open_graph(
     vec![
         html!(<meta property="og:type" content="website" />),
         html!(<meta property="og:title" content={title} />),
-        html!(<meta property="og:description" content={description} />),
+        html!(<meta property="og:description" content={description.as_str()} />),
         html!(<meta property="og:image" content={image} />),
         html!(<meta property="og:url" content={url} />),
         html!(<meta property="og:site_name" content="MHRice" />),
+        html!(<meta name="description" content={description.as_str()} />),
     ]
 }
 
@@ -156,7 +157,7 @@ pub fn gen_slot(decorations_num_list: &[u32], is_rampage_slot: bool) -> Box<span
             html!(
                 <span class="mh-slot-outer">
                     <img alt={alt.as_str()}
-                        src={format!("/resources/slot_{}.png", s).as_str()} class={class} />
+                        src={format!("/resources/slot_{s}.png").as_str()} class={class} />
                     { is_rampage_slot.then(||html!(<img alt="Rampage slot" class="mh-slot-rampage"
                         src="/resources/slot_rampage.png" />)) }
                 </span>

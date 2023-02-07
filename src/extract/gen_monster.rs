@@ -102,7 +102,7 @@ pub fn gen_sub_type_tag(_em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<s
 
         (EmTypes::Em(136 | 392), Some(1)) => Some("Sleeping".to_owned()),
 
-        (_, Some(x)) => Some(format!("type{}", x)),
+        (_, Some(x)) => Some(format!("type{x}")),
     };
     text.map(|t| html!(<span class="tag">{text!("{}", t)}</span>))
 }
@@ -161,11 +161,11 @@ fn gen_extractive_type(extractive_type: ExtractiveType) -> Result<Box<span<Strin
 }
 
 fn safe_float(v: f32) -> String {
-    let normal = format!("{}", v);
+    let normal = format!("{v}");
     if normal.len() < 5 {
         normal
     } else {
-        format!("{:e}", v)
+        format!("{v:e}")
     }
 }
 
@@ -591,12 +591,6 @@ fn gen_grouped_reward_table<'a>(
                 .filter(|&((&item, _), _)| item != ItemId::None)
                 .enumerate()
                 .map(move |(i, ((&item, &num), &probability))| {
-                    let item = if let Some(item) = pedia_ex.items.get(&item) {
-                        html!(<div class="il">{gen_item_label(item)}</div>)
-                    } else {
-                        html!(<div class="il">{text!("Unknown {:?}", item)}</div>)
-                    };
-
                     let reward_type: Vec<_> = drop_dictionary
                         .get(&reward_type)
                         .unwrap_or(&vec![])
@@ -608,7 +602,8 @@ fn gen_grouped_reward_table<'a>(
 
                     html!(<tr>
                         {group}
-                        <td>{text!("{}x ", num)}{item}</td>
+                        <td>{text!("{}x ", num)}
+                        <div class="il">{gen_item_label_from_id(item, pedia_ex)}</div></td>
                         <td>{text!("{}%", probability)}</td>
                     </tr>)
                 })
@@ -735,12 +730,6 @@ pub fn gen_lot(
                             .filter(|&((&item, _), _)|item != ItemId::None)
                             .enumerate()
                             .map(move |(i, ((&item, &num), &probability))|{
-                                let item = if let Some(item) = pedia_ex.items.get(&item) {
-                                    html!(<div class="il">{gen_item_label(item)}</div>)
-                                } else {
-                                    html!(<div class="il">{text!("Unknown {:?}", item)}</div>)
-                                };
-
                                 let part_name = if let Some(name) =
                                     pedia_ex.parts_dictionary.get(&(em_type, part)) {
                                     gen_multi_lang(name)
@@ -784,7 +773,8 @@ pub fn gen_lot(
 
                                 html!(<tr>
                                     {group}
-                                    <td>{text!("{}x ", num)}{item}</td>
+                                    <td>{text!("{}x ", num)}
+                                    <div class="il">{gen_item_label_from_id(item, pedia_ex)}</div></td>
                                     <td>{text!("{}%", probability)}</td>
                                 </tr>)
                             })
@@ -866,7 +856,7 @@ pub fn gen_multipart<'a>(
                         .enumerate().filter(|&(_, &p)| p)
                         .map(|(part, _)| part);
                     html!(<span>
-                        {parts().map(|part|{let part_color = format!("mh-part-group mh-part-{}", part);
+                        {parts().map(|part|{let part_color = format!("mh-part-group mh-part-{part}");
                             html!(<span class=part_color.as_str()/>)})}
                         {parts().map(|part|html!(<span>{text!("[{}]", part)}</span>))}
                     </span>)
@@ -1337,7 +1327,7 @@ pub fn gen_monster(
                             "".to_owned()
                         };
 
-                        let part_color = format!("mh-part mh-part-{}", part);
+                        let part_color = format!("mh-part mh-part-{part}");
 
                         let span = meats.meat_group_info.len();
                         let mut part_common: Option<Vec<Box<td<String>>>> = Some(vec![
@@ -1392,7 +1382,7 @@ pub fn gen_monster(
 
                                     phase_text.to_string()
                                 } else {
-                                    format!("{}", phase)
+                                    format!("{phase}")
                                 };
 
                                 tds.extend(vec![
@@ -1460,7 +1450,7 @@ pub fn gen_monster(
                         "".to_owned()
                     };
 
-                    let part_color = format!("mh-part-group mh-part-{}", index);
+                    let part_color = format!("mh-part-group mh-part-{index}");
 
                     let class_str = if part.extractive_type == ExtractiveType::None {
                         "mh-invalid-part mh-color-diagram-switch"
@@ -2034,8 +2024,9 @@ pub fn gen_monsters(
     let doc: DOMTree<String> = html!(
         <html lang="en">
             <head itemscope=true>
-                <title>{text!("Monsters - MHRice")}</title>
+                <title>{text!("Monsters - MHRice - Monster Hunter Rise Database")}</title>
                 { head_common(hash_store) }
+                <meta name="description" content="List of monsters. Monster Hunter Rise Database" />
             </head>
             <body>
                 { navbar() }

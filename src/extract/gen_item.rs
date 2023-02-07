@@ -23,8 +23,8 @@ pub fn item_page(item: ItemId) -> String {
     match item {
         ItemId::Null => "null.html".to_string(),
         ItemId::None => "none.html".to_string(),
-        ItemId::Normal(id) => format!("normal_{:04}.html", id),
-        ItemId::Ec(id) => format!("ec_{:04}.html", id),
+        ItemId::Normal(id) => format!("normal_{id:04}.html"),
+        ItemId::Ec(id) => format!("ec_{id:04}.html"),
     }
 }
 
@@ -49,13 +49,26 @@ fn gen_item_icon(item: &Item) -> Box<div<String>> {
 }
 
 pub fn gen_item_label(item: &Item) -> Box<a<String>> {
+    let annotation = match item.param.id {
+        ItemId::Normal(1057) => Some(html!(<span class="mh-item-anno">"[Trinket]"</span>)),
+        _ => None,
+    };
     let link = format!("/item/{}", item_page(item.param.id));
     html!(
         <a href={link} class="mh-icon-text">
             {gen_item_icon(item)}
-            <span>{gen_multi_lang(item.name)}</span>
+            {annotation.is_none().then(||html!(<span>{gen_multi_lang(item.name)}</span>))}
+            {annotation}
         </a>
     )
+}
+
+pub fn gen_item_label_from_id(item: ItemId, pedia_ex: &PediaEx) -> Box<dyn FlowContent<String>> {
+    if let Some(item) = pedia_ex.items.get(&item) {
+        gen_item_label(item)
+    } else {
+        text!("Unknown item {:?}", item)
+    }
 }
 
 pub fn gen_materials(
@@ -73,14 +86,9 @@ pub fn gen_materials(
             } else {
                 None
             };
-            let item = if let Some(item) = pedia_ex.items.get(item) {
-                html!(<div class="il">{gen_item_label(item)}</div>)
-            } else {
-                html!(<div class="il">{text!("{:?}", item)}</div>)
-            };
             html!(<li>
                 {text!("{}x ", num)}
-                {item}
+                <div class="il">{gen_item_label_from_id(*item, pedia_ex)}</div>
                 {key}
             </li>)
         })
@@ -90,14 +98,9 @@ pub fn gen_materials(
             item_f != ItemId::None && item_f != ItemId::Null && !item.contains(&item_f)
         )
         .map(|item| {
-            let item = if let Some(item) = pedia_ex.items.get(item) {
-                html!(<div class="il">{gen_item_label(item)}</div>)
-            } else {
-                html!(<div class="il">{text!("{:?}", item)}</div>)
-            };
             html!(<li>
                 "("
-                {item}
+                <div class="il">{gen_item_label_from_id(*item, pedia_ex)}</div>
                 <span class="tag is-primary">"Key"</span>
                 ")"
             </li>)
@@ -559,6 +562,76 @@ fn gen_item_usage_hyakuryu_deco(item_id: ItemId, pedia_ex: &PediaEx) -> Option<B
     }
 }
 
+fn gen_item_usage_mix(
+    item_id: ItemId,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let htmls: Vec<_> = pedia
+        .item_mix
+        .param
+        .iter()
+        .filter(|p| p.item_id_list.contains(&item_id))
+        .map(|p| html!(<li> {gen_item_label_from_id(p.generated_item_id, pedia_ex)} </li>))
+        .collect();
+
+    if !htmls.is_empty() {
+        Some(html!(<div class="mh-item-in-out">
+            <h3>"For " <a href="/misc/mix.html">"item crafting"</a>": "</h3>
+            <ul class="mh-item-list">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+fn gen_item_usage_convert(
+    item_id: ItemId,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let htmls: Vec<_> = pedia
+        .offcut_convert
+        .param
+        .iter()
+        .filter(|p| p.base_item_id == item_id)
+        .map(|p| html!(<li>{gen_item_label_from_id(p.convert_item_id, pedia_ex)}</li>))
+        .collect();
+
+    if !htmls.is_empty() {
+        Some(html!(<div class="mh-item-in-out">
+            <h3>"For " <a href="/misc/scraps.html">"trading for scraps"</a>": "</h3>
+            <ul class="mh-item-list">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+fn gen_item_usage_misc(
+    item_id: ItemId,
+    _pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let mut htmls = vec![];
+    if pedia_ex.bbq.iter().any(|bbq| bbq.param.item_id == item_id) {
+        htmls.push(html!(<li><a href="/misc/bbq.html">"Motley mix"</a></li>));
+    }
+
+    if !htmls.is_empty() {
+        Some(
+            html!(<div class="mh-item-in-out"> <h3>"For other places: "</h3>
+            <ul class="mh-item-list">{
+                htmls
+            }</ul> </div>),
+        )
+    } else {
+        None
+    }
+}
+
 fn gen_item_source_map(
     item_id: ItemId,
     pedia: &Pedia,
@@ -612,6 +685,143 @@ fn gen_item_source_map(
             <ul class="mh-item-list">{
                 htmls
             }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+fn gen_item_source_mix(
+    item_id: ItemId,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let htmls: Vec<_> = pedia
+        .item_mix
+        .param
+        .iter()
+        .filter(|p| p.generated_item_id == item_id)
+        .map(|p| {
+            html!(<li>
+                {p.item_id_list.iter().filter(|i|!matches!(i, ItemId::Null|ItemId::None))
+                    .enumerate().map(|(i, &item)| {
+                    html!(<div>
+                        {(i != 0).then(||text!("+"))}
+                        {gen_item_label_from_id(item, pedia_ex)}
+                    </div>)
+                })}
+            </li>)
+        })
+        .collect();
+
+    if !htmls.is_empty() {
+        Some(html!(<div class="mh-item-in-out">
+            <h3>"From " <a href="/misc/mix.html">"item crafting"</a>": "</h3>
+            <ul class="mh-item-list">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+fn gen_item_source_convert(
+    item_id: ItemId,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let htmls: Vec<_> = pedia
+        .offcut_convert
+        .param
+        .iter()
+        .filter(|p| p.convert_item_id == item_id)
+        .map(|p| html!(<li>{gen_item_label_from_id(p.base_item_id, pedia_ex)}</li>))
+        .collect();
+
+    if !htmls.is_empty() {
+        Some(html!(<div class="mh-item-in-out">
+            <h3>"From " <a href="/misc/scraps.html">"trading for scraps"</a>": "</h3>
+            <ul class="mh-item-list">{
+                htmls
+            }</ul> </div>))
+    } else {
+        None
+    }
+}
+
+fn gen_item_source_misc(
+    item_id: ItemId,
+    pedia: &Pedia,
+    pedia_ex: &PediaEx,
+) -> Option<Box<div<String>>> {
+    let mut htmls = vec![];
+
+    if pedia.item_shop.param.iter().any(|item| item.id == item_id) {
+        htmls.push(html!(<li><a href="/misc/market.html#s-item">"Market"</a></li>));
+    }
+
+    if pedia_ex.item_shop_lot.iter().any(|lot| {
+        lot.reward_tables
+            .iter()
+            .any(|table| table.item_id_list.iter().any(|item| *item == item_id))
+    }) {
+        htmls.push(html!(<li><a href="/misc/market.html#s-lottery">"Market lottery"</a></li>));
+    }
+
+    if pedia
+        .fukudama
+        .count_stop_param
+        .iter()
+        .chain(&pedia.fukudama.no_count_stop_param)
+        .any(|p| p.item_id == item_id)
+    {
+        htmls.push(html!(<li><a href="/misc/market.html#s-lucky">"Market lucky prize"</a></li>));
+    }
+
+    if pedia
+        .mystery_labo_trade_item
+        .as_ref()
+        .map_or(false, |lab| lab.param.iter().any(|p| p.item_id == item_id))
+    {
+        htmls.push(html!(<li><a href="/misc/lab.html">"Anomaly research lab"</a></li>));
+    }
+
+    if pedia_ex.bbq.iter().any(|bbq| {
+        bbq.param.fix_out_item_id_list.contains(&item_id)
+            || bbq
+                .table
+                .map_or(false, |table| table.item_id_list.contains(&item_id))
+    }) {
+        htmls.push(html!(<li><a href="/misc/bbq.html">"Motley mix"</a></li>));
+    }
+
+    if pedia.trade.param.iter().any(|p| p.item_id == item_id)
+        || pedia.trade_rare.param.iter().any(|p| p.item_id == item_id)
+        || pedia.trade_dust.param.iter().any(|p| p.item_id == item_id)
+        || pedia
+            .trade_feature
+            .param
+            .iter()
+            .any(|p| p.item_id == item_id)
+        || pedia
+            .exchange_item
+            .param
+            .iter()
+            .any(|p| p.item_id == item_id)
+    {
+        htmls.push(html!(<li><a href="/misc/argosy.html">"Argosy"</a></li>));
+    }
+
+    if pedia.spy.param.iter().any(|p| p.item_id.contains(&item_id)) {
+        htmls.push(html!(<li><a href="/misc/meowcenaries.html">"Meowcenaries"</a></li>));
+    }
+
+    if !htmls.is_empty() {
+        Some(
+            html!(<div class="mh-item-in-out"> <h3>"From other places: "</h3>
+            <ul class="mh-item-list">{
+                htmls
+            }</ul> </div>),
+        )
     } else {
         None
     }
@@ -729,6 +939,9 @@ pub fn gen_item(
             {gen_item_source_map(item.param.id, pedia, pedia_ex)}
             {gen_item_source_weapon(item.param.id, pedia_ex)}
             {gen_item_source_armor(item.param.id, pedia_ex)}
+            {gen_item_source_mix(item.param.id, pedia, pedia_ex)}
+            {gen_item_source_convert(item.param.id, pedia, pedia_ex)}
+            {gen_item_source_misc(item.param.id, pedia, pedia_ex)}
             </section>
         ),
     });
@@ -744,6 +957,9 @@ pub fn gen_item(
             {gen_item_usage_deco(item.param.id, pedia_ex)}
             {gen_item_usage_hyakuryu(item.param.id, pedia_ex)}
             {gen_item_usage_hyakuryu_deco(item.param.id, pedia_ex)}
+            {gen_item_usage_mix(item.param.id, pedia, pedia_ex)}
+            {gen_item_usage_convert(item.param.id, pedia, pedia_ex)}
+            {gen_item_usage_misc(item.param.id, pedia, pedia_ex)}
             </section>
         ),
     });
@@ -867,15 +1083,19 @@ pub fn gen_reward_table<'a>(
         .zip(probability)
         .filter(|&((&item, _), _)| item != ItemId::None)
         .map(move |((&item, &num), probability)| {
-            let item = if let Some(item) = pedia_ex.items.get(&item) {
-                html!(<div class="il">{gen_item_label(item)}</div>)
-            } else {
-                html!(<div class="il">{text!("{:?}", item)}</div>)
-            };
-
             html!(<tr>
-                <td>{text!("{}x ", num)}{item}</td>
+                <td>{text!("{}x ", num)}
+                <div class="il">{gen_item_label_from_id(item, pedia_ex)}</div></td>
                 <td>{text!("{}%", probability)}</td>
             </tr>)
         })
+}
+
+pub fn gen_buff_cage_label(buff_cage: &BuffCage<'_>) -> Box<a<String>> {
+    html!(
+        <a href={"/misc/petalace.html"} class="mh-icon-text">
+            {gen_rared_icon(buff_cage.data.rarity, "/resources/equip/030", [])}
+            <span>{gen_multi_lang(buff_cage.name)}</span>
+        </a>
+    )
 }

@@ -261,6 +261,26 @@ pub struct Pedia {
     pub switch_action_name_mr: Msg,
     pub weapon_control: Msg,
     pub weapon_control_mr: Msg,
+
+    pub buff_cage: NormalLvBuffCageBaseUserData,
+    pub buff_cage_name: Msg,
+    pub buff_cage_explain: Msg,
+
+    pub item_shop: ItemShopDisplayUserData,
+    pub item_shop_lot: ItemShopLotUserData,
+    pub fukudama: ShopFukudamaUserData,
+    pub mystery_labo_trade_item: Option<MysteryLaboTradeItemUserData>,
+    pub item_mix: ItemMixRecipeUserData,
+    pub bbq: BbqConvertUserData,
+
+    pub exchange_item: ExchangeItemUserData,
+    pub trade_dust: TradeDustUserData,
+    pub trade_feature: TradeFeatureUserData,
+    pub trade_rare: TradeRareUserData,
+    pub trade: TradeUserData,
+
+    pub spy: OtomoSpyUnitGridUserData,
+    pub offcut_convert: OffcutsItemConvertTable,
 }
 
 pub struct QuestReward<'a> {
@@ -491,6 +511,22 @@ pub struct SwitchSkill<'a> {
     pub name: &'a MsgEntry,
 }
 
+pub struct BuffCage<'a> {
+    pub name: &'a MsgEntry,
+    pub explain: &'a MsgEntry,
+    pub data: &'a NormalLvBuffCageBaseUserDataParam,
+}
+
+pub struct ItemShopLot<'a> {
+    pub data: &'a ItemShopLotUserDataParam,
+    pub reward_tables: Vec<&'a RewardIdLotTableUserDataParam>,
+}
+
+pub struct BbqData<'a> {
+    pub param: &'a BbqConvertUserDataParam,
+    pub table: Option<&'a RewardIdLotTableUserDataParam>,
+}
+
 pub struct PediaEx<'a> {
     pub monsters: BTreeMap<EmTypes, MonsterEx<'a>>,
     pub sizes: HashMap<EmTypes, &'a SizeInfo>,
@@ -536,4 +572,7 @@ pub struct PediaEx<'a> {
     pub progress: HashMap<i32, &'a ProgressCheckerUserDataParam>,
 
     pub switch_skills: HashMap<i32, SwitchSkill<'a>>,
+    pub buff_cage: BTreeMap<LvBuffCageId, BuffCage<'a>>,
+    pub item_shop_lot: Vec<ItemShopLot<'a>>,
+    pub bbq: Vec<BbqData<'a>>,
 }

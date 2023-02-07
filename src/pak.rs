@@ -3,6 +3,7 @@ use crate::file_ext::*;
 use crate::hash::hash_as_utf16;
 use crate::suffix::SUFFIX_MAP;
 use anyhow::{bail, Context, Result};
+use base64::prelude::*;
 use compress::flate;
 use num_bigint::BigUint;
 use once_cell::sync::Lazy;
@@ -12,11 +13,17 @@ use std::io::{Read, Seek, SeekFrom};
 
 static PAK_MAIN_KEY_MOD: Lazy<Option<Vec<u8>>> = Lazy::new(|| None);
 
-static PAK_SUB_KEY_MOD: Lazy<Vec<u8>> =
-    Lazy::new(|| base64::decode("E9eciYiRSBDXqniu+FnffTxDoNC7Nne18FwCr2XYdwM=").unwrap());
+static PAK_SUB_KEY_MOD: Lazy<Vec<u8>> = Lazy::new(|| {
+    BASE64_STANDARD
+        .decode("E9eciYiRSBDXqniu+FnffTxDoNC7Nne18FwCr2XYdwM=")
+        .unwrap()
+});
 
-static PAK_SUB_KEY_EXP: Lazy<Vec<u8>> =
-    Lazy::new(|| base64::decode("wMJ3H1s0agHH1NeFLkIrOxY6FxMW6oMwMN8/9CWTIAE=").unwrap());
+static PAK_SUB_KEY_EXP: Lazy<Vec<u8>> = Lazy::new(|| {
+    BASE64_STANDARD
+        .decode("wMJ3H1s0agHH1NeFLkIrOxY6FxMW6oMwMN8/9CWTIAE=")
+        .unwrap()
+});
 
 const LANGUAGE_LIST: &[&str] = &[
     "", "Ja", "En", "Fr", "It", "De", "Es", "Ru", "Pl", "Nl", "Pt", "PtBR", "Ko", "ZhTW", "ZhCN",
@@ -161,11 +168,14 @@ impl<F: Read + Seek> PakReader<F> {
             .context("Unknown extension")?;
         for suffix in suffix.iter().rev() {
             let full_paths = [
-                format!("natives/NSW/{}.{}", path, suffix),
-                format!("natives/NSW/{}.{}.NSW", path, suffix),
-                format!("natives/STM/{}.{}", path, suffix),
-                format!("natives/STM/{}.{}.x64", path, suffix),
-                format!("natives/STM/{}.{}.STM", path, suffix),
+                format!("natives/NSW/{path}.{suffix}"),
+                format!("natives/NSW/{path}.{suffix}.NSW"),
+                format!("natives/STM/{path}.{suffix}"),
+                format!("natives/STM/{path}.{suffix}.x64"),
+                format!("natives/STM/{path}.{suffix}.STM"),
+                format!("natives/MSG/{path}.{suffix}"),
+                format!("natives/MSG/{path}.{suffix}.x64"),
+                format!("natives/MSG/{path}.{suffix}.MSG"),
             ];
 
             let mut result = vec![];
@@ -173,7 +183,7 @@ impl<F: Read + Seek> PakReader<F> {
             for &language in LANGUAGE_LIST {
                 for full_path in &full_paths {
                     let dot = if language.is_empty() { "" } else { "." };
-                    let with_language = format!("{}{}{}", full_path, dot, language);
+                    let with_language = format!("{full_path}{dot}{language}");
                     if let Some(index) = self.find_file_internal(with_language) {
                         result.push(I18nPakFileIndex { language, index });
                         break;
@@ -191,7 +201,7 @@ impl<F: Read + Seek> PakReader<F> {
         Ok(self
             .find_file_i18n(path)?
             .first()
-            .with_context(|| format!("No matching hash for {}", path))?
+            .with_context(|| format!("No matching hash for {path}"))?
             .index)
     }
 

@@ -53,7 +53,7 @@ rsz_enum! {
 // snow.data.DataDef.RankTypes
 rsz_enum! {
     #[rsz(i32)]
-    #[derive(Debug, Serialize)]
+    #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
     pub enum RankTypes {
         Low = 0,
         Upper = 1,
@@ -161,5 +161,47 @@ rsz_struct! {
     #[derive(Debug, Serialize)]
     pub struct ItemUserData {
         pub param: Vec<ItemUserDataParam>,
+    }
+}
+
+// snow.data.ContentsIdSystem.LvBuffCageId
+rsz_enum! {
+    #[rsz(u32)]
+    #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
+    pub enum LvBuffCageId {
+        CommonNone = 0x18000000,
+        CommonError = 0x18000001,
+        CommonMax = 0x18000002,
+        Normal(u32) = 0x18100000..= 0x1810FFFF
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.NormalLvBuffCageBaseUserData.Param",
+        0x1026C5DC = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct NormalLvBuffCageBaseUserDataParam {
+        pub id: LvBuffCageId,
+        pub sort_index: u32,
+        pub rarity: RareTypes,
+        pub model_lv: i32, // snow.equip.LvBuffCageModelLv
+        pub model_color_index: ColorTypes,
+        pub status_buff_limit: [u32; 5], // Health, Stamina, Attack, Defense, ?(always 3)
+        pub status_buff_add_value: [u32; 4], // Health, Stamina, Attack, Defense
+        pub status_buff_all_add_value: [u32; 4], // Health, Stamina, Attack, Defense
+        pub status_start_revise_val: [u32; 5], // all zero?
+        pub element_revise_val: [u32; 5], // all zero?
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.data.NormalLvBuffCageBaseUserData",
+        path = "data/System/ContentsIdSystem/LvBuffCage/Normal/NormalLvBuffCageBaseData.user",
+        0x849E4F82 = 10_00_02
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct NormalLvBuffCageBaseUserData {
+        pub param: Vec<NormalLvBuffCageBaseUserDataParam>
     }
 }

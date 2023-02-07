@@ -129,7 +129,7 @@ pub fn gen_quest_list(
                 QuestLevel::QL7Ex => "7★Ex",
             };
 
-            let title = format!("{} {}", quest_level_name, level_name);
+            let title = format!("{quest_level_name} {level_name}");
             let id = format!("s-{}s{}", enemy_level.into_raw(), quest_level.into_raw());
             sections.push(Section {
                 title: title.clone(),
@@ -150,8 +150,8 @@ pub fn gen_quest_list(
     }
 
     for (quest_level, quests) in anomaly_ordered {
-        let title = format!("A{}★", quest_level);
-        let id = format!("s-a{}", quest_level);
+        let title = format!("A{quest_level}★");
+        let id = format!("s-a{quest_level}");
         sections.push(Section {
             title: title.clone(),
             content: html!(
@@ -256,7 +256,7 @@ pub fn gen_quest_monster_data(
             let mut s = difficulty_rate
                 .vital_rate_table_list
                 .get(usize::from(v))
-                .map_or_else(|| format!("~ {}", v), |r| format!("x{}", r.vital_rate));
+                .map_or_else(|| format!("~ {v}"), |r| format!("x{}", r.vital_rate));
             match enemy_param.difficulty(index) {
                 Some(NandoYuragi::True1) => s += "(±)",
                 Some(NandoYuragi::True2) => s += "(±±)",
@@ -271,7 +271,7 @@ pub fn gen_quest_monster_data(
             difficulty_rate
                 .attack_rate_table_list
                 .get(usize::from(v))
-                .map_or_else(|| format!("~ {}", v), |r| format!("x{}", r.attack_rate))
+                .map_or_else(|| format!("~ {v}"), |r| format!("x{}", r.attack_rate))
         },
     );
     let parts = enemy_param.parts_tbl(index).map_or_else(
@@ -280,10 +280,7 @@ pub fn gen_quest_monster_data(
             difficulty_rate
                 .parts_rate_table_list
                 .get(usize::from(v))
-                .map_or_else(
-                    || format!("~ {}", v),
-                    |r| format!("x{}", r.parts_vital_rate),
-                )
+                .map_or_else(|| format!("~ {v}"), |r| format!("x{}", r.parts_vital_rate))
         },
     );
 
@@ -332,7 +329,7 @@ pub fn gen_quest_monster_data(
 
     let stamina = enemy_param
         .stamina_tbl(index)
-        .map_or_else(|| "-".to_owned(), |v| format!("{}", v));
+        .map_or_else(|| "-".to_owned(), |v| format!("{v}"));
 
     let mut result = if let Some(size) = size {
         vec![html!(<td>{size}</td>)]
@@ -527,7 +524,7 @@ fn gen_quest(
         .order_type
         .iter()
         .filter(|&&t| t != QuestOrderType::None)
-        .map(|t| format!("{}", t))
+        .map(|t| format!("{t}"))
         .collect::<Vec<String>>()
         .join(", ");
 
@@ -744,14 +741,9 @@ fn gen_quest(
         quest.param.tgt_item_id.iter().zip(quest.param.tgt_num.iter())
             .filter(|&(&item, _)| item != ItemId::None)
             .map(|(&item, num)|{
-            let item = if let Some(item) = pedia_ex.items.get(&item) {
-                html!(<div class="il">{gen_item_label(item)}</div>)
-            } else {
-                html!(<div class="il">{text!("Unknown item {:?}", item)}</div>)
-            };
             html!(<li>
                 {text!("{}x ", num)}
-                {item}
+                <div class="il">{gen_item_label_from_id(item, pedia_ex)}</div>
             </li>)
         })
         }</ul>
@@ -1059,14 +1051,9 @@ fn gen_quest(
             html!(<div><ul class="mh-item-list"> {
                 supply.item_id.iter().zip(&supply.num).filter(|(&item, _)| item != ItemId::Null && item != ItemId::None )
                 .map(|(item, &num)| {
-                    let item = if let Some(item) = pedia_ex.items.get(item) {
-                        html!(<div class="il">{gen_item_label(item)}</div>)
-                    } else {
-                        html!(<div class="il">{text!("Unknown item {:?}", item)}</div>)
-                    };
                     html!(<li>
                         {text!("{}x ", num)}
-                        {item}
+                        <div class="il">{gen_item_label_from_id(*item, pedia_ex)}</div>
                     </li>)
                 })
             } </ul></div>)
@@ -1110,19 +1097,13 @@ fn gen_quest(
 
                 { arena.arena_pl.iter().enumerate().map(|(i, pl)|{
                     let weapon_control_ref = |name: &str| {
-                        if let Some(entry) = pedia.weapon_control.get_entry(name) {
-                            Some(entry)
-                        } else if let  Some(entry) = pedia.weapon_control_mr.get_entry(name) {
-                            Some(entry)
-                        } else {
-                            None
-                        }
+                        pedia.weapon_control.get_entry(name).or_else(||pedia.weapon_control_mr.get_entry(name))
                     };
 
                     let weapon_action = |actions: &[i32]| {
                         html!(<ul class="mh-arena-switch-skill">{actions.iter().map(|action|{
                             if let Some(skill) = pedia_ex.switch_skills.get(action) {
-                                html!(<li>{gen_multi_lang_with_ref(&skill.name, weapon_control_ref)}</li>)
+                                html!(<li>{gen_multi_lang_with_ref(skill.name, weapon_control_ref)}</li>)
                             } else {
                                 html!(<li>{text!("Unknown skill {:?}", action)}</li>)
                             }
@@ -1163,17 +1144,18 @@ fn gen_quest(
                         html!(<ul class="mh-item-list-arena-set"> {
                             items.iter().filter(|item_work| item_work.item != ItemId::Null && item_work.item != ItemId::None )
                             .map(|item_work| {
-                                let item = if let Some(item) = pedia_ex.items.get(&item_work.item) {
-                                    html!(<div class="il">{gen_item_label(item)}</div>)
-                                } else {
-                                    html!(<div class="il">{text!("Unknown item {:?}", item_work.item)}</div>)
-                                };
                                 html!(<li>
                                     {text!("{}x ", item_work.num)}
-                                    {item}
+                                    <div class="il">{gen_item_label_from_id(item_work.item, pedia_ex)}</div>
                                 </li>)
                             })
                         } </ul>)
+                    };
+
+                    let buff_cage = if let Some(buff_cage) = pedia_ex.buff_cage.get(&pl.lv_buff_cage_id) {
+                        html!(<td>{gen_buff_cage_label(buff_cage)}</td>)
+                    } else {
+                        html!(<td>{text!("Unknown {:?}", pl.lv_buff_cage_id)}</td>)
                     };
 
                     html!(<section class="mh-arena-set">
@@ -1252,7 +1234,7 @@ fn gen_quest(
                     </tr>
                     <tr>
                         <td>"Petalace"</td>
-                        <td>{text!("{}", pl.lv_buff_cage_id)}</td> // TODO
+                        {buff_cage}
                         <td/>
                         <td/>
                     </tr>
@@ -1586,7 +1568,7 @@ pub fn gen_quests(
         for (category, t) in table.nand_data.iter().enumerate() {
             for (kind, t) in t.nand_kinds_data.iter().enumerate() {
                 let output = quest_path
-                    .create_html(&format!("anomaly_difficulty_{}_{}.html", category, kind))?;
+                    .create_html(&format!("anomaly_difficulty_{category}_{kind}.html"))?;
                 gen_random_mystery_difficulty(
                     hash_store,
                     pedia,

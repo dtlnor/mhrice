@@ -9,6 +9,7 @@ mod condition_damage_preset;
 mod custom_buildup;
 mod data_base;
 mod data_tune;
+mod facility;
 mod item;
 mod lot;
 mod map;
@@ -33,6 +34,7 @@ pub use condition_damage_preset::*;
 pub use custom_buildup::*;
 pub use data_base::*;
 pub use data_tune::*;
+pub use facility::*;
 pub use item::*;
 pub use lot::*;
 pub use map::*;
@@ -460,9 +462,9 @@ pub enum ExternUser<T> {
 }
 
 impl<T: 'static> ExternUser<T> {
-    pub fn load<'a, 'b>(
+    pub fn load<'a>(
         &'a mut self,
-        pak: &'b mut crate::pak::PakReader<impl Read + Seek>,
+        pak: &'_ mut crate::pak::PakReader<impl Read + Seek>,
     ) -> Result<&'a mut T> {
         match self {
             ExternUser::Path(path) => {
@@ -767,7 +769,12 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         SlotWorthTableUserData,
     );
 
-    r!(ItemUserDataParam, ItemUserData);
+    r!(
+        ItemUserDataParam,
+        ItemUserData,
+        NormalLvBuffCageBaseUserDataParam,
+        NormalLvBuffCageBaseUserData
+    );
 
     r!(
         MonsterLotTableUserDataParam,
@@ -984,6 +991,38 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         ReleaseDataParam,
         ReleaseData,
         RandomMysteryMonsterRankReleaseData
+    );
+
+    r!(
+        ItemShopDisplayUserDataParam,
+        ItemShopDisplayUserData,
+        ShopFukudamaLotTableUserDataParam,
+        ShopFukudamaLotTableUserDataTable,
+        ShopFukudamaLotTableUserData,
+        ShopFukudamaUserDataParam,
+        ShopFukudamaUserData,
+        ItemShopLotUserDataParam,
+        ItemShopLotUserData,
+        MysteryLaboTradeItemUserDataParam,
+        MysteryLaboTradeItemUserData,
+        ItemMixRecipeUserDataParam,
+        ItemMixRecipeUserData,
+        BbqConvertUserDataParam,
+        BbqConvertUserData,
+        ExchangeItemUserDataParam,
+        ExchangeItemUserData,
+        TradeDustUserDataParam,
+        TradeDustUserData,
+        TradeFeatureUserDataParam,
+        TradeFeatureUserData,
+        TradeRareUserDataParam,
+        TradeRareUserData,
+        TradeUserDataParam,
+        TradeUserData,
+        OtomoSpyUnitGridUserDataParam,
+        OtomoSpyUnitGridUserData,
+        OffcutsItemConvertTableParam,
+        OffcutsItemConvertTable
     );
 
     m

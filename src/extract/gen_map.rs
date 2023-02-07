@@ -103,11 +103,7 @@ fn gen_map(
 
                     let item_id = get_fish_item_id(f.fish_id);
                     let item = if let Some(item) = item_id {
-                        if let Some(item) = pedia_ex.items.get(&item) {
-                            html!(<div class="il">{gen_item_label(item)}</div>)
-                        } else {
-                            html!(<div class="il">{text!("{:?}", item)}</div>)
-                        }
+                        html!(<div class="il">{gen_item_label_from_id(item, pedia_ex)}</div>)
                     } else {
                         html!(<div class="il">{text!("Unknown fish {}", f.fish_id)}</div>)
                     };
@@ -324,7 +320,7 @@ fn gen_map(
                         } else {
                             "mh-map-layer undraggable mh-hidden"
                         };
-                        let html_id = format!("mh-map-layer-{}", j);
+                        let html_id = format!("mh-map-layer-{j}");
                         html!(
                             <img alt="Map" class={c} id={html_id.as_str()} draggable=false
                                 src={format!("/resources/map{id:02}_{j}.png")}/>
