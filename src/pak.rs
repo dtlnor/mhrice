@@ -1,5 +1,6 @@
 use crate::align::align_up;
 use crate::file_ext::*;
+use crate::get_config;
 use crate::hash::hash_as_utf16;
 use crate::suffix::SUFFIX_MAP;
 use anyhow::{bail, Context, Result};
@@ -11,7 +12,9 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek, SeekFrom};
 
-static PAK_MAIN_KEY_MOD: Lazy<Option<Vec<u8>>> = Lazy::new(|| None);
+// static PAK_MAIN_KEY_MOD: Lazy<Option<Vec<u8>>> = Lazy::new(|| None);
+static PAK_MAIN_KEY_MOD: Lazy<Option<Vec<u8>>> =
+    Lazy::new(|| get_config("PAK_MAIN_KEY_MOD").and_then(|s| base64::decode(s).ok()));
 
 static PAK_SUB_KEY_MOD: Lazy<Vec<u8>> = Lazy::new(|| {
     BASE64_STANDARD

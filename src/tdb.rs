@@ -15,24 +15,23 @@ fn as_hex(array: &[u8], len: usize) -> String {
     let mut s = String::new();
     if len % 4 == 0 {
         if len > 4 {
-            /*
-            s += "[in-order-hexBE]";
-            for i in 0..(len/4){
-                for j in (0..4).rev(){
-                    s += &(format!("{:01$X}", array[i*4+j] as u8, 2));
-                }
-                if i < (len/4) - 1 { s += " " }
-            }*/
+            // s += "[in-order-hexBE]";
+            // for i in 0..(len/4){
+            //     for j in (0..4).rev(){
+            //         s += &(format!("{:01$X}", array[i*4+j] as u8, 2));
+            //     }
+            //     if i < (len/4) - 1 { s += " " }
+            // }
             s += "[hexLE]"; //remain order
             for i in 0..len { //.rev() to get BE
                 if i % 4 == 0 && i > 0 { s += " " }
                 s += &(format!("{:01$X}", array[i] as u8, 2));
             }
-        }else{ //len = 4
-            //s += "[hexBE]"; //remain order
-            //for i in (0..len).rev(){
+        }else{ // len == 4
+            // s += "[hexBE]"; //remain order
+            // for i in (0..len).rev(){
             //    s += &(format!("{:01$X}", array[i] as u8, 2));
-            //}
+            // }
         }
     }else{
         s += "[hexLE]"; //remain order
