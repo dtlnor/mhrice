@@ -63,19 +63,19 @@ pub fn gen_mystery_tag(mystery_type: Option<EnemyIndividualType>) -> Option<Box<
             Some(html!(<span class="tag is-danger">"Risen"</span>))
         }
         Some(EnemyIndividualType::OverMysteryStrengthLv1) => {
-            Some(html!(<span class="tag is-danger">"Risen 1"</span>))
+            Some(html!(<span class="tag is-danger">"Risen lv1"</span>))
         }
         Some(EnemyIndividualType::OverMysteryStrengthLv2) => {
-            Some(html!(<span class="tag is-danger">"Risen"</span>))
+            Some(html!(<span class="tag is-danger">"Risen lv2"</span>))
         }
         Some(EnemyIndividualType::OverMysteryStrengthLv3) => {
-            Some(html!(<span class="tag is-danger">"Risen"</span>))
+            Some(html!(<span class="tag is-danger">"Risen lv3"</span>))
         }
     }
 }
 
-pub fn gen_sub_type_tag(_em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<span<String>>> {
-    let text = match (_em_type, sub_type) {
+pub fn gen_sub_type_tag(em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<span<String>>> {
+    let text = match (em_type, sub_type) {
         (_, None | Some(0)) => None,
 
         (EmTypes::Em(23), Some(1)) => Some("Sleeping".to_owned()), // observed in game but tdb says always enraged...
@@ -85,7 +85,11 @@ pub fn gen_sub_type_tag(_em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<s
         (EmTypes::Em(24), Some(1)) => Some("vs allmother".to_owned()),
         (EmTypes::Em(27), Some(1)) => Some("vs allmother".to_owned()),
 
+        (EmTypes::Em(549 /*37_02*/), Some(1)) => Some("High level".to_owned()),
+
         (EmTypes::Em(57), Some(1)) => Some("Charged".to_owned()),
+
+        (EmTypes::Em(594 /*82_02*/), Some(1)) => Some("High level".to_owned()),
 
         (EmTypes::Em(89), Some(1)) => Some("vs allmother".to_owned()),
 
@@ -101,6 +105,8 @@ pub fn gen_sub_type_tag(_em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<s
         (EmTypes::Em(134), Some(1)) => Some("QuickGoApe".to_owned()), // what
 
         (EmTypes::Em(136 | 392), Some(1)) => Some("Sleeping".to_owned()),
+        (EmTypes::Em(392), Some(2)) => Some("High level".to_owned()),
+        (EmTypes::Em(392), Some(3)) => Some("High level sleeping".to_owned()),
 
         (_, Some(x)) => Some(format!("type{x}")),
     };
@@ -1781,7 +1787,7 @@ pub fn gen_monster(
 
                     if atk.data.base_piyo_value != 0 {
                         statuss.push(html!(<li>
-                            <img src="/resources/stun.png" class="mh-small-icon" alt="Stunt"/>
+                            <img src="/resources/stun.png" class="mh-small-icon" alt="Stun"/>
                             {text!("{}", atk.data.base_piyo_value)}</li>))
                     }
 
