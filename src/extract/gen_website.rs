@@ -1,5 +1,6 @@
 use super::gen_armor::*;
 use super::gen_common::*;
+use super::gen_dlc::*;
 use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_map::*;
@@ -121,9 +122,19 @@ pub fn navbar() -> Box<nav<String>> {
                 <a class="navbar-item" href="/monster.html">
                     "Monsters"
                 </a>
-                <a class="navbar-item" href="/quest.html">
+
+                <a class="navbar-item navbar-folded" href="/quest.html">
                     "Quests"
                 </a>
+                <div class="navbar-item has-dropdown is-hoverable navbar-expanded">
+                <a class="navbar-link" href="/quest.html">
+                    "Quests"
+                </a>
+                <div class="navbar-dropdown">
+                    <a class="navbar-item" href="/quest.html">"Main quests"</a>
+                    <a class="navbar-item" href="/villager_request.html">"Villager requests"</a>
+                </div>
+                </div>
 
                 <a class="navbar-item navbar-folded" href="/skill.html">
                     "Skills"
@@ -208,6 +219,7 @@ pub fn navbar() -> Box<nav<String>> {
                     <a class="navbar-item" href="/misc/argosy.html">"Argosy"</a>
                     <a class="navbar-item" href="/misc/meowcenaries.html">"Meowcenaries"</a>
                     <a class="navbar-item" href="/misc/scraps.html">"Trade for scraps"</a>
+                    <a class="navbar-item" href="/dlc.html">"DLC"</a>
                 </div>
                 </div>
             </div>
@@ -636,6 +648,10 @@ pub fn gen_static(hash_store: &mut HashStore, output: &impl Sink) -> Result<()> 
         .write_all(include_bytes!("static/mhrice.js"))?;
 
     output
+        .create_with_hash("masonry.pkgd.min.js", FileTag::Masonry, hash_store)?
+        .write_all(include_bytes!("static/masonry.pkgd.min.js"))?;
+
+    output
         .create("favicon.png")?
         .write_all(include_bytes!("static/favicon.png"))?;
     output
@@ -676,6 +692,8 @@ pub fn gen_website(
     gen_part_color_css(hash_store, output)?;
     gen_quests(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
     gen_quest_list(hash_store, &pedia_ex.quests, output)?;
+    gen_npc_missions(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
+    gen_npc_mission_list(hash_store, pedia_ex, output)?;
     gen_skills(hash_store, pedia_ex, config, output, &mut toc)?;
     gen_skill_list(hash_store, &pedia_ex.skills, output)?;
     gen_hyakuryu_skills(hash_store, pedia_ex, config, output, &mut toc)?;
@@ -693,6 +711,8 @@ pub fn gen_website(
     gen_about(hash_store, output)?;
     gen_search(hash_store, output)?;
     gen_misc(hash_store, pedia, pedia_ex, output, &mut toc)?;
+    gen_dlc_list(hash_store, pedia_ex, output)?;
+    gen_dlcs(hash_store, pedia, pedia_ex, config, output, &mut toc)?;
     toc.finalize(&output.sub_sink("tocv2")?)?;
     Ok(())
 }

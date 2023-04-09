@@ -1,4 +1,5 @@
 use super::gen_common::*;
+use super::gen_dlc::*;
 use super::gen_hyakuryu_skill::*;
 use super::gen_item::*;
 use super::gen_monster::*;
@@ -8,7 +9,7 @@ use super::pedia::*;
 use super::sink::*;
 use crate::rsz::*;
 use anyhow::Result;
-use std::collections::HashSet;
+use std::collections::*;
 use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
@@ -68,7 +69,7 @@ where
     html!(
         <a href={link} class="mh-icon-text">
             {gen_weapon_icon(main, false, icon_element, icon_element2)}
-            <span>{gen_multi_lang(weapon.name)}</span>
+            <span class="mh-weapon-name">{gen_multi_lang(weapon.name)}</span>
         </a>
     )
 }
@@ -582,6 +583,50 @@ where
         })
     };
 
+    let dlc: Vec<(&Dlc, bool, bool)> = pedia_ex
+        .dlc
+        .values()
+        .filter_map(|dlc| {
+            if let Some(add) = dlc.add {
+                let is_normal = add.pl_weapon_list.contains(&main.id);
+
+                let is_layered = if let Some(ow) = weapon.overwear {
+                    add.pl_overwear_weapon_id_list
+                        .0
+                        .as_deref()
+                        .unwrap_or_default()
+                        .contains(&ow.id)
+                } else {
+                    false
+                };
+
+                if is_normal || is_layered {
+                    Some((dlc, is_normal, is_layered))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if !dlc.is_empty() {
+        sections.push(Section {
+            title: "DLC".to_owned(),
+            content: html!(<section id="s-dlc">
+            <h2 >"DLC"</h2>
+            <ul class="mh-item-list">
+            {dlc.into_iter().map(|(dlc, is_normal, is_layered)| html!(<li>
+                {gen_dlc_label(dlc)}
+                {is_normal.then(||html!(<span class="tag">"Normal"</span>))}
+                {is_layered.then(||html!(<span class="tag">"Layered"</span>))}
+            </li>))}
+            </ul>
+            </section>),
+        })
+    }
+
     sections.push(Section {
         title: "Crafting".to_owned(),
         content: html!(<section id="s-crafting">
@@ -631,7 +676,7 @@ where
                     gen_craft_row(pedia_ex, html!(<td>"As layered (rampage weapon)"</td>), None,
                         &change.base, None)
                 })}
-                {weapon.overwear.as_ref().map(|data| {
+                {weapon.overwear_product.as_ref().map(|data| {
                     let category = gen_category(pedia_ex, data.material_category, data.material_category_num);
                     let materials = gen_materials(pedia_ex, &data.item, &data.item_num, &[data.item_flag]);
                     html!(<tr>
@@ -813,37 +858,88 @@ where
     Ok(())
 }
 
-fn gen_tree_rec<Param>(weapon_tree: &WeaponTree<Param>, list: &[WeaponId]) -> Box<ul<String>>
+fn gen_tree_rec<Param>(
+    pedia: &Pedia,
+    weapon_tree: &WeaponTree<Param>,
+    list: &[WeaponId],
+    parent_series: Option<TreeType>,
+    (parent_row, parent_col): (i32, i32),
+    row_counter: &mut i32,
+) -> Box<ul<String>>
 where
     Param: ToBase<MainWeaponBaseData>
         + MaybeToBase<ElementWeaponBaseData>
         + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     html!(<ul> {
-        list.iter().map(|id| {
+        list.iter().enumerate().map(|(index, id)| {
             let weapon = weapon_tree.weapons.get(id).unwrap();
             let mut filter_tags = vec![];
             if weapon.children.is_empty() {
                 filter_tags.push("final");
             }
-            if weapon.overwear.is_some() {
+            if weapon.overwear_product.is_some() {
                 filter_tags.push("layer");
             }
             if weapon.change.is_some() {
                 filter_tags.push("rampage");
             }
             let filter = filter_tags.join(" ");
-            html!(<li>
-                <div class="mh-main-filter-item" data-filter={filter}>{
+            let tree_type = weapon.update.as_ref().map(|u|u.tree_type);
+            if index == 0 && parent_series.is_some() && parent_series != tree_type {
+                *row_counter += 1
+            }
+
+            let row = *row_counter;
+            let col = weapon.update.as_ref().map_or(0, |u|u.index);
+            let row_rel = row - parent_row;
+            let col_rel = col - parent_col;
+            let css_var = format!("--data-row:{row_rel};--data-col:{col_rel};");
+            let series_css_var = format!("--data-col:{col};");
+            let result = html!(<li style={css_var.as_str()}>
+                {(index != 0 || parent_series != tree_type)
+                    .then(||{
+                        let tree_string = if let Some(tree_type) = tree_type {
+                            let tree_type = tree_type.into_raw() as usize;
+                            #[allow(clippy::collapsible_else_if)]
+                            if tree_type < 100 {
+                                if let Some(entry) = pedia.weapon_series.entries.get(tree_type) {
+                                    if let (32, Some(another)) = (tree_type, pedia.weapon_series.entries.get(33)) {
+                                        // snow.data.DataShortcut.getName: special case for type A/B player
+                                        html!(<span>{gen_multi_lang(entry)}" / "{gen_multi_lang(another)}</span>)
+                                    } else {
+                                        gen_multi_lang(entry)
+                                    }
+                                } else {
+                                    html!(<span>{text!("Unknown {}", tree_type)}</span>)
+                                }
+                            } else {
+                                if let Some(entry) = pedia.weapon_series_mr.entries.get(tree_type - 100) {
+                                    gen_multi_lang(entry)
+                                } else {
+                                    html!(<span>{text!("Unknown {}", tree_type)}</span>)
+                                }
+                            }
+                        } else {
+                            html!(<span>"<None>"</span>)
+                        };
+                        html!(<div class="mh-weapon-series" style={series_css_var.as_str()}>{tree_string}</div>)
+                    })}
+                <div class="mh-weapon-tree-label mh-main-filter-item" data-filter={filter}>{
                     gen_weapon_label(weapon)
                 }</div>
-                { gen_tree_rec(weapon_tree, &weapon.children) }
-            </li>)
+                { gen_tree_rec(pedia, weapon_tree, &weapon.children, tree_type, (row, col), row_counter) }
+            </li>);
+            if index != list.len() - 1 {
+                *row_counter += 1;
+            }
+            result
         })
     } </ul>)
 }
 
 fn gen_tree<Param>(
+    pedia: &Pedia,
     hash_store: &HashStore,
     weapon_tree: &WeaponTree<Param>,
     weapon_path: &impl Sink,
@@ -856,12 +952,27 @@ where
         + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     let mut list_path = weapon_path.create_html(&format!("{tag}.html"))?;
+    let masonry_js = format!(
+        "/masonry.pkgd.min.js?h={}",
+        hash_store.get(FileTag::Masonry)
+    );
+
+    let cols = weapon_tree
+        .weapons
+        .values()
+        .filter_map(|w| w.update.map(|u| u.index))
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    let mut row_counter = 0;
 
     let doc: DOMTree<String> = html!(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("{} - MHRice", name)}</title>
                 { head_common(hash_store) }
+                <script src={masonry_js}/>
                 <style id="mh-main-list-style">""</style>
             </head>
             <body>
@@ -886,9 +997,33 @@ where
                     <li id="mh-main-filter-button-rampage" class="mh-main-filter-button">
                         <a>"Layered for rampage"</a></li>
                 </ul></div>
-                <div class="mh-weapon-tree">
-                { gen_tree_rec(weapon_tree, &weapon_tree.roots) }
+                <div class="select"><select id="combo-weapon-tree">
+                    <option value="list">"List view"</option>
+                    <option value="grid">"Grid view"</option>
+                </select></div>
+                <div class="mh-weapon-tree-list" id="mh-weapon-tree">
+                {
+                    let mut root = gen_tree_rec(pedia, weapon_tree, &weapon_tree.roots, None, (0, 0), &mut row_counter);
+                    let rows = row_counter + 1;
+                    let style = format!("--data-rows:{rows}; --data-cols:{cols};");
+                    root.attrs.style = Some(style);
+                    root
+                }
                 </div>
+
+                <section>
+                <h2>"Other"</h2>
+                <ul class="mh-item-list">
+                {
+                    weapon_tree.unpositioned.iter().map(|w| {
+                        html!(<li class="il">{
+                            gen_weapon_label(&weapon_tree.weapons[w])
+                        }</li>)
+                    })
+                }
+                </ul>
+                </section>
+
                 </main>
                 { right_aside() }
             </body>
@@ -976,7 +1111,7 @@ pub fn gen_weapons(
                     <span>{text!("{}", $name)}</span>
                 </a>
             </li>));
-            gen_tree(hash_store, &pedia_ex.$label, &path, stringify!($label), $name)?;
+            gen_tree(pedia, hash_store, &pedia_ex.$label, &path, stringify!($label), $name)?;
             for (weapon_id, weapon) in &pedia_ex.$label.weapons {
                 let (file_path, toc_sink) =
                     path.create_html_with_toc(&format!("{}.html", weapon_id.to_tag()), toc)?;

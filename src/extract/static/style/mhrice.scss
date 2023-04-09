@@ -514,7 +514,7 @@ ul.mh-armor-series-list {
 ul.mh-item-list {
     list-style: none;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
 
     >li {
         margin-top: 0.5rem;
@@ -833,6 +833,11 @@ img.mh-quest-icon {
     background-color: rgb(90, 100, 44);
 }
 
+.tag.mh-quest-npc {
+    color: #FFFFFF;
+    background-color: rgb(56, 54, 44);
+}
+
 .mh-quest-header>h1>* {
     vertical-align: middle;
     margin-right: 0.25rem;
@@ -960,7 +965,8 @@ ul.mh-damages {
 }
 
 /** Weapon list **/
-.mh-weapon-tree>ul>li {
+.mh-weapon-tree-list>ul>li {
+    width: 25rem;
     display: inline-block;
     vertical-align: top;
     border-radius: 6px;
@@ -974,6 +980,88 @@ ul.mh-damages {
         list-style-type: none;
         margin-top: 0;
         margin-left: 1rem;
+    }
+
+    .mh-weapon-series {
+        font-style: italic;
+    }
+}
+
+$mh-weapon-tree-grid-left: 15rem;
+$mh-weapon-tree-grid-col-width: 3rem;
+$mh-weapon-tree-grid-row-height: 2rem;
+
+.mh-weapon-tree-grid {
+    overflow-x: scroll;
+    overflow-y: scroll;
+    height: calc(100vh - 20rem);
+
+    >ul {
+        position: relative;
+        list-style-type: none;
+        margin-top: 0;
+        margin-left: $mh-weapon-tree-grid-left;
+        width: calc(var(--data-cols) * #{$mh-weapon-tree-grid-col-width} + 15rem);
+        height: calc(var(--data-rows) * #{$mh-weapon-tree-grid-row-height});
+
+        ul {
+            list-style-type: none;
+        }
+
+        li {
+            position: absolute;
+            margin-top: 0;
+            margin-left: 0;
+            left: calc(var(--data-col) * #{$mh-weapon-tree-grid-col-width});
+            top: calc(var(--data-row) * #{$mh-weapon-tree-grid-row-height});
+        }
+
+        ul li::before {
+            z-index: -100;
+            display: block;
+            position: absolute;
+            left: calc((0 - var(--data-col)) * #{$mh-weapon-tree-grid-col-width} + 1rem);
+            top: calc((0 - var(--data-row)) * #{$mh-weapon-tree-grid-row-height} + 1rem);
+            width: calc(var(--data-col) * #{$mh-weapon-tree-grid-col-width});
+            height: calc(var(--data-row) * #{$mh-weapon-tree-grid-row-height});
+            border-left: solid lightgray 2px;
+            border-bottom: solid lightgray 2px;
+            box-shadow: -2px 2px lightgray;
+            box-sizing: content-box;
+            content: ' '
+        }
+
+        .mh-weapon-tree-label {
+            .mh-weapon-name {
+                display: none;
+            }
+        }
+
+        .mh-weapon-tree-label:hover {
+
+            .mh-weapon-name {
+                background-color: white;
+                border-width: 1px;
+                border-style: solid;
+                border-color: black;
+                z-index: 100;
+                display: block;
+                height: 2rem;
+                width: fit-content;
+                position: absolute;
+                left: 2rem;
+                top: 0rem;
+                display: block;
+                white-space: nowrap;
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+        }
+
+        .mh-weapon-series {
+            position: absolute;
+            left: calc(0rem - var(--data-col) * #{$mh-weapon-tree-grid-col-width} - #{$mh-weapon-tree-grid-left})
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 use super::gen_common::*;
+use super::gen_dlc::*;
 use super::gen_item::*;
 use super::gen_monster::*;
 use super::gen_skill::*;
@@ -88,6 +89,8 @@ pub fn gen_armor_list(
                         <a>"High rank"</a></li>
                     <li id="mh-armor-filter-button-mr" class="mh-armor-filter-button">
                         <a>"Master rank"</a></li>
+                    <li id="mh-armor-filter-button-layered" class="mh-armor-filter-button">
+                        <a>"Layered"</a></li>
                 </ul></div>
                 <div class="select"><select id="scombo-armor" class="mh-scombo">
                     <option value="0">"Sort by internal ID"</option>
@@ -104,11 +107,14 @@ pub fn gen_armor_list(
                         let sort_tag = format!("{},{}",
                             series.series.armor_series.0, sort);
 
-                        let filter = match series.series.difficulty_group {
+                        let mut filter = match series.series.difficulty_group {
                             EquipDifficultyGroup::Lower => "lr",
                             EquipDifficultyGroup::Upper => "hr",
                             EquipDifficultyGroup::Master => "mr",
-                        };
+                        }.to_owned();
+                        if series.pieces.iter().any(|p|p.is_some() && p.as_ref().unwrap().overwear.is_some()) {
+                            filter += " layered";
+                        }
                         let series_name = gen_multi_lang(series.name);
                         html!(
                             <li class="mh-armor-filter-item" data-sort=sort_tag data-filter={filter}>
@@ -534,6 +540,54 @@ fn gen_armor(
                 </section>
             ),
         });
+    }
+
+    let dlc: Vec<(&Dlc, bool, bool)> = pedia_ex
+        .dlc
+        .values()
+        .filter_map(|dlc| {
+            if let Some(add) = dlc.add {
+                let is_normal = add.pl_armor_list.iter().any(|&id| {
+                    series
+                        .pieces
+                        .iter()
+                        .flatten()
+                        .any(|a| a.data.pl_armor_id == id)
+                });
+
+                let is_layered = add.pl_overwear_id_list.iter().any(|&id| {
+                    series
+                        .pieces
+                        .iter()
+                        .flatten()
+                        .any(|a| a.overwear.map(|ow| ow.id) == Some(id))
+                });
+
+                if is_normal || is_layered {
+                    Some((dlc, is_normal, is_layered))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if !dlc.is_empty() {
+        sections.push(Section {
+            title: "DLC".to_owned(),
+            content: html!(<section id="s-dlc">
+            <h2 >"DLC"</h2>
+            <ul class="mh-item-list">
+            {dlc.into_iter().map(|(dlc, is_normal, is_layered)| html!(<li>
+                {gen_dlc_label(dlc)}
+                {is_normal.then(||html!(<span class="tag">"Normal"</span>))}
+                {is_layered.then(||html!(<span class="tag">"Layered"</span>))}
+            </li>))}
+            </ul>
+            </section>),
+        })
     }
 
     sections.push(Section {

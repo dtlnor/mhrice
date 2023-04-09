@@ -571,7 +571,7 @@ rsz_struct! {
         pub zako_multi: u8,
         pub route_no: Vec<u8>,
         pub init_set_name: Vec<String>,
-        pub sub_type_v11: Versioned<Vec<u8>, 11_00_01, 0xFFFFFFFF>,
+        pub sub_type_v11: Versioned<Vec<u8>, 11_00_01>,
         pub individual_type: Vec<EnemyIndividualType>,
         pub sub_type: Versioned<Vec<u8>, 10_00_00, 10_99_99>,
         pub vital_tbl: Vec<u16>,
@@ -1043,9 +1043,9 @@ rsz_struct! {
         pub item_num: u32,
         pub quest_reward_table_index: u32,
         pub additional_quest_reward_table_index: Vec<u32>,
-        pub special_quest_reward_table_index: Versioned<u32, 11_00_01, 0xFFFFFFFF>,
-        pub multiple_target_reward_table_index: Versioned<u32, 11_00_01, 0xFFFFFFFF>,
-        pub multiple_fix_reward_table_index: Versioned<u32, 11_00_01, 0xFFFFFFFF>,
+        pub special_quest_reward_table_index: Versioned<u32, 11_00_01>,
+        pub multiple_target_reward_table_index: Versioned<u32, 11_00_01>,
+        pub multiple_fix_reward_table_index: Versioned<u32, 11_00_01>,
     }
 }
 
@@ -1534,4 +1534,88 @@ rsz_struct! {
     pub struct TimeAttackRewardUserData {
         pub data_list: Vec<TimeAttackRewardData>,
     }
+}
+
+rsz_struct! {
+    #[rsz("snow.npc.QuestGroup",
+        0x24364BAE = 14_00_00,
+        0x98FC5F75 = 13_00_00,
+        0x5F8315C6 = 12_00_00,
+        0xE9A5D28D = 11_00_01,
+        0x654A07EC = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct QuestGroup {
+        pub quest_no_array: Vec<i32>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.npc.TalkConditionQuestListUserData",
+        path = "npc/userdata/common/TalkConditionQuestList.user",
+        0xB78D58EF = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct TalkConditionQuestListUserData {
+        pub quest_group: [QuestGroup; 2],
+    }
+}
+
+// snow.quest.MissionDef.Rank
+rsz_enum! {
+    #[rsz(i32)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum MissionRank {
+        Any = 0,
+        Low = 1,
+        High = 2,
+        Master = 3,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.quest.NPCMissionData",
+        0xB1000D1F = 10_00_02,
+        0xEA502473 = 11_00_01,
+        0x63D6F917 = 12_00_00,
+        0x67D10722 = 13_00_00,
+        0xAD34C61D = 14_00_00,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct NPCMissionData {
+        pub index: i32,
+        pub id: i32,
+        pub start_flag: i32, // snow.npc.TalkFlag
+        pub end_flag: i32, // snow.npc.TalkFlag
+        pub client_npc: i32, // snow.NpcDefine.NpcID
+        pub reward_type: i32, // snow.quest.MissionDef.NPCRewardIcon
+        pub reward_id: Vec<i32>,
+        pub reward_type_sub: i32, // snow.quest.MissionDef.NPCRewardIcon
+        pub reward_id_sub: Vec<i32>,
+        pub reward_num_sub: Vec<i32>,
+        pub mission_type: i32, // snow.quest.MissionDef.MissionType
+        pub rank: MissionRank,
+        pub em_type: EmTypes,
+        pub map_no: i32, // snow.QuestMapManager.MapNoType
+        pub item_id: Vec<ItemId>,
+        pub tgt_num: Vec<i32>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.quest.NPCMissionDataList",
+        0xDAB9C3B9 = 10_00_02,
+    )]
+    #[derive(Debug, Serialize)]
+    pub struct NPCMissionDataList {
+        pub param: Vec<NPCMissionData>,
+    }
+}
+
+rsz_with_singleton! {
+    #[path("Quest/MissionData/NPCMissionData.user")]
+    pub struct NPCMissionDataListLrHr(NPCMissionDataList);
+
+    #[path("Quest/MissionData/NPCMissionDataList_MR.user")]
+    pub struct NPCMissionDataListMr(NPCMissionDataList);
 }

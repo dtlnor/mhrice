@@ -95,6 +95,9 @@ pub struct Pedia {
     pub arena_quest: ArenaQuestData,
     pub quest_unlock: QuestUnlockRequestListUserData,
     pub time_attack_reward: TimeAttackRewardUserData,
+    pub talk_condition_quest_list: TalkConditionQuestListUserData,
+    pub npc_mission: NPCMissionDataListLrHr,
+    pub npc_mission_mr: NPCMissionDataListMr,
     pub quest_hall_msg: Msg,
     pub quest_hall_msg_mr: Msg,
     pub quest_hall_msg_mr2: Msg,
@@ -103,6 +106,8 @@ pub struct Pedia {
     pub quest_tutorial_msg: Msg,
     pub quest_arena_msg: Msg,
     pub quest_dlc_msg: Msg,
+    pub npc_mission_msg: Msg,
+    pub npc_mission_msg_mr: Msg,
 
     pub armor: ArmorBaseUserData,
     pub armor_series: ArmorSeriesUserData,
@@ -193,6 +198,8 @@ pub struct Pedia {
     pub horn_melody_mr: Msg,
     pub hyakuryu_weapon_buildup: HyakuryuWeaponHyakuryuBuildupUserData,
     pub weapon_chaos_critical: Option<WeaponChaosCriticalUserData>,
+    pub weapon_series: Msg,
+    pub weapon_series_mr: Msg,
 
     pub maps: BTreeMap<i32, GameMap>,
     pub map_name: Msg,
@@ -207,6 +214,9 @@ pub struct Pedia {
     pub dog_weapon: OtDogWeaponBaseUserData,
     pub dog_weapon_product: OtDogWeaponProductUserData,
     pub ot_equip_series: OtEquipSeriesUserData,
+    pub airou_overwear: OtAirouOverwearBaseUserData,
+    pub dog_overwear: OtDogOverwearBaseUserData,
+    pub ot_overwear_recipe: OtOverwearRecipeUserData,
     pub airou_armor_head_name: Msg,
     pub airou_armor_head_explain: Msg,
     pub airou_armor_chest_name: Msg,
@@ -282,6 +292,14 @@ pub struct Pedia {
 
     pub spy: OtomoSpyUnitGridUserData,
     pub offcut_convert: OffcutsItemConvertTable,
+
+    pub dlc: DlcListUserData,
+    pub dlc_add: DlcAddUserData,
+    pub item_pack: ItemPackUserData,
+    pub dlc_name: Msg,
+    pub dlc_name_mr: Msg,
+    pub dlc_explain: Msg,
+    pub dlc_explain_mr: Msg,
 }
 
 pub struct QuestReward<'a> {
@@ -321,6 +339,18 @@ pub struct Quest<'a> {
     pub unlock: Vec<QuestUnlock<'a>>,
     pub random_group: Option<&'a RandomQuestUnlockByQuestClear>,
     pub time_attack_reward: Vec<TimeAttackReward<'a>>,
+    // TODO: how to display this?
+    pub is_mr_all_clear_quest: bool,
+    pub is_mr_all_clear_follower_quest: bool,
+}
+
+pub struct NpcMission<'a> {
+    pub param: &'a NPCMissionData,
+    pub name: &'a MsgEntry,
+    pub requester: &'a MsgEntry,
+    pub detail: &'a MsgEntry,
+    pub target: Option<&'a MsgEntry>,
+    pub reward: Option<&'a MsgEntry>,
 }
 
 pub struct Deco<'a> {
@@ -406,7 +436,8 @@ pub struct Weapon<'a, Param> {
     pub product: Option<&'a WeaponProductUserDataParam>,
     pub change: Option<&'a WeaponChangeUserDataParam>,
     pub process: Option<&'a WeaponProcessUserDataParam>,
-    pub overwear: Option<&'a OverwearWeaponProductUserDataParam>,
+    pub overwear: Option<&'a OverwearWeaponBaseUserDataParam>,
+    pub overwear_product: Option<&'a OverwearWeaponProductUserDataParam>,
     pub name: &'a MsgEntry,
     pub explain: Option<&'a MsgEntry>,
     pub children: Vec<WeaponId>,
@@ -432,6 +463,8 @@ pub struct OtWeapon<'a> {
 pub struct OtArmor<'a> {
     pub param: &'a OtArmorBase,
     pub product: Option<&'a OtArmorProductUserDataParam>,
+    pub overwear: Option<&'a OtOverwearBaseUserDataParam>,
+    pub overwear_recipe: Option<&'a OtOverwearRecipeUserDataParam>,
     pub name: &'a MsgEntry,
     pub explain: &'a MsgEntry,
 }
@@ -529,11 +562,20 @@ pub struct BbqData<'a> {
     pub table: Option<&'a RewardIdLotTableUserDataParam>,
 }
 
+pub struct Dlc<'a> {
+    pub data: &'a DlcData,
+    pub add: Option<&'a AddDataInfo>,
+    pub item_pack: Option<&'a ItemPackParam>,
+    pub name: Option<&'a MsgEntry>,
+    pub explain: Option<&'a MsgEntry>,
+}
+
 pub struct PediaEx<'a> {
     pub monsters: BTreeMap<EmTypes, MonsterEx<'a>>,
     pub sizes: HashMap<EmTypes, &'a SizeInfo>,
     pub size_dists: HashMap<i32, &'a [ScaleAndRateData]>,
     pub quests: BTreeMap<i32, Quest<'a>>,
+    pub npc_missions: BTreeMap<i32, NpcMission<'a>>,
     pub skills: BTreeMap<PlEquipSkillId, Skill<'a>>,
     pub hyakuryu_skills: BTreeMap<PlHyakuryuSkillId, HyakuryuSkill<'a>>,
     pub armors: BTreeMap<PlArmorSeriesTypes, ArmorSeries<'a>>,
@@ -577,4 +619,6 @@ pub struct PediaEx<'a> {
     pub buff_cage: BTreeMap<LvBuffCageId, BuffCage<'a>>,
     pub item_shop_lot: Vec<ItemShopLot<'a>>,
     pub bbq: Vec<BbqData<'a>>,
+
+    pub dlc: BTreeMap<i32, Dlc<'a>>,
 }

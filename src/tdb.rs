@@ -44,7 +44,7 @@ fn as_hex(array: &[u8], len: usize) -> String {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone, Debug, PartialEq, Eq, Copy)]
     #[serde(into = "u16")]
     struct FieldAttribute: u16 {
         const PRIVATE_SCOPE            = 0x0000;
@@ -80,7 +80,7 @@ impl From<FieldAttribute> for u16 {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone, Debug, PartialEq, Eq, Copy)]
     #[serde(into = "u16")]
     struct ParamAttribute: u16 {
         const IN                = 0x0001;
@@ -100,7 +100,7 @@ impl From<ParamAttribute> for u16 {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone, Debug, PartialEq, Eq, Copy)]
     #[serde(into = "u16")]
     struct MethodAttribute: u16 {
         const PRIVATE_SCOPE            = 0x0000;
@@ -135,7 +135,7 @@ impl From<MethodAttribute> for u16 {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone, Debug, PartialEq, Eq, Copy)]
     #[serde(into = "u32")]
     struct TypeFlag: u32 {
         const NOT_PUBLIC           = 0x00000000;
@@ -199,7 +199,7 @@ impl From<TypeFlag> for u32 {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone, Debug, PartialEq, Eq, Copy)]
     #[serde(into = "u16")]
     struct MethodImplFlag: u16 {
         const CODE_TYPE_MASK              = 0x0003;
@@ -234,7 +234,7 @@ impl From<MethodImplFlag> for u16 {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone, Debug, PartialEq, Eq, Copy)]
     #[serde(into = "u16")]
     struct PropertyFlag: u16 {
         const SPECIAL_NAME    = 0x0200;

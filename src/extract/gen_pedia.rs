@@ -563,6 +563,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let quest_tutorial_msg = get_msg(pak, "Message/Quest/QuestData_Tutorial.msg")?;
     let quest_arena_msg = get_msg(pak, "Message/Quest/QuestData_Arena.msg")?;
     let quest_dlc_msg = get_msg(pak, "Message/Quest/QuestData_Dlc.msg")?;
+    let npc_mission_msg = get_msg(pak, "Message/Quest/QuestData_NpcMission.msg")?;
+    let npc_mission_msg_mr = get_msg(pak, "Message/Quest/QuestData_NpcMission_MR.msg")?;
 
     let armor_head_name_msg = get_msg(pak, "data/Define/Player/Armor/Head/A_Head_Name.msg")?;
     let armor_chest_name_msg = get_msg(pak, "data/Define/Player/Armor/Chest/A_Chest_Name.msg")?;
@@ -698,6 +700,14 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let horn_melody_mr = get_msg(
         pak,
         "data/Define/Player/Weapon/Horn/Horn_UniqueParam_MR.msg",
+    )?;
+    let weapon_series = get_msg(
+        pak,
+        "data/Define/Player/Weapon/WeaponSeries_Hunter_Name.msg",
+    )?;
+    let weapon_series_mr = get_msg(
+        pak,
+        "data/Define/Player/Weapon/WeaponSeries_Hunter_Name_MR.msg",
     )?;
 
     let maps = prepare_maps(pak)?;
@@ -849,6 +859,11 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         "data/System/ContentsIdSystem/LvBuffCage/Normal/LvBuffCage_Explain.msg",
     )?;
 
+    let dlc_name = get_msg(pak, "Message/DLC/DLC_Name.msg")?;
+    let dlc_name_mr = get_msg(pak, "Message/DLC/DLC_Name_MR.msg")?;
+    let dlc_explain = get_msg(pak, "Message/DLC/DLC_Explain.msg")?;
+    let dlc_explain_mr = get_msg(pak, "Message/DLC/DLC_Explain_MR.msg")?;
+
     Ok(Pedia {
         monsters,
         small_monsters,
@@ -892,6 +907,9 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         arena_quest: get_singleton(pak)?,
         quest_unlock: get_singleton(pak)?,
         time_attack_reward: get_singleton(pak)?,
+        talk_condition_quest_list: get_singleton(pak)?,
+        npc_mission: get_singleton(pak)?,
+        npc_mission_mr: get_singleton(pak)?,
         quest_hall_msg,
         quest_hall_msg_mr,
         quest_hall_msg_mr2,
@@ -900,6 +918,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         quest_tutorial_msg,
         quest_arena_msg,
         quest_dlc_msg,
+        npc_mission_msg,
+        npc_mission_msg_mr,
         armor: get_singleton(pak)?,
         armor_series: get_singleton(pak)?,
         armor_product: get_singleton(pak)?,
@@ -981,6 +1001,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         horn_melody_mr,
         hyakuryu_weapon_buildup: get_singleton(pak)?,
         weapon_chaos_critical: get_singleton_opt(pak)?,
+        weapon_series,
+        weapon_series_mr,
         maps,
         map_name,
         map_name_mr,
@@ -994,6 +1016,9 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         dog_weapon: get_singleton(pak)?,
         dog_weapon_product: get_singleton(pak)?,
         ot_equip_series: get_singleton(pak)?,
+        airou_overwear: get_singleton(pak)?,
+        dog_overwear: get_singleton(pak)?,
+        ot_overwear_recipe: get_singleton(pak)?,
         airou_armor_head_name,
         airou_armor_head_explain,
         airou_armor_chest_name,
@@ -1059,6 +1084,14 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         trade: get_singleton(pak)?,
         spy: get_singleton(pak)?,
         offcut_convert: get_singleton(pak)?,
+
+        dlc: get_singleton(pak)?,
+        dlc_add: get_singleton(pak)?,
+        item_pack: get_singleton(pak)?,
+        dlc_name,
+        dlc_name_mr,
+        dlc_explain,
+        dlc_explain_mr,
     })
 }
 
@@ -1726,6 +1759,18 @@ fn prepare_quests<'a>(
         false,
     )?;
 
+    let mr_all_clear_quest: HashSet<_> = pedia.talk_condition_quest_list.quest_group[0]
+        .quest_no_array
+        .iter()
+        .copied()
+        .collect();
+
+    let mr_all_clear_follower_quest: HashSet<_> = pedia.talk_condition_quest_list.quest_group[1]
+        .quest_no_array
+        .iter()
+        .copied()
+        .collect();
+
     let mut result = pedia
         .normal_quest_data
         .param
@@ -1869,6 +1914,9 @@ fn prepare_quests<'a>(
                     unlock: vec![],
                     random_group: None,
                     time_attack_reward,
+                    is_mr_all_clear_quest: mr_all_clear_quest.contains(&param.quest_no),
+                    is_mr_all_clear_follower_quest: mr_all_clear_follower_quest
+                        .contains(&param.quest_no),
                 },
             ))
         })
@@ -2664,19 +2712,15 @@ where
             .remove(&explain_tag)
             .or_else(|| explain_map_mr.remove(&explain_tag));
 
-        let overwear = if let Some(overwear) = overwear_map.get(&id) {
-            if let Some(product) = overwear_product_map.get(&overwear.id) {
-                Some(*product)
+        let (overwear, overwear_product) = if let Some(&overwear) = overwear_map.get(&id) {
+            if let Some(&product) = overwear_product_map.get(&overwear.id) {
+                (Some(overwear), Some(product))
             } else {
                 // This happens for DLC layered
-                eprintln!(
-                    "Overwear product not found for weapon {:?}, overwear{}",
-                    id, overwear.id
-                );
-                None
+                (Some(overwear), None)
             }
         } else {
-            None
+            (None, None)
         };
 
         let weapon = Weapon {
@@ -2685,6 +2729,7 @@ where
             change: change_map.remove(&id),
             process: process_map.remove(&id),
             overwear,
+            overwear_product,
             name,
             explain,
             children: vec![],
@@ -3136,6 +3181,8 @@ fn prepeare_ot_equip(pedia: &Pedia) -> Result<BTreeMap<OtEquipSeriesId, OtEquipS
         let entry = OtArmor {
             param: armor,
             product: armor_products.remove(&armor.id),
+            overwear: None,
+            overwear_recipe: None,
             name,
             explain,
         };
@@ -3165,6 +3212,54 @@ fn prepeare_ot_equip(pedia: &Pedia) -> Result<BTreeMap<OtEquipSeriesId, OtEquipS
 
     if !armor_products.is_empty() {
         bail!("Left over otomo armor product")
+    }
+
+    let mut overwear_recipe = hash_map_unique(
+        pedia
+            .ot_overwear_recipe
+            .param
+            .iter()
+            .filter(|p| p.id != OtArmorId::None),
+        |p| (p.id, p),
+        true, // crapcom please: multiple AirouHead(0)
+    )?;
+
+    for overwear in pedia
+        .airou_overwear
+        .param
+        .iter()
+        .chain(&pedia.dog_overwear.param)
+    {
+        if !overwear.is_valid || overwear.id == OtArmorId::None {
+            continue;
+        }
+        if overwear.id != overwear.relative_id {
+            bail!(
+                "Overwear ID not matching itself: {:?} vs {:?}",
+                overwear.id,
+                overwear.relative_id
+            )
+        }
+        let series = res.get_mut(&overwear.series_id).with_context(|| {
+            format!(
+                "Series {:?} not found for overwear {:?}",
+                overwear.series_id, overwear.id
+            )
+        })?;
+        let piece = match overwear.id {
+            OtArmorId::None => unreachable!(),
+            OtArmorId::AirouHead(_) | OtArmorId::DogHead(_) => &mut series.head,
+            OtArmorId::AirouChest(_) | OtArmorId::DogChest(_) => &mut series.chest,
+        };
+        let piece = piece
+            .as_mut()
+            .with_context(|| format!("OtArmor not init for overwear {:?}", overwear.id))?;
+        piece.overwear = Some(overwear);
+        piece.overwear_recipe = overwear_recipe.remove(&overwear.id);
+    }
+
+    if !overwear_recipe.is_empty() {
+        bail!("Leftover recipe {:?}", overwear_recipe)
     }
 
     Ok(res)
@@ -3722,6 +3817,110 @@ fn prepare_bbq<'a>(
     Ok(result)
 }
 
+fn prepare_npc_mission(pedia: &'_ Pedia) -> Result<BTreeMap<i32, NpcMission<'_>>> {
+    let mut result: BTreeMap<i32, NpcMission> = BTreeMap::new();
+
+    let all_msg = pedia
+        .npc_mission_msg
+        .entries
+        .iter()
+        .chain(&pedia.npc_mission_msg_mr.entries);
+
+    let all_msg = hash_map_unique(all_msg, |e| (&e.name, e), false)?;
+
+    for param in pedia
+        .npc_mission
+        .param
+        .iter()
+        .chain(&pedia.npc_mission_mr.param)
+    {
+        let tag = format!("NSQ{:03}", param.id);
+        let name_tag = format!("{tag}_01");
+        let requester_tag = format!("{tag}_02");
+        let detail_tag = format!("{tag}_03");
+        let reward_tag = format!("{tag}_04");
+        let target_tag = format!("{tag}_09");
+        let name = *all_msg
+            .get(&name_tag)
+            .with_context(|| format!("{name_tag} not found"))?;
+        let requester = *all_msg
+            .get(&requester_tag)
+            .with_context(|| format!("{requester_tag} not found"))?;
+        let detail = *all_msg
+            .get(&detail_tag)
+            .with_context(|| format!("{detail_tag} not found"))?;
+        let reward = all_msg.get(&reward_tag).copied();
+        let target = all_msg.get(&target_tag).copied();
+        let mission = NpcMission {
+            param,
+            name,
+            requester,
+            detail,
+            target,
+            reward,
+        };
+        if result.insert(param.id, mission).is_some() {
+            bail!("duplicate NPC mission {}", param.id)
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn prepare_dlc(pedia: &'_ Pedia) -> Result<BTreeMap<i32, Dlc<'_>>> {
+    let mut result = BTreeMap::new();
+
+    let mut dlc_adds = hash_map_unique(
+        pedia
+            .dlc_add
+            .add_data_info_list
+            .iter()
+            .filter(|p| p.dlc_id != 0 && p.slc_id == SaveLinkContents::Invalid),
+        |p| (p.dlc_id, p),
+        true, // crapcom: there seems to be duplicated identical stuff...
+    )?;
+
+    let mut item_pack = hash_map_unique(&pedia.item_pack.param, |p| (p.dlc_id, p), false)?;
+
+    let names = pedia.dlc_name.get_name_map();
+    let names_mr = pedia.dlc_name_mr.get_name_map();
+    let explains = pedia.dlc_explain.get_name_map();
+    let explains_mr = pedia.dlc_explain_mr.get_name_map();
+
+    for dlc in &pedia.dlc.data_list {
+        let add = dlc_adds.remove(&dlc.dlc_id);
+        let item_pack = item_pack.remove(&dlc.dlc_id);
+        let name = names
+            .get(&dlc.title_msg_id)
+            .or_else(|| names_mr.get(&dlc.title_msg_id))
+            .cloned();
+        let explain = explains
+            .get(&dlc.explain_msg_id)
+            .or_else(|| explains_mr.get(&dlc.explain_msg_id))
+            .cloned();
+        let entry = Dlc {
+            data: dlc,
+            add,
+            item_pack,
+            name,
+            explain,
+        };
+        if result.insert(dlc.dlc_id, entry).is_some() {
+            bail!("duplicate dlc {}", dlc.dlc_id)
+        }
+    }
+
+    if !dlc_adds.is_empty() {
+        bail!("Leftover dlc add: {:?}", dlc_adds)
+    }
+
+    if !item_pack.is_empty() {
+        bail!("Left over item pack: {:?}", item_pack)
+    }
+
+    Ok(result)
+}
+
 pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
     let monster_order = pedia
         .monster_list
@@ -3784,6 +3983,7 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         sizes: prepare_size_map(&pedia.size_list)?,
         size_dists: prepare_size_dist_map(&pedia.random_scale)?,
         quests: prepare_quests(pedia, &reward_lot)?,
+        npc_missions: prepare_npc_mission(pedia)?,
         skills: prepare_skills(pedia)?,
         hyakuryu_skills: prepare_hyakuryu_skills(pedia)?,
         armors: prepare_armors(pedia)?,
@@ -3824,5 +4024,7 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         buff_cage: prepare_buff_cage(pedia)?,
         item_shop_lot: prepare_item_shop_lot(pedia, &reward_lot)?,
         bbq: prepare_bbq(pedia, &reward_lot)?,
+
+        dlc: prepare_dlc(pedia)?,
     })
 }
