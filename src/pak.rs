@@ -248,7 +248,7 @@ impl<F: Read + Seek> PakReader<F> {
             _ => bail!("Unsupported encryption {}", encryption),
         }
 
-        match (format & 0b0000_0011) {
+        match format & 0b0000_0011 {
             0 => {
                 if len != u64::try_from(data.len())? {
                     bail!("Uncompressed file should have len == len_compressed")
