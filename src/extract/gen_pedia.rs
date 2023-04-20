@@ -77,6 +77,14 @@ fn exactly_one<T>(mut iterator: impl Iterator<Item = T>) -> Result<T> {
     Ok(next)
 }
 
+fn atmost_one<T>(mut iterator: impl Iterator<Item = T>) -> Result<Option<T>> {
+    let Some(next) = iterator.next() else {return Ok(None)};
+    if iterator.next().is_some() {
+        bail!("Multiple elements found");
+    }
+    Ok(Some(next))
+}
+
 fn gen_em_collider_path(id: u32, sub_id: u32) -> String {
     format!("enemy/em{id:03}/{sub_id:02}/collision/em{id:03}_{sub_id:02}_colliders.rcol")
 }
@@ -298,6 +306,7 @@ pub fn gen_monsters(
             let condition_damage_data =
                 sub_file(pak, &main_pfb).context("condition_damage_data")?;
             let anger_data = sub_file(pak, &main_pfb).context("anger_data")?;
+            let stamina_data = sub_file(pak, &main_pfb).context("stamina_data")?;
             let parts_break_data = sub_file(pak, &main_pfb).context("parts_break_data")?;
 
             let boss_init_set_data = if let Some(path) = boss_init_path_gen(id, sub_id) {
@@ -377,6 +386,40 @@ pub fn gen_monsters(
                 }
             }
 
+            let pop_parameter = sub_file(pak, &main_pfb).context("pop_parameter")?;
+
+            let unique_mystery = if let Some((loader, path)) =
+                atmost_one(main_pfb.children.iter().filter_map(|child| {
+                    UNIQUE_MYSTERY_TYPE_MAP
+                        .get(&child.hash)
+                        .map(|loader| (loader, &child.name))
+                }))? {
+                let index = pak.find_file(path)?;
+                let data = User::new(Cursor::new(pak.read_file(index)?))?;
+                let data = loader(data.rsz.deserialize_single_any().context(path.clone())?)?;
+                if data.base.condition_damage_data.len() > 1 {
+                    bail!("Multiple condition damage data for mystery {main_pfb_path}")
+                }
+                Some(data)
+            } else {
+                eprintln!("Unique mystery file not found for {main_pfb_path}");
+                None
+            };
+
+            let unique_over_mystery = if let Some(child) = atmost_one(
+                main_pfb
+                    .children
+                    .iter()
+                    .filter(|child| child.hash == EnemyUniqueOverMysteryData::type_hash()),
+            )? {
+                let path = &child.name;
+                let index = pak.find_file(path)?;
+                let data = User::new(Cursor::new(pak.read_file(index)?))?;
+                Some(data.rsz.deserialize_single().context(path.clone())?)
+            } else {
+                None
+            };
+
             monsters.push(Monster {
                 id,
                 sub_id,
@@ -387,12 +430,16 @@ pub fn gen_monsters(
                 meat_data,
                 condition_damage_data,
                 anger_data,
+                stamina_data,
                 parts_break_data,
                 boss_init_set_data,
                 collider_mapping,
                 drop_item,
                 parts_break_reward,
                 atk_colliders,
+                pop_parameter,
+                unique_mystery,
+                unique_over_mystery,
             })
         }
     }
@@ -1088,10 +1135,14 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         dlc: get_singleton(pak)?,
         dlc_add: get_singleton(pak)?,
         item_pack: get_singleton(pak)?,
+        slc_item_pack: get_singleton(pak)?,
         dlc_name,
         dlc_name_mr,
         dlc_explain,
         dlc_explain_mr,
+
+        system_mystery: get_singleton(pak)?,
+        system_mario: get_singleton(pak)?,
     })
 }
 
@@ -3921,6 +3972,40 @@ pub fn prepare_dlc(pedia: &'_ Pedia) -> Result<BTreeMap<i32, Dlc<'_>>> {
     Ok(result)
 }
 
+pub fn prepare_slc(pedia: &'_ Pedia) -> Result<BTreeMap<SaveLinkContents, Slc<'_>>> {
+    let mut result = BTreeMap::new();
+
+    for add in pedia
+        .dlc_add
+        .add_data_info_list
+        .iter()
+        .filter(|add| add.slc_id != SaveLinkContents::Invalid)
+    {
+        if result
+            .insert(
+                add.slc_id,
+                Slc {
+                    add: Some(add),
+                    item_pack: None,
+                },
+            )
+            .is_some()
+        {
+            bail!("Duplicate SLC add for {:?}", add.slc_id)
+        }
+    }
+
+    for item_pack in &pedia.slc_item_pack.param {
+        let entry = result.entry(item_pack.save_link_id).or_default();
+        if entry.item_pack.is_some() {
+            bail!("Duplicate SLC item pack for {:?}", item_pack.save_link_id);
+        }
+        entry.item_pack = Some(item_pack);
+    }
+
+    Ok(result)
+}
+
 pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
     let monster_order = pedia
         .monster_list
@@ -4026,5 +4111,6 @@ pub fn gen_pedia_ex(pedia: &Pedia) -> Result<PediaEx<'_>> {
         bbq: prepare_bbq(pedia, &reward_lot)?,
 
         dlc: prepare_dlc(pedia)?,
+        slc: prepare_slc(pedia)?,
     })
 }

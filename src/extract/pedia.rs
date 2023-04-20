@@ -29,12 +29,16 @@ pub struct Monster {
     pub meat_data: EnemyMeatData,
     pub condition_damage_data: EnemyConditionDamageData,
     pub anger_data: EnemyAngerData,
+    pub stamina_data: EnemyStaminaData,
     pub parts_break_data: EnemyPartsBreakData,
     pub boss_init_set_data: Option<EnemyBossInitSetData>,
     pub collider_mapping: ColliderMapping,
     pub drop_item: EnemyDropItemInfoData,
     pub parts_break_reward: Option<EnemyPartsBreakRewardData>,
     pub atk_colliders: Vec<AttackCollider>,
+    pub pop_parameter: EnemyPopParameterData,
+    pub unique_mystery: Option<EnemyUniqueMysteryDataWrapper>,
+    pub unique_over_mystery: Option<EnemyUniqueOverMysteryData>,
 }
 
 #[derive(Debug, Serialize)]
@@ -296,10 +300,14 @@ pub struct Pedia {
     pub dlc: DlcListUserData,
     pub dlc_add: DlcAddUserData,
     pub item_pack: ItemPackUserData,
+    pub slc_item_pack: ItemPackSaveLinkUserData,
     pub dlc_name: Msg,
     pub dlc_name_mr: Msg,
     pub dlc_explain: Msg,
     pub dlc_explain_mr: Msg,
+
+    pub system_mystery: SystemMysteryUserData,
+    pub system_mario: SystemMarionetteUserData,
 }
 
 pub struct QuestReward<'a> {
@@ -570,6 +578,12 @@ pub struct Dlc<'a> {
     pub explain: Option<&'a MsgEntry>,
 }
 
+#[derive(Default)]
+pub struct Slc<'a> {
+    pub add: Option<&'a AddDataInfo>,
+    pub item_pack: Option<&'a SlcItemPackParam>,
+}
+
 pub struct PediaEx<'a> {
     pub monsters: BTreeMap<EmTypes, MonsterEx<'a>>,
     pub sizes: HashMap<EmTypes, &'a SizeInfo>,
@@ -621,4 +635,5 @@ pub struct PediaEx<'a> {
     pub bbq: Vec<BbqData<'a>>,
 
     pub dlc: BTreeMap<i32, Dlc<'a>>,
+    pub slc: BTreeMap<SaveLinkContents, Slc<'a>>,
 }

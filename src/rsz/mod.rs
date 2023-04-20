@@ -16,6 +16,7 @@ mod lot;
 mod map;
 mod meat_data;
 mod monster_list;
+mod mystery;
 mod otomo;
 mod parts_break_data;
 mod quest_data;
@@ -42,6 +43,7 @@ pub use lot::*;
 pub use map::*;
 pub use meat_data::*;
 pub use monster_list::*;
+pub use mystery::*;
 pub use otomo::*;
 pub use parts_break_data::*;
 pub use quest_data::*;
@@ -213,12 +215,16 @@ impl Rsz {
                     &buffer[0..read]
                 )
             })?;
-            let version = *type_info.versions.get(&crc).with_context(|| {
-                format!(
-                    "Unknown type CRC {:08X} for type {:08X} ({}) at {:08X}",
-                    crc, hash, type_info.symbol, pos
-                )
-            })?;
+            let version = if type_info.versions.is_empty() {
+                0
+            } else {
+                *type_info.versions.get(&crc).with_context(|| {
+                    format!(
+                        "Unknown type CRC {:08X} for type {:08X} ({}) at {:08X}",
+                        crc, hash, type_info.symbol, pos
+                    )
+                })?
+            };
             let mut rsz_deserializer = RszDeserializer {
                 node_buf: &mut node_buf,
                 cursor: &mut cursor,
@@ -284,10 +290,10 @@ impl Rsz {
         self.roots.len()
     }
 
-    pub fn verify_crc(&self, crc_mismatches: &mut BTreeMap<&str, u32>) {
+    pub fn verify_crc(&self, crc_mismatches: &mut BTreeMap<&str, u32>, print_all: bool) {
         for td in &self.type_descriptors {
             if let Some(type_info) = RSZ_TYPE_MAP.get(&td.hash) {
-                if !type_info.versions.contains_key(&td.crc) {
+                if print_all || !type_info.versions.contains_key(&td.crc) {
                     crc_mismatches.insert(type_info.symbol, td.crc);
                 }
             }
@@ -525,25 +531,25 @@ static EXTERN_PATH_TYPE_INFO: Lazy<RszTypeInfo> = Lazy::new(|| RszTypeInfo {
     symbol: "FAKE_SYMBOL_ExternPath",
 });
 
+pub fn register<T: 'static + FromRsz + Serialize + Debug>(m: &mut HashMap<u32, RszTypeInfo>) {
+    let hash = T::type_hash();
+
+    let package = RszTypeInfo {
+        deserializer: rsz_deserializer::<T>,
+        to_json: rsz_to_json::<T>,
+        debug: rsz_debug::<T>,
+        versions: T::VERSIONS.iter().copied().collect(),
+        symbol: T::SYMBOL,
+    };
+
+    let old = m.insert(hash, package);
+    if old.is_some() {
+        panic!("Multiple type reigstered for the same hash")
+    }
+}
+
 pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
     let mut m = HashMap::new();
-
-    fn register<T: 'static + FromRsz + Serialize + Debug>(m: &mut HashMap<u32, RszTypeInfo>) {
-        let hash = T::type_hash();
-
-        let package = RszTypeInfo {
-            deserializer: rsz_deserializer::<T>,
-            to_json: rsz_to_json::<T>,
-            debug: rsz_debug::<T>,
-            versions: T::VERSIONS.iter().copied().collect(),
-            symbol: T::SYMBOL,
-        };
-
-        let old = m.insert(hash, package);
-        if old.is_some() {
-            panic!("Multiple type reigstered for the same hash")
-        }
-    }
 
     macro_rules! r {
         ($($t:ty),*$(,)?) => {
@@ -582,7 +588,16 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
 
     r!(EnemyDataBase);
 
-    r!(EnemyAngerSeparateData, EnemyAngerData);
+    r!(
+        EnemyAngerSeparateData,
+        EnemyAngerData,
+        EnemyStaminaPointData,
+        EnemyStaminaSeparateData,
+        NikuEatInfo,
+        SetMeatInfo,
+        PredatorData,
+        EnemyStaminaData
+    );
 
     r!(
         PartsLockParam,
@@ -647,6 +662,19 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         PresetKoyashiData,
         PresetSteelFangData,
         EnemyConditionPresetData,
+        BindWireTotalNumParam,
+        BindWireStrength,
+        BindStartPullAdjustParam,
+        MarionetteWireGaugeParam,
+        SystemMarionetteStartDamageData,
+        HitStopInfo,
+        AdjustValueByDirection,
+        EnemyMarionetteAttackAdjustInfo,
+        EnemyMarionetteAttackRate,
+        EnemyMarionetteAttackModeRate,
+        MarionetteModePower,
+        MarionetteModeReward,
+        SystemMarionetteUserData,
     );
 
     r!(
@@ -794,6 +822,8 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         PartsTypeTextUserDataTextInfo,
         PartsTypeInfo,
         PartsTypeTextUserData,
+        HagiPopParameter,
+        EnemyPopParameterData,
     );
 
     r!(
@@ -1047,8 +1077,39 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         DlcListUserData,
         ItemInfo,
         ItemPackParam,
-        ItemPackUserData
+        ItemPackUserData,
+        SlcItemInfo,
+        SlcItemPackParam,
+        ItemPackSaveLinkUserData,
     );
+
+    r!(
+        MysteryCoreEffectSettingInfo,
+        EnemyMysteryCorePartsData,
+        EnemyMysteryMaximumActivityReleaseInfo,
+        SystemMysteryUserDataAttackRate,
+        SystemMysteryUserDataMotSpeedRate,
+        EnemyUniqueMysteryDataConditionDamageData,
+        EnemyCameraZoomParam,
+        EnemyUniqueMysteryData,
+        ShellInfo,
+        SuperNovaSpiralShellPresetData,
+        TimeSecPresetData,
+        RatePresetData,
+        PercentagePresetData,
+        MaximumActivityReleaseInfoPresetData,
+        MaximumToActivityNeedReleaseNumPresetData,
+        AttackRatePresetData,
+        MotSpeedRatePresetData,
+        MysteryDebuffTimeRatePresetData,
+        MRConditionDamageResistData,
+        SystemMysteryUserData,
+        StrengthLevelData,
+        OverMysteryBurstData,
+        EnemyUniqueOverMysteryData,
+    );
+
+    m.extend(unique_mystery::unique_mystery_type_map());
 
     m
 });

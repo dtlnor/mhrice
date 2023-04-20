@@ -14,7 +14,7 @@ use typed_html::{dom::*, elements::*, html, text};
 pub fn gen_atomo_armor_label(piece: &OtArmor) -> Box<div<String>> {
     let icon = format!("/resources/equip/{:03}", piece.param.id.icon_index());
     html!(<div class="mh-icon-text">
-        { gen_rared_icon(piece.param.rare_type, &icon, []) }
+        { gen_rared_icon(piece.param.rare_type, &icon, [], false) }
         <span>{ gen_multi_lang(piece.name) }</span>
     </div>)
 }
@@ -30,7 +30,7 @@ pub fn gen_atomo_weapon_label(piece: &OtWeapon) -> Box<div<String>> {
 
     let icon = format!("/resources/equip/{icon_index:03}");
     html!(<div class="mh-icon-text">
-        { gen_rared_icon(piece.param.rare_type, &icon, []) }
+        { gen_rared_icon(piece.param.rare_type, &icon, [], false) }
         <span>{ gen_multi_lang(piece.name) }</span>
     </div>)
 }
@@ -189,25 +189,30 @@ fn gen_otomo_equip(
         ),
     });
 
-    let dlc: Vec<&Dlc> = pedia_ex
+    let dlc_add = pedia_ex
         .dlc
         .values()
-        .filter(|dlc| {
-            if let Some(add) = dlc.add {
-                if let Some(id) = series.head.as_ref().and_then(|p| p.overwear).map(|p| p.id) {
-                    if add.ot_overwear_id_list.contains(&id) {
-                        return true;
-                    }
+        .filter_map(|dlc| dlc.add.map(|add| (gen_dlc_label(dlc), add)));
+
+    let slc_add = pedia_ex
+        .slc
+        .iter()
+        .filter_map(|(id, slc)| slc.add.map(|add| (gen_slc_label(id), add)));
+
+    let dlc: Vec<Box<a<String>>> = dlc_add
+        .chain(slc_add)
+        .filter_map(|(label, add)| {
+            if let Some(id) = series.head.as_ref().and_then(|p| p.overwear).map(|p| p.id) {
+                if add.ot_overwear_id_list.contains(&id) {
+                    return Some(label);
                 }
-                if let Some(id) = series.chest.as_ref().and_then(|p| p.overwear).map(|p| p.id) {
-                    if add.ot_overwear_id_list.contains(&id) {
-                        return true;
-                    }
-                }
-                false
-            } else {
-                false
             }
+            if let Some(id) = series.chest.as_ref().and_then(|p| p.overwear).map(|p| p.id) {
+                if add.ot_overwear_id_list.contains(&id) {
+                    return Some(label);
+                }
+            }
+            None
         })
         .collect();
 
@@ -218,7 +223,7 @@ fn gen_otomo_equip(
             <h2 >"DLC"</h2>
             <ul class="mh-item-list">
             {dlc.into_iter().map(|dlc| html!(<li>
-                {gen_dlc_label(dlc)}
+                {dlc}
                 <span class="tag">"Layered"</span>
             </li>))}
             </ul>
@@ -393,7 +398,7 @@ fn gen_otomo_equip(
             <main>
             <header>
                 <div class="mh-title-icon">
-                { gen_rared_icon(rarity, icon, []) }
+                { gen_rared_icon(rarity, icon, [], false) }
                 </div>
                 <h1> {gen_multi_lang(series.name)} </h1>
             </header>

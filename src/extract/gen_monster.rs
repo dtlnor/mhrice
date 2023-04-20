@@ -221,7 +221,7 @@ fn gen_condition_paralyze(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/para.png" alt="Paralyze" class="mh-small-icon"/>"Paralyze"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset={}", data.preset_type)} </td>
+            <td>  </td>
         </tr>
     )
 }
@@ -235,7 +235,7 @@ fn gen_condition_sleep(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/sleep.png" alt="Sleep" class="mh-small-icon"/>"Sleep"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td>  </td>
         </tr>
     )
 }
@@ -249,7 +249,7 @@ fn gen_condition_stun(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/stun.png" alt="Stun" class="mh-small-icon"/>"Stun"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td>  </td>
         </tr>
     )
 }
@@ -263,13 +263,15 @@ fn gen_condition_stamina(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/exhaust.png" alt="Exhaust" class="mh-small-icon"/>"Exhaust"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Stamina reduction = {}, Preset={}", data.sub_stamina, data.preset_type)} </td>
+            <td> {text!("Stamina reduction = {}", data.sub_stamina)} </td>
         </tr>
     )
 }
 
 fn gen_condition_flash(
+    pedia_ex: &PediaEx,
     is_preset: bool,
+    is_mystery: bool,
     data: &FlashDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
@@ -305,7 +307,11 @@ fn gen_condition_flash(
 
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Flash"</td>
+            <td>
+            {pedia_ex.items.get(&ItemId::Normal(163)).map(|item| gen_item_icon(item, true))}
+            "Flash"
+            {is_mystery.then(||html!(<img src="/resources/afflicted.png" alt="Afflicted" class="mh-small-icon"/>))}
+            </td>
             { gen_condition_base(&data.base) }
             <td>
             { data.damage_lvs.iter().map(|lv| {
@@ -319,7 +325,6 @@ fn gen_condition_flash(
             <br />
             {text!("Distance = {} ~ {}, Angle = {}", data.min_distance, data.max_distance, data.angle)}
             <br />
-            {text!("Preset = {}", data.preset_type)}
             </td>
         </tr>
     )
@@ -334,7 +339,7 @@ fn gen_condition_poison(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/poison.png" alt="Poison" class="mh-small-icon"/>"Poison"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td>  </td>
         </tr>
     )
 }
@@ -348,24 +353,25 @@ fn gen_condition_blast(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/blast.png" alt="Blast" class="mh-small-icon"/>"Blast"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Blast damage = {}, Preset = {}", data.blast_damage, data.preset_type)} </td>
+            <td> {text!("Blast damage = {}", data.blast_damage)} </td>
         </tr>
     )
 }
 
 fn gen_condition_ride(
+    pedia_ex: &PediaEx,
+    is_preset: bool,
     data: &MarionetteStartDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
-    let use_data = match data.use_data {
-        UseDataType::Common => "common",
-        UseDataType::Unique => "unique",
-    };
     html!(
-        <tr class={gen_disabled(used, None).as_str()}>
-            <td>"Ride"</td>
+        <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
+            <td>
+            {pedia_ex.items.get(&ItemId::Normal(1062)).map(|item| gen_item_icon(item, true))}
+            "Ride"
+            </td>
             { gen_condition_base(&data.base) }
-            <td> {text!("{}, Nora first limit = {}", use_data, data.nora_first_limit)} </td>
+            <td> {text!("Non-target monster first ride limit = {}", data.nora_first_limit)} </td>
         </tr>
     )
 }
@@ -392,7 +398,6 @@ fn gen_condition_water(
                 data.shell_adjust.judge_meat_value
             )}
             <br />
-            {text!("Preset = {}", data.preset_type)}
             </td>
         </tr>
     )
@@ -407,7 +412,7 @@ fn gen_condition_fire(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/fire.png" alt="Fire" class="mh-small-icon"/>"Fire"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Hit-damage rate = {}, Preset = {}", data.hit_damage_rate, data.preset_type)} </td>
+            <td> {text!("Hit-damage rate = {}", data.hit_damage_rate)} </td>
         </tr>
     )
 }
@@ -421,7 +426,7 @@ fn gen_condition_ice(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/ice.png" alt="Ice" class="mh-small-icon"/>"Ice"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Motion speed rate = {}, Preset = {}", data.motion_speed_rate, data.preset_type)} </td>
+            <td> {text!("Motion speed rate = {}", data.motion_speed_rate)} </td>
         </tr>
     )
 }
@@ -450,94 +455,122 @@ fn gen_condition_thunder(
                 data.normal_meat_adjust.default_stun_damage_rate
             )}
             <br />
-            {text!("Stun active limit = {}, Preset = {}",
-                data.stun_active_limit, data.preset_type)}
+            {text!("Stun active limit = {}", data.stun_active_limit)}
             </td>
         </tr>
     )
 }
 
 fn gen_condition_fall_trap(
+    pedia_ex: &PediaEx,
     is_preset: bool,
+    is_mystery: bool,
     data: &FallTrapDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Fall trap"</td>
+            <td>
+            {pedia_ex.items.get(&ItemId::Normal(123)).map(|item| gen_item_icon(item, true))}
+            "Pitfall trap"
+            {is_mystery.then(||html!(<img src="/resources/afflicted.png" alt="Afflicted" class="mh-small-icon"/>))}
+            </td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td> </td>
         </tr>
     )
 }
 
 fn gen_condition_fall_quick_sand(
     is_preset: bool,
+    is_mystery: bool,
     data: &FallQuickSandDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Quick sand"</td>
+            <td>
+            {gen_colored_icon(5, "/resources/item/113", [], true)}
+            "Quicksand"
+            {is_mystery.then(||html!(<img src="/resources/afflicted.png" alt="Afflicted" class="mh-small-icon"/>))}
+            </td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td> </td>
         </tr>
     )
 }
 
 fn gen_condition_fall_otomo_trap(
     is_preset: bool,
+    is_mystery: bool,
     data: &FallOtomoTrapDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Buddy fall trap"</td>
+            <td>
+            {gen_colored_icon(9, "/resources/item/156", [], true)}
+            "Poison purr-ison"
+            {is_mystery.then(||html!(<img src="/resources/afflicted.png" alt="Afflicted" class="mh-small-icon"/>))}
+            </td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Poison stacking = {}, Preset = {}",
-                data.already_poison_stock_value, data.preset_type)} </td>
+            <td> {text!("Poison stacking = {}", data.already_poison_stock_value)} </td>
         </tr>
     )
 }
 
 fn gen_condition_shock_trap(
+    pedia_ex: &PediaEx,
     is_preset: bool,
+    is_mystery: bool,
     data: &ShockTrapDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Shock trap"</td>
+            <td>
+            {pedia_ex.items.get(&ItemId::Normal(4)).map(|item| gen_item_icon(item, true))}
+            "Shock trap"
+            {is_mystery.then(||html!(<img src="/resources/afflicted.png" alt="Afflicted" class="mh-small-icon"/>))}
+            </td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td> </td>
         </tr>
     )
 }
 
 fn gen_condition_shock_otomo_trap(
     is_preset: bool,
+    is_mystery: bool,
     data: &ShockTrapDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Buddy shock trap"</td>
+            <td>
+            {gen_colored_icon(4, "/resources/item/156", [], true)}
+            "Shock purr-ison"
+            {is_mystery.then(||html!(<img src="/resources/afflicted.png" alt="Afflicted" class="mh-small-icon"/>))}
+            </td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td></td>
         </tr>
     )
 }
 
 fn gen_condition_capture(
+    pedia_ex: &PediaEx,
     is_preset: bool,
     data: &CaptureDamageData,
     used: ConditionDamageDataUsed,
 ) -> Box<tr<String>> {
     html!(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
-            <td>"Capture"</td>
+            <td>
+            {pedia_ex.items.get(&ItemId::Normal(494)).map(|item| gen_item_icon(item, true))}
+            "Capture"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td> </td>
         </tr>
     )
 }
@@ -551,7 +584,7 @@ fn gen_condition_dung(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/dung.png" alt="Dung" class="mh-small-icon"/>"Dung"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Preset = {}", data.preset_type)} </td>
+            <td></td>
         </tr>
     )
 }
@@ -565,8 +598,8 @@ fn gen_condition_steel_fang(
         <tr class={gen_disabled(used, Some(is_preset)).as_str()}>
             <td><img src="/resources/steelfang.png" alt="Steel fang" class="mh-small-icon"/>"Steel fang"</td>
             { gen_condition_base(&data.base) }
-            <td> {text!("Active limit = {}, Preset = {}, Unique target param = {}",
-                data.active_limit_count, data.preset_type, data.is_unique_target_param)}
+            <td> {text!("Active limit = {}, Unique target param = {}",
+                data.active_limit_count, data.is_unique_target_param)}
                 <br />
                 {text!("Distance = {} ~ {}, Angle = {}",
                 data.min_distance, data.max_distance, data.angle)}
@@ -628,8 +661,19 @@ pub fn gen_lot(
         return None;
     };
 
+    // TODO: find how to use other pop parameter
+    let main_body_tag = monster
+        .pop_parameter
+        .system_pop_parameters
+        .iter()
+        .find(|p| p.pop_id == 0)
+        .map_or_else(
+            || "Main body".to_string(),
+            |p| format!("Main body (x{})", p.base_max_hagi_count),
+        );
+
     let mut drop_dictionary = HashMap::new();
-    drop_dictionary.insert(EnemyRewardPopTypes::MainBody, vec!["Main body".to_string()]);
+    drop_dictionary.insert(EnemyRewardPopTypes::MainBody, vec![main_body_tag]);
     drop_dictionary.insert(
         EnemyRewardPopTypes::PartsLoss1,
         vec!["Severed part A".to_string()],
@@ -1446,6 +1490,9 @@ pub fn gen_monster(
                     <th>"Break"</th>
                     <th>"Sever"</th>
                     <th>"Extract"</th>
+                    <th>"Anomaly cores" {
+                        monster.unique_mystery.as_ref().map(|m| text!(" ({}x active)", m.base.maximum_activity_core_num))
+                    } </th>
                 </tr>
             </thead>
             <tbody>{
@@ -1511,6 +1558,32 @@ pub fn gen_monster(
                         <td>{ text!("{}", part_break) }</td>
                         <td>{ text!("{}", part_loss) }</td>
                         <td>{ gen_extractive_type(part.extractive_type) }</td>
+                        {
+                            if let Some(m) = &monster.unique_mystery {
+                                html!(<td>
+                                {if let Some(core @ EnemyMysteryCorePartsData{is_core_candidate: true, ..}) = m.base.mystery_core_parts_data.get(index) {
+                                    html!(<div>
+                                        <div>{text!("{}% probability, {} HP", core.activate_percentage, core.maximum_activity_vital)}</div>
+                                        {(!core.link_parts_list.is_empty()).then(|| html!(<div>"Linked parts "
+                                            {core.link_parts_list.iter().map(|part|{let part_color = format!("mh-part-group mh-part-{part}");
+                                                html!(<span class=part_color.as_str()/>)})}
+                                            {core.link_parts_list.iter().map(|part|text!("[{}]", part))}
+                                        </div>))}
+                                        {(core.prohibit_same_apply_group.0.is_some() && core.prohibit_same_apply_group.0 != Some(6)).then(||
+                                            html!(<div>{text!("Mutual exclusive group {}", core.prohibit_same_apply_group.0.unwrap())}</div>)
+                                        )}
+                                    </div>)
+                                } else {
+                                    html!(<div>"-"</div>)
+                                }}
+                                { (Ok(m.base.maximum_activity_release_last_attack_parts) == index_u16).then(||
+                                    html!(<span class="tag is-primary">"Final part to release"</span>)
+                                )}
+                                </td>)
+                            } else {
+                                html!(<td/>)
+                            }
+                        }
                     </tr>)
                 }).collect::<Vec<_>>()
             }</tbody>
@@ -1571,8 +1644,13 @@ pub fn gen_monster(
                 {gen_condition_stun(true, monster.condition_damage_data.stun_data.or_preset(condition_preset), monster.condition_damage_data.use_stun)}
                 {gen_condition_stamina(true, monster.condition_damage_data.stamina_data.or_preset(condition_preset), monster.condition_damage_data.use_stamina)}
 
-                {gen_condition_flash(false, &monster.condition_damage_data.flash_data, monster.condition_damage_data.use_flash)}
-                {gen_condition_flash(true, monster.condition_damage_data.flash_data.or_preset(condition_preset), monster.condition_damage_data.use_flash)}
+                {gen_condition_flash(pedia_ex, false, false, &monster.condition_damage_data.flash_data, monster.condition_damage_data.use_flash)}
+                {gen_condition_flash(pedia_ex, true, false, monster.condition_damage_data.flash_data.or_preset(condition_preset), monster.condition_damage_data.use_flash)}
+                {monster.unique_mystery.as_ref().into_iter().flat_map(|m| &m.base.condition_damage_data).map(|c| {
+                    let value = usize::try_from(c.flash_damage_use_preset_type).ok().and_then(|v|pedia.system_mystery.flash_data.get(v))
+                        .map(|v|&v.base.0).unwrap_or(&c.flash_damage_data);
+                    gen_condition_flash(pedia_ex, true, true, value, monster.condition_damage_data.use_flash)
+                })}
 
                 {gen_condition_poison(false, &monster.condition_damage_data.poison_data, monster.condition_damage_data.use_poison)}
                 {gen_condition_blast(false, &monster.condition_damage_data.blast_data, monster.condition_damage_data.use_blast)}
@@ -1580,18 +1658,25 @@ pub fn gen_monster(
                 {gen_condition_poison(true, monster.condition_damage_data.poison_data.or_preset(condition_preset), monster.condition_damage_data.use_poison)}
                 {gen_condition_blast(true, monster.condition_damage_data.blast_data.or_preset(condition_preset), monster.condition_damage_data.use_blast)}
 
-                {gen_condition_ride(&monster.condition_damage_data.marionette_data, monster.condition_damage_data.use_ride)}
+                {gen_condition_ride(pedia_ex, false, &monster.condition_damage_data.marionette_data, monster.condition_damage_data.use_ride)}
+                {
+                    let marionette_data = match monster.condition_damage_data.marionette_data.use_data {
+                        UseDataType::Common => &pedia.system_mario.marionette_start_damage_data.base,
+                        UseDataType::Unique => &monster.condition_damage_data.marionette_data
+                    };
+                    gen_condition_ride(pedia_ex, true, marionette_data, monster.condition_damage_data.use_ride)
+                }
 
                 {gen_condition_water(false, &monster.condition_damage_data.water_data, monster.condition_damage_data.use_water)}
                 {gen_condition_fire(false, &monster.condition_damage_data.fire_data, monster.condition_damage_data.use_fire)}
                 {gen_condition_ice(false, &monster.condition_damage_data.ice_data, monster.condition_damage_data.use_ice)}
                 {gen_condition_thunder(false, &monster.condition_damage_data.thunder_data, monster.condition_damage_data.use_thunder)}
-                {gen_condition_fall_trap(false, &monster.condition_damage_data.fall_trap_data, monster.condition_damage_data.use_fall_trap)}
-                {gen_condition_fall_quick_sand(false, &monster.condition_damage_data.fall_quick_sand_data, monster.condition_damage_data.use_fall_quick_sand)}
-                {gen_condition_fall_otomo_trap(false, &monster.condition_damage_data.fall_otomo_trap_data, monster.condition_damage_data.use_fall_otomo_trap)}
-                {gen_condition_shock_trap(false, &monster.condition_damage_data.shock_trap_data, monster.condition_damage_data.use_shock_trap)}
-                {gen_condition_shock_otomo_trap(false, &monster.condition_damage_data.shock_otomo_trap_data, monster.condition_damage_data.use_shock_otomo_trap)}
-                {gen_condition_capture(false, &monster.condition_damage_data.capture_data, monster.condition_damage_data.use_capture)}
+                {gen_condition_fall_trap(pedia_ex, false, false, &monster.condition_damage_data.fall_trap_data, monster.condition_damage_data.use_fall_trap)}
+                {gen_condition_fall_quick_sand(false, false, &monster.condition_damage_data.fall_quick_sand_data, monster.condition_damage_data.use_fall_quick_sand)}
+                {gen_condition_fall_otomo_trap(false, false, &monster.condition_damage_data.fall_otomo_trap_data, monster.condition_damage_data.use_fall_otomo_trap)}
+                {gen_condition_shock_trap(pedia_ex, false, false, &monster.condition_damage_data.shock_trap_data, monster.condition_damage_data.use_shock_trap)}
+                {gen_condition_shock_otomo_trap(false, false, &monster.condition_damage_data.shock_otomo_trap_data, monster.condition_damage_data.use_shock_otomo_trap)}
+                {gen_condition_capture(pedia_ex, false, &monster.condition_damage_data.capture_data, monster.condition_damage_data.use_capture)}
                 {gen_condition_dung(false, &monster.condition_damage_data.koyashi_data, monster.condition_damage_data.use_dung)}
                 {gen_condition_steel_fang(false, &monster.condition_damage_data.steel_fang_data, monster.condition_damage_data.use_steel_fang)}
 
@@ -1599,18 +1684,254 @@ pub fn gen_monster(
                 {gen_condition_fire(true, monster.condition_damage_data.fire_data.or_preset(condition_preset), monster.condition_damage_data.use_fire)}
                 {gen_condition_ice(true, monster.condition_damage_data.ice_data.or_preset(condition_preset), monster.condition_damage_data.use_ice)}
                 {gen_condition_thunder(true, monster.condition_damage_data.thunder_data.or_preset(condition_preset), monster.condition_damage_data.use_thunder)}
-                {gen_condition_fall_trap(true, monster.condition_damage_data.fall_trap_data.or_preset(condition_preset), monster.condition_damage_data.use_fall_trap)}
-                {gen_condition_fall_quick_sand(true, monster.condition_damage_data.fall_quick_sand_data.or_preset(condition_preset), monster.condition_damage_data.use_fall_quick_sand)}
-                {gen_condition_fall_otomo_trap(true, monster.condition_damage_data.fall_otomo_trap_data.or_preset(condition_preset), monster.condition_damage_data.use_fall_otomo_trap)}
-                {gen_condition_shock_trap(true, <ShockTrapDamageData as ConditionDamage<PresetShockTrapData>>::or_preset(&monster.condition_damage_data.shock_trap_data, condition_preset), monster.condition_damage_data.use_shock_trap)}
-                {gen_condition_shock_otomo_trap(true, <ShockTrapDamageData as ConditionDamage<PresetShockOtomoTrapData>>::or_preset(&monster.condition_damage_data.shock_trap_data, condition_preset), monster.condition_damage_data.use_shock_otomo_trap)}
-                {gen_condition_capture(true, monster.condition_damage_data.capture_data.or_preset(condition_preset), monster.condition_damage_data.use_capture)}
+                {gen_condition_fall_trap(pedia_ex, true, false, monster.condition_damage_data.fall_trap_data.or_preset(condition_preset), monster.condition_damage_data.use_fall_trap)}
+                {gen_condition_fall_quick_sand(true, false, monster.condition_damage_data.fall_quick_sand_data.or_preset(condition_preset), monster.condition_damage_data.use_fall_quick_sand)}
+                {gen_condition_fall_otomo_trap(true, false, monster.condition_damage_data.fall_otomo_trap_data.or_preset(condition_preset), monster.condition_damage_data.use_fall_otomo_trap)}
+                {gen_condition_shock_trap(pedia_ex, true, false, <ShockTrapDamageData as ConditionDamage<PresetShockTrapData>>::or_preset(&monster.condition_damage_data.shock_trap_data, condition_preset), monster.condition_damage_data.use_shock_trap)}
+                {gen_condition_shock_otomo_trap(true, false, <ShockTrapDamageData as ConditionDamage<PresetShockOtomoTrapData>>::or_preset(&monster.condition_damage_data.shock_trap_data, condition_preset), monster.condition_damage_data.use_shock_otomo_trap)}
+                {monster.unique_mystery.as_ref().into_iter().flat_map(|m| &m.base.condition_damage_data).flat_map(|c| {
+                    let value = usize::try_from(c.fall_trap_use_preset_type).ok().and_then(|v|pedia.system_mystery.fall_trap_data.get(v))
+                        .map(|v|&v.base.0).unwrap_or(&c.fall_trap_data);
+                    let fall_trap = gen_condition_fall_trap(pedia_ex, true, true, value, monster.condition_damage_data.use_fall_trap);
+                    let value = usize::try_from(c.fall_quick_sand_use_preset_type).ok().and_then(|v|pedia.system_mystery.fall_quick_sand_data.get(v))
+                        .map(|v|&v.base.0).unwrap_or(&c.fall_quick_sand_data);
+                    let fall_quick_sand = gen_condition_fall_quick_sand(true, true, value, monster.condition_damage_data.use_fall_quick_sand);
+                    let value = usize::try_from(c.fall_otomo_trap_use_preset_type).ok().and_then(|v|pedia.system_mystery.fall_otomo_trap_data.get(v))
+                        .map(|v|&v.base.0).unwrap_or(&c.fall_otomo_trap_data);
+                    let fall_otomo_trap = gen_condition_fall_otomo_trap(true, true, value, monster.condition_damage_data.use_fall_otomo_trap);
+                    let value = usize::try_from(c.shock_trap_use_preset_type).ok().and_then(|v|pedia.system_mystery.shock_trap_data.get(v))
+                        .map(|v|&v.base.0).unwrap_or(&c.shock_trap_data);
+                    let shock_trap = gen_condition_shock_trap(pedia_ex, true, true, value, monster.condition_damage_data.use_shock_trap);
+                    let value = usize::try_from(c.shock_otomo_trap_use_preset_type).ok().and_then(|v|pedia.system_mystery.shock_otomo_trap_data.get(v))
+                        .map(|v|&v.base.0).unwrap_or(&c.shock_otomo_trap_data);
+                    let shock_otomo_trap = gen_condition_shock_otomo_trap(true, true, value, monster.condition_damage_data.use_shock_otomo_trap);
+
+                    [fall_trap, fall_quick_sand, fall_otomo_trap, shock_trap, shock_otomo_trap]
+                })}
+                {gen_condition_capture(pedia_ex, true, monster.condition_damage_data.capture_data.or_preset(condition_preset), monster.condition_damage_data.use_capture)}
                 {gen_condition_dung(true, monster.condition_damage_data.koyashi_data.or_preset(condition_preset), monster.condition_damage_data.use_dung)}
                 {gen_condition_steel_fang(true, monster.condition_damage_data.steel_fang_data.or_preset(condition_preset), monster.condition_damage_data.use_steel_fang)}
             </tbody>
         </table></div>
         </section>
     )});
+
+    if let Some(m) = &monster.unique_mystery {
+        let base = &m.base;
+        let system = &pedia.system_mystery;
+        sections.push(Section {
+            title: "Afflicted stats".to_owned(),
+            content: html!(<section id="s-afflicted">
+                <h2>"Afflicted stats"</h2>
+                <div class="mh-kvlist mh-wide">
+                <p class="mh-kv"><span>"Return to great activity time"</span>
+                    <span>{
+                        let value = usize::try_from(base.return_to_great_activity_time_use_data_type).ok()
+                            .and_then(|i|system.return_to_great_activity_time_sec_preset_data_list.get(i))
+                            .map(|v|v.time_sec)
+                            .unwrap_or(base.return_to_great_activity_time_sec);
+                        text!("{} sec", value)
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Damage to release"</span>
+                <span>{
+                    let value = usize::try_from(base.maximum_activity_release_info_use_data_type).ok()
+                        .and_then(|i|system.maximum_activity_release_info_preset_data_list.get(i))
+                        .map(|v|&v.maximum_activity_release_info_list[..])
+                        .unwrap_or(&base.maximum_activity_release_info[..]);
+                    let display: Vec<_> = value.iter().map(|v| format!("x{} (carry over x{})",
+                        v.release_damage_rate, v.carry_over_limit_rate)).collect();
+                    text!("{}", display.join(" / "))
+                }</span>
+                </p>
+                <p class="mh-kv"><span>"Release count to topple"</span>
+                <span>{
+                    let value = usize::try_from(base.maximum_to_activity_need_release_num_use_data_type).ok()
+                        .and_then(|i|system.maximum_to_activity_need_release_num_preset_data_list.get(i))
+                        .map(|v|&v.num_list[..])
+                        .unwrap_or(&base.maximum_to_activity_need_release_num[..]);
+                    let display: Vec<_> = value.iter().map(|v| format!("{v}")).collect();
+                    text!("{}", display.join(" / "))
+                }</span>
+                </p>
+                <p class="mh-kv"><span>"Maximum activity min continue time"</span>
+                    <span>{
+                        let value = usize::try_from(base.maxiimum_activity_min_continue_time_use_data_type).ok()
+                            .and_then(|i|system.maxiimum_activity_min_continue_time_sec_preset_data_list.get(i))
+                            .map(|v|v.time_sec)
+                            .unwrap_or(base.maxiimum_activity_min_continue_time_sec);
+                        text!("{} sec", value)
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Anomaly burst time"</span>
+                    <span>{
+                        let value = usize::try_from(base.maxiimum_activity_failed_end_time_use_data_type).ok()
+                            .and_then(|i|system.maxiimum_activity_failed_end_time_sec_preset_data_list.get(i))
+                            .map(|v|v.time_sec)
+                            .unwrap_or(base.maxiimum_activity_failed_end_time_sec);
+                        text!("{} sec", value)
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Add enrage"</span>
+                    <span>{
+                        let value = usize::try_from(base.add_anger_rate_use_data_type).ok()
+                            .and_then(|i|system.add_anger_rate_preset_data_list.get(i))
+                            .map(|v|v.rate)
+                            .unwrap_or(base.add_anger_rage);
+                        text!("x{}", value)
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Core break damage"</span>
+                    <span>{
+                        let value = usize::try_from(base.mystery_core_break_damage_rate_use_data_type).ok()
+                            .and_then(|i|system.mystery_core_break_damage_rate_preset_data_list.get(i))
+                            .map(|v|v.percentage)
+                            .unwrap_or(base.mystery_core_break_damage_rate);
+                        text!("{}%", value)
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Core break part break"</span>
+                    <span>{
+                        let value = usize::try_from(base.mystery_core_break_parts_damage_rate_use_data_type).ok()
+                            .and_then(|i|system.mystery_core_break_parts_damage_rate_preset_data_list.get(i))
+                            .map(|v|v.percentage)
+                            .unwrap_or(base.mystery_core_break_parts_damage_rate);
+                        text!("{}%", value)
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Attack"</span>
+                    <span>{
+                        let value = usize::try_from(base.attack_rate_use_data_type).ok()
+                            .and_then(|i|system.attack_rate_preset_data_list.get(i))
+                            .map(|v|&v.attack_rate_list)
+                            .unwrap_or(&base.attack_rate);
+                        let display: Vec<_> = value.iter().map(|v| format!("(normal) x{} / (great) x{} / (max) x{}",
+                            v.activity, v.great_activity, v.maximum_activity
+                        )).collect();
+                        text!("{}", display.join(" || "))
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Motion"</span>
+                    <span>{
+                        let value = usize::try_from(base.mot_speed_rate_use_data_type).ok()
+                            .and_then(|i|system.mot_speed_rate_preset_data_list.get(i))
+                            .map(|v|&v.mot_speed_rate_list)
+                            .unwrap_or(&base.mot_speed_rate);
+                        let display: Vec<_> = value.iter().map(|v| format!("(normal) x{} / (great) x{} / (max) x{}",
+                            v.activity, v.great_activity, v.maximum_activity
+                        )).collect();
+                        text!("{}", display.join(" || "))
+                    }</span>
+                </p>
+                <p class="mh-kv"><span>"Bloodblight time"</span>
+                <span>{
+                    let value = usize::try_from(base.mystery_debuff_time_rate_use_data_type).ok()
+                        .and_then(|i|system.mystery_debuff_time_rate_preset_data_list.get(i))
+                        .map(|v|&v.rate_list[..])
+                        .unwrap_or(&base.mystery_debuff_time_rate[..]);
+                    let display: Vec<_> = value.iter().map(|v| format!("x{v}")).collect();
+                    text!("{}", display.join(" / "))
+                }</span>
+                </p>
+                </div>
+            </section>),
+        });
+    }
+
+    if let Some(over_mystery) = &monster.unique_over_mystery {
+        struct Combined<'a> {
+            level_data: Option<&'a StrengthLevelData>,
+            burst_data: Option<&'a OverMysteryBurstData>,
+        }
+        let mut combineds: Vec<_> = over_mystery
+            .strength_level_list
+            .iter()
+            .map(|level| Combined {
+                level_data: Some(level),
+                burst_data: None,
+            })
+            .collect();
+        let mut next = 0;
+        for burst in &over_mystery.over_mystery_burst_list {
+            loop {
+                if next == combineds.len() {
+                    combineds.push(Combined {
+                        level_data: None,
+                        burst_data: Some(burst),
+                    });
+                    next += 1;
+                } else {
+                    match combineds[next]
+                        .level_data
+                        .unwrap()
+                        .need_research_level
+                        .cmp(&burst.need_research_level)
+                    {
+                        std::cmp::Ordering::Less => {
+                            next += 1;
+                            continue;
+                        }
+                        std::cmp::Ordering::Equal => {
+                            combineds[next].burst_data = Some(burst);
+                            next += 1;
+                        }
+                        std::cmp::Ordering::Greater => {
+                            combineds.insert(
+                                next,
+                                Combined {
+                                    level_data: None,
+                                    burst_data: Some(burst),
+                                },
+                            );
+                            next += 1;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        sections.push(Section {
+            title: "Risen mode stats".to_owned(),
+            content: html!(<section id="s-risen">
+            <h2> "Risen mode stats" </h2>
+            <div class="mh-table"><table>
+            <thead>
+            <tr>
+                <th>"Research level"</th>
+                <th>"Level"</th>
+                <th>"Trigger health"</th>
+                <th>"Release health"</th>
+                <th>"Motion"</th>
+                <th>"Attack"</th>
+            </tr>
+            </thead>
+            {combineds.into_iter().map(|combined| html!(<tr>
+                <td> {
+                    let lva = combined.level_data.map(|d|d.need_research_level);
+                    let lvb = combined.burst_data.map(|d|d.need_research_level);
+                    if lva.is_some() && lvb.is_some() {
+                        assert!(lva == lvb)
+                    }
+                    text!("{}", lva.or(lvb).unwrap())
+                }</td>
+                <td>{combined.level_data.map(|d| match d.strength_level {
+                    OverMysteryStrengthLevel::Default => text!("Default"),
+                    OverMysteryStrengthLevel::Lv1 => text!("1"),
+                    OverMysteryStrengthLevel::Lv2 => text!("2"),
+                    OverMysteryStrengthLevel::Lv3 => text!("3"),
+                })}</td>
+                <td>{combined.burst_data.map(|d|text!("x{}", d.enable_vital_rate))}</td>
+                <td>{combined.burst_data.map(|d|text!("x{}", d.release_vital_rate))}</td>
+                <td>{combined.burst_data.map(|d|text!("x{}", d.mot_speed_rate))}</td>
+                <td>{combined.burst_data.map(|d|text!("x{}", d.attack_rate))}</td>
+            </tr>))}
+            <tbody>
+            </tbody>
+            </table></div>
+            </section>),
+        });
+    }
 
     if let Some(lot) = gen_lot(monster, monster_em_type, QuestRank::Low, pedia_ex) {
         sections.push(Section {
@@ -1750,10 +2071,9 @@ pub fn gen_monster(
                 <th>"Internal name"</th>
                 <th>"Damage"</th>
                 <th>"Status"</th>
-                <th>"Guarding"</th>
+                <th>"Guardable"</th>
                 <th>"Power"</th>
                 <th>"Type"</th>
-                <th>"Type value"</th>
                 <th>"To object"</th>
                 <th>"To other monster"</th>
                 <th>"Flags"</th>
@@ -1763,7 +2083,7 @@ pub fn gen_monster(
                 monster.atk_colliders.iter().map(|atk| {
                     let mut damages = vec![];
                     if atk.data.base_damage != 0 {
-                        damages.push(html!(<li>{text!("Raw {}", atk.data.base_damage)}</li>))
+                        damages.push(html!(<li>{text!("Physical {}", atk.data.base_damage)}</li>))
                     }
                     if atk.data.base_attack_element_value != 0 || atk.data.base_attack_element != AttackElement::None {
                         let image = match atk.data.base_attack_element {
@@ -1780,6 +2100,7 @@ pub fn gen_monster(
                             html!(<img src={path.as_str()} class="mh-small-icon" alt={alt}/>)
                         });
                         damages.push(html!(<li>{image}
+                            {(atk.data.base_attack_element == AttackElement::None).then(||text!("Null-elem "))}
                             {text!("{}", atk.data.base_attack_element_value)}</li>))
                     }
 
@@ -1950,10 +2271,9 @@ pub fn gen_monster(
                         <td lang="ja">{text!("{}", atk.data.name)}</td>
                         <td><ul class="mh-damages">{damages}</ul></td>
                         <td><ul class="mh-damages">{statuss}</ul></td>
-                        <td>{text!("{:?}", atk.data.guardable_type)}</td>
+                        <td>{text!("{}", atk.data.guardable_type.display())}</td>
                         <td>{text!("{}", atk.data.power)}</td>
-                        <td>{text!("{:?}", atk.data.damage_type)}</td>
-                        <td>{text!("{}", atk.data.damage_type_value)}</td>
+                        <td>{text!("{}", atk.data.damage_type.display(atk.data.damage_type_value))}</td>
                         <td>{text!("{:?}", atk.data.object_break_type)}</td>
                         <td>{text!("{:?}", atk.data.base_em2em_damage_type)}</td>
                         <td>{flags}</td>
