@@ -379,6 +379,9 @@ enum Mhrice {
         /// Path to the USER file
         #[clap(short, long)]
         user: String,
+        /// Version of the game, optional
+        #[clap(short, long)]
+        version: Option<u32>,
     },
 
     /// Find TDB in the a full minidump (DMP file) and print the converted TDB
@@ -1231,8 +1234,10 @@ fn hash(input: String, utf16: bool) {
     }
 }
 
-fn read_user(user: String) -> Result<()> {
-    let nodes = User::new(File::open(user)?)?.rsz.deserialize()?;
+fn read_user(user: String, version_hint: Option<u32>) -> Result<()> {
+    let nodes = User::new(File::open(user)?)?
+        .rsz
+        .deserialize(version_hint)?;
     for node in nodes {
         println!("{}", node.to_json()?);
     }
@@ -1330,8 +1335,9 @@ fn scene(pak: Vec<String>, name: String) -> Result<()> {
 fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: String) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
     let scene = Scene::new(&mut pak, &name)?;
-    let scale: rsz::GuiMapScaleDefineData =
-        User::new(File::open(scale)?)?.rsz.deserialize_single()?;
+    let scale: rsz::GuiMapScaleDefineData = User::new(File::open(scale)?)?
+        .rsz
+        .deserialize_single(None)?;
     let tex = Tex::new(File::open(tex)?)?;
     let mut rgba = tex.to_rgba(0, 0)?;
 
@@ -1410,7 +1416,7 @@ fn main() -> Result<()> {
             hash(input, utf16);
             Ok(())
         }
-        Mhrice::ReadUser { user } => read_user(user),
+        Mhrice::ReadUser { user, version } => read_user(user, version),
         Mhrice::ReadDmpTdb {
             dmp,
             address,
