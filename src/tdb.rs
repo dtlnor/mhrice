@@ -287,7 +287,13 @@ fn display_type_flags(flags: TypeFlag) -> String {
         TypeFlag::EXPLICIT_LAYOUT => "[explicit]", //"[StructLayoutAttribute(LayoutKind.Explicit)]",
         _ => "[unknown_layout]",
     };
-
+    
+    s += match flags & TypeFlag::CLASS_SEMANTICS_MASK {
+        TypeFlag::CLASS => "[class]",
+        TypeFlag::INTERFACE => "[interface]",
+        _ => panic!(),
+    };
+    
     if flags.contains(TypeFlag::SPECIAL_NAME) {
         s += "[special]"
     }
@@ -366,12 +372,6 @@ fn display_type_flags(flags: TypeFlag) -> String {
     if flags.contains(TypeFlag::SEALED) {
         s += "sealed "
     }
-
-    s += match flags & TypeFlag::CLASS_SEMANTICS_MASK {
-        TypeFlag::CLASS => "class ",
-        TypeFlag::INTERFACE => "interface ",
-        _ => panic!(),
-    };
 
     s
 }
@@ -2589,7 +2589,8 @@ impl Tdb {
                 }
                 write!(
                     output,
-                    "    {} {} {}",
+                    "    /* +0x{:X} */ {} {} {}",
+                    field.position,
                     display_field_attributes(field.flags),
                     type_infos[field.ti].full_name,
                     field.name
