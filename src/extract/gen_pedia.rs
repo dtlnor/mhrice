@@ -15,6 +15,7 @@ use crate::uvs::*;
 use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
@@ -1161,6 +1162,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         random_mystery_difficulty,
         random_mystery_enemy: get_singleton_opt(pak, version_hint)?,
         random_mystery_rank_release: get_singleton_opt(pak, version_hint)?,
+        random_mystery_reward_base: get_singleton_opt(pak, version_hint)?,
+        random_mystery_reward_subtarget: get_singleton_opt(pak, version_hint)?,
         progress: get_singleton(pak, version_hint)?,
         enemy_rank: get_singleton(pak, version_hint)?,
         species: get_singleton(pak, version_hint)?,
@@ -2466,12 +2469,8 @@ fn prepare_armors(pedia: &Pedia) -> Result<BTreeMap<PlArmorSeriesTypes, ArmorSer
         series_map.insert(armor_series.armor_series, series);
     }
 
-    for armor in &pedia.armor.param {
-        if !armor.is_valid {
-            continue;
-        }
-
-        let (mut slot, msg, explain_msg, msg_mr, explain_msg_mr, id) = match armor.pl_armor_id {
+    let delegate = |pl_armor_id: PlArmorId| -> Result<(usize, &MsgEntry, &MsgEntry)> {
+        let (slot, msg, explain_msg, msg_mr, explain_msg_mr, id) = match pl_armor_id {
             PlArmorId::Head(id) => (
                 0,
                 &pedia.armor_head_name_msg,
@@ -2512,19 +2511,28 @@ fn prepare_armors(pedia: &Pedia) -> Result<BTreeMap<PlArmorSeriesTypes, ArmorSer
                 &pedia.armor_leg_explain_msg_mr,
                 id,
             ),
-            _ => bail!("Unknown armor ID {:?}", armor.pl_armor_id),
+            _ => bail!("Unknown armor ID {:?}", pl_armor_id),
         };
-
-        if armor.id_after_ex_change == PlArmorId::ChangedEx {
-            slot += 5;
-        }
 
         let id = usize::try_from(id)?;
 
         let name = get_msg(id, msg, msg_mr)
-            .with_context(|| format!("Cannot find name for armor {:?}", armor.pl_armor_id))?;
+            .with_context(|| format!("Cannot find name for armor {:?}", pl_armor_id))?;
         let explain = get_msg(id, explain_msg, explain_msg_mr)
-            .with_context(|| format!("Cannot find name for armor {:?}", armor.pl_armor_id))?;
+            .with_context(|| format!("Cannot find name for armor {:?}", pl_armor_id))?;
+        Ok((slot, name, explain))
+    };
+
+    for armor in &pedia.armor.param {
+        if !armor.is_valid {
+            continue;
+        }
+
+        let (mut slot, name, explain) = delegate(armor.pl_armor_id)?;
+
+        if armor.id_after_ex_change == PlArmorId::ChangedEx {
+            slot += 5;
+        }
 
         let product = product_map.remove(&armor.pl_armor_id);
 
@@ -2546,7 +2554,8 @@ fn prepare_armors(pedia: &Pedia) -> Result<BTreeMap<PlArmorSeriesTypes, ArmorSer
         series.pieces[slot] = Some(Armor {
             name,
             explain,
-            data: armor,
+            fake_data: false,
+            data: Cow::Borrowed(armor),
             product,
             overwear: None,
             overwear_product: None,
@@ -2599,12 +2608,55 @@ fn prepare_armors(pedia: &Pedia) -> Result<BTreeMap<PlArmorSeriesTypes, ArmorSer
             PlOverwearId::Waist(_) => 3,
             PlOverwearId::Leg(_) => 4,
         };
-        let Some(armor) = series.pieces[slot]
-            .as_mut() else {
-                // Crapcom TU 5
-                eprintln!("No armor slot for for overwear {:?}", overwear.id);
-                continue;
+
+        if series.pieces[slot].is_none() {
+            // Crapcom TU 5. Let's make up some entry
+            eprintln!(
+                "No armor slot for for overwear {:?}. Making up one",
+                overwear.id
+            );
+
+            let data = ArmorBaseUserDataParam {
+                pl_armor_id: overwear.relative_id,
+                is_valid: true,
+                series: overwear.series,
+                sort_id: 0,
+                model_id: overwear.model_id,
+                rare: overwear.rare_type,
+                value: 0,
+                buy_value: 0,
+                sexual_equipable: SexualEquipableFlag::Both,
+                symbol_color1: false,
+                symbol_color2: false,
+                def_val: 0,
+                fire_reg_val: 0,
+                water_reg_val: 0,
+                ice_reg_val: 0,
+                thunder_reg_val: 0,
+                dragon_reg_val: 0,
+                buildup_table: 0,
+                buff_formula: 0,
+                decorations_num_list: [0; 4],
+                skill_list: vec![],
+                skill_lv_list: vec![],
+                id_after_ex_change: PlArmorId::TableNone,
+                custom_table_no: 0,
+                custom_cost: 0,
             };
+
+            let (_, name, explain) = delegate(overwear.relative_id)?;
+            series.pieces[slot] = Some(Armor {
+                name,
+                explain,
+                data: Cow::Owned(data),
+                fake_data: true,
+                product: None,
+                overwear: None,
+                overwear_product: None,
+            })
+        }
+
+        let armor = series.pieces[slot].as_mut().unwrap();
 
         if armor.data.pl_armor_id != overwear.relative_id {
             bail!("Mismatch armor ID for overwear {:?}", overwear.id);
@@ -3395,6 +3447,26 @@ fn prepare_monsters<'a>(
         false,
     )?;
 
+    let mut random_mystery_reward: HashMap<EmTypes, Vec<&RandomMysteryRewardBaseParam>> =
+        HashMap::new();
+
+    for p in pedia
+        .random_mystery_reward_base
+        .iter()
+        .flat_map(|p| &p.param_data)
+    {
+        random_mystery_reward.entry(p.em_type).or_default().push(p)
+    }
+
+    let random_mystery_subtarget = hash_map_unique(
+        pedia
+            .random_mystery_reward_subtarget
+            .iter()
+            .flat_map(|p| &p.param_data),
+        |p| (p.em_type, p),
+        false,
+    )?;
+
     let discoveries: HashMap<EmTypes, &DiscoverEmSetDataParam> = hash_map_unique(
         pedia
             .discover_em_set_data
@@ -3523,6 +3595,11 @@ fn prepare_monsters<'a>(
         let mut mystery_reward = mystery_rewards.remove(&monster.em_type).unwrap_or_default();
         mystery_reward.sort_by_key(|m| m.lv_lower_limit);
         let random_quest = random_quests.get(&monster.em_type).copied();
+        let random_mystery_reward = random_mystery_reward
+            .remove(&monster.em_type)
+            .unwrap_or_default();
+        let random_mystery_subtarget_reward =
+            random_mystery_subtarget.get(&monster.em_type).copied();
         let discovery = discoveries.get(&monster.em_type).copied();
         let rank = ranks.get(&monster.em_type).copied();
         let species = speciess.get(&monster.em_type).copied();
@@ -3575,6 +3652,8 @@ fn prepare_monsters<'a>(
                 explain2,
                 mystery_reward,
                 random_quest,
+                random_mystery_reward,
+                random_mystery_subtarget_reward,
                 discovery,
                 rank,
                 species,
@@ -3589,6 +3668,8 @@ fn prepare_monsters<'a>(
                 explain2: None,
                 mystery_reward,
                 random_quest,
+                random_mystery_reward,
+                random_mystery_subtarget_reward,
                 discovery,
                 rank,
                 species,

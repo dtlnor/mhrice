@@ -2,6 +2,7 @@ use super::prepare_map::*;
 use crate::msg::*;
 use crate::rsz::*;
 use serde::*;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -266,6 +267,8 @@ pub struct Pedia {
     pub random_mystery_difficulty: Option<RandomMysteryDifficultyRateListData>,
     pub random_mystery_enemy: Option<RandomMysteryLotEnemyData>,
     pub random_mystery_rank_release: Option<RandomMysteryMonsterRankReleaseData>,
+    pub random_mystery_reward_base: Option<RandomMysteryRewardBase>,
+    pub random_mystery_reward_subtarget: Option<RandomMysteryRewardSubTarget>,
 
     pub progress: ProgressCheckerUserData,
 
@@ -413,7 +416,8 @@ impl<'a> HyakuryuSkill<'a> {
 pub struct Armor<'a> {
     pub name: &'a MsgEntry,
     pub explain: &'a MsgEntry,
-    pub data: &'a ArmorBaseUserDataParam,
+    pub data: Cow<'a, ArmorBaseUserDataParam>,
+    pub fake_data: bool,
     pub product: Option<&'a ArmorProductUserDataParam>,
     pub overwear: Option<&'a PlOverwearBaseUserDataParam>,
     pub overwear_product: Option<&'a PlOverwearProductUserDataParam>,
@@ -507,6 +511,8 @@ pub struct MonsterEx<'a> {
     pub explain2: Option<&'a MsgEntry>,
     pub mystery_reward: Vec<MysteryReward<'a>>,
     pub random_quest: Option<&'a LotEnemyData>,
+    pub random_mystery_reward: Vec<&'a RandomMysteryRewardBaseParam>,
+    pub random_mystery_subtarget_reward: Option<&'a RandomMysteryRewardSubTargetParam>,
     pub discovery: Option<&'a DiscoverEmSetDataParam>,
     pub rank: Option<u8>,
     pub species: Option<&'a EmSpeciesData>,

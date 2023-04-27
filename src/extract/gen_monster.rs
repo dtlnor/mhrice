@@ -63,7 +63,7 @@ pub fn gen_mystery_tag(mystery_type: Option<EnemyIndividualType>) -> Option<Box<
             Some(html!(<span class="tag is-danger">"Risen"</span>))
         }
         Some(EnemyIndividualType::OverMysteryStrengthLv1) => {
-            Some(html!(<span class="tag is-danger">"Risen lv1"</span>))
+            Some(html!(<span class="tag is-danger">"Risen (hard)"</span>))
         }
         Some(EnemyIndividualType::OverMysteryStrengthLv2) => {
             Some(html!(<span class="tag is-danger">"Risen lv2"</span>))
@@ -89,6 +89,9 @@ pub fn gen_sub_type_tag(em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<sp
 
         (EmTypes::Em(57), Some(1)) => Some("Charged".to_owned()),
 
+        (EmTypes::Em(58), Some(1)) => Some("Emergency".to_owned()),
+        (EmTypes::Em(58), Some(2)) => Some("High level".to_owned()),
+
         (EmTypes::Em(594 /*82_02*/), Some(1)) => Some("High level".to_owned()),
 
         (EmTypes::Em(89), Some(1)) => Some("vs allmother".to_owned()),
@@ -97,6 +100,8 @@ pub fn gen_sub_type_tag(em_type: EmTypes, sub_type: Option<u8>) -> Option<Box<sp
 
         (EmTypes::Em(99), Some(1)) => Some("ExStart".to_owned()),
         (EmTypes::Em(99), Some(2)) => Some("Debug".to_owned()),
+
+        (EmTypes::Em(124), Some(1)) => Some("High level".to_owned()),
 
         (EmTypes::Em(132), Some(1)) => Some("vs allmother".to_owned()),
 
@@ -1308,6 +1313,19 @@ pub fn gen_monster(
                 <span><a href={extra_diff_table.as_str()}>{
                 text!("Table {}", random_quest.difficulty_table_type_extra)}</a></span>
             </p>
+            <p class="mh-kv"><span>"Base research point"</span>
+                <span>{
+                    let s: Vec<_> = monster_ex.random_mystery_reward.iter().map(|p|format!("(A{}) {}", p.rank, p.base)).collect();
+                    text!("{}", s.join(" / "))
+                }</span>
+            </p>
+            <p class="mh-kv"><span>"Subtarget research point adjust"</span>
+            { if let Some(p) = monster_ex.random_mystery_subtarget_reward {
+                html!(<span>{text!("x{}", p.adjust)}</span>)
+            } else {
+                html!(<span>"-"</span>)
+            }}
+            </p>
             </div>
 
             <div class="mh-anomaly-maps"> <h3>"Allowed map"</h3>
@@ -1932,10 +1950,10 @@ pub fn gen_monster(
                     text!("{}", lva.or(lvb).unwrap())
                 }</td>
                 <td>{combined.level_data.map(|d| match d.strength_level {
-                    OverMysteryStrengthLevel::Default => text!("Default"),
-                    OverMysteryStrengthLevel::Lv1 => text!("1"),
-                    OverMysteryStrengthLevel::Lv2 => text!("2"),
-                    OverMysteryStrengthLevel::Lv3 => text!("3"),
+                    OverMysteryStrengthLevel::Default => text!("Normal"),
+                    OverMysteryStrengthLevel::Lv1 => text!("Hard"),
+                    OverMysteryStrengthLevel::Lv2 => text!("lv2"),
+                    OverMysteryStrengthLevel::Lv3 => text!("lv3"),
                 })}</td>
                 <td>{combined.burst_data.map(|d|text!("x{}", d.enable_vital_rate))}</td>
                 <td>{combined.burst_data.map(|d|text!("x{}", d.release_vital_rate))}</td>
