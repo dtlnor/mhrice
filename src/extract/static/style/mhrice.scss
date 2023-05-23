@@ -881,6 +881,10 @@ div.mh-color-diagram {
     background-color: $active-background-color;
 }
 
+#mh-part-dt-extract {
+    text-decoration: underline;
+}
+
 span.mh-part {
     display: inline-block;
     height: 1.5rem;
@@ -1225,5 +1229,20 @@ ul.mh-buddy-gear-stat {
 .mh-misc-list {
     >* {
         display: block;
+    }
+}
+
+.mh-award {
+    width: 8rem;
+}
+
+ul.mh-achievements {
+    >li {
+        display: inline-block;
+        break-inside: avoid;
+
+        &::before {
+            content: "▸"
+        }
     }
 }

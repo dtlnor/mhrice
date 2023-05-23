@@ -162,12 +162,21 @@ pub fn gen_monster_tag(
     </div>)
 }
 
-fn gen_extractive_type(extractive_type: ExtractiveType) -> Result<Box<span<String>>> {
+fn gen_extractive_type(extractive_type: ExtractiveType) -> Box<span<String>> {
     match extractive_type {
-        ExtractiveType::Red => Ok(html!(<span><span class="mh-extract-red"/>"Red"</span>)),
-        ExtractiveType::White => Ok(html!(<span><span class="mh-extract-white"/>"White"</span>)),
-        ExtractiveType::Orange => Ok(html!(<span><span class="mh-extract-orange"/>"Orange"</span>)),
-        ExtractiveType::None => Ok(html!(<span><span class="mh-extract-unknown"/>"None"</span>)),
+        ExtractiveType::Red => html!(<span><span class="mh-extract-red"/>"Red"</span>),
+        ExtractiveType::White => html!(<span><span class="mh-extract-white"/>"White"</span>),
+        ExtractiveType::Orange => html!(<span><span class="mh-extract-orange"/>"Orange"</span>),
+        ExtractiveType::None => html!(<span><span class="mh-extract-unknown"/>"None"</span>),
+    }
+}
+
+fn gen_extractive_type_tag(extractive_type: ExtractiveType) -> &'static str {
+    match extractive_type {
+        ExtractiveType::Red => "red",
+        ExtractiveType::White => "white",
+        ExtractiveType::Orange => "orange",
+        ExtractiveType::None => "none",
     }
 }
 
@@ -1357,7 +1366,7 @@ pub fn gen_monster(
             <section id="s-hitzone">
             <h2 >"Hitzone data"</h2>
             <div class="mh-color-diagram">
-                <img id="mh-hitzone-img" alt="Monster hitzone diagram" src=meat_figure />
+                <img id="mh-hitzone-img" class="mh-color-diagram-img" alt="Monster hitzone diagram" src=meat_figure />
                 <canvas id="mh-hitzone-canvas" width=1 height=1 />
             </div>
             <div>
@@ -1489,7 +1498,7 @@ pub fn gen_monster(
             "Parts"
         </h2>
         <div class="mh-color-diagram">
-            <img id="mh-part-img" alt="Monster parts diagram" src=parts_group_figure />
+            <img id="mh-part-img" class="mh-color-diagram-img" alt="Monster parts diagram" src=parts_group_figure />
             <canvas id="mh-part-canvas" width=1 height=1 />
         </div>
         <div>
@@ -1507,7 +1516,7 @@ pub fn gen_monster(
                     <th>"Stagger"</th>
                     <th>"Break"</th>
                     <th>"Sever"</th>
-                    <th>"Extract"</th>
+                    <th class="mh-color-diagram-switch" id="mh-part-dt-extract" data-diagram="mh-part">"Extract"</th>
                     <th>"Anomaly cores" {
                         monster.unique_mystery.as_ref().map(|m| text!(" ({}x active)", m.base.maximum_activity_core_num))
                     } </th>
@@ -1524,9 +1533,9 @@ pub fn gen_monster(
                     let part_color = format!("mh-part-group mh-part-{index}");
 
                     let class_str = if part.extractive_type == ExtractiveType::None {
-                        "mh-invalid-part mh-color-diagram-switch"
+                        "mh-invalid-part mh-color-diagram-switch mh-extractive-color"
                     } else {
-                        "mh-color-diagram-switch"
+                        "mh-color-diagram-switch mh-extractive-color"
                     };
 
                     let index_u16 = u16::try_from(index);
@@ -1560,9 +1569,9 @@ pub fn gen_monster(
                         }).collect::<Vec<_>>().join(" , ");
 
                     let id = format!("mh-part-dt-{index}");
-
+                    let extractive_tag = gen_extractive_type_tag(part.extractive_type);
                     html!(<tr id = {id.as_str()} class=class_str data-color={ PART_COLORS[index] }
-                        data-diagram="mh-part">
+                        data-diagram="mh-part" data-extractcolor={extractive_tag}>
                         <td>
                             <span class=part_color.as_str()/>
                             { text!("[{}]", index) }
@@ -2370,6 +2379,8 @@ pub fn gen_monster(
                     <h1> {
                         if let Some(monster_alias) = monster_alias {
                             gen_multi_lang(monster_alias)
+                        } else if monster.id == 131 {
+                            html!(<span>"Toadversary"</span>)
                         } else {
                             html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>)
                         }
@@ -2422,18 +2433,20 @@ pub fn gen_monsters(
                     <option value="1">"Sort by in-game order"</option>
                 </select></div>
                 <ul class="mh-list-monster" id="slist-monster">{
-                    pedia.monsters.iter().filter(|monster|monster.id != 131).map(|monster| {
+                    pedia.monsters.iter().map(|monster| {
                         let icon_path = format!("/resources/em{0:03}_{1:02}_icon.png", monster.id, monster.sub_id);
 
                         let monster_ex = &pedia_ex.monsters[&monster.em_type];
                         let name_entry = if let Some(entry) = monster_ex.name {
                             gen_multi_lang(entry)
+                        } else if monster.id == 131 {
+                            html!(<span>"Toadversary"</span>)
                         } else {
                             html!(<span>{text!("Monster {:03}_{:02}", monster.id, monster.sub_id)}</span>)
                         };
 
                         let order = pedia_ex.monster_order.get(&EmTypes::Em(monster.id | (monster.sub_id << 8)))
-                            .cloned().unwrap_or(0);
+                            .cloned().unwrap_or(i32::MAX as usize);
                         let sort_tag = format!("{},{}", monster.id << 16 | monster.sub_id, order);
                         html!{<li data-sort=sort_tag>
                             <a href={format!("/monster/{:03}_{:02}.html", monster.id, monster.sub_id)}>

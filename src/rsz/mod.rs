@@ -1,6 +1,7 @@
 mod alchemy;
 mod anger_data;
 mod armor;
+mod award;
 mod boss_init_set_data;
 mod collision;
 mod common;
@@ -28,6 +29,7 @@ mod weapon;
 pub use alchemy::*;
 pub use anger_data::*;
 pub use armor::*;
+pub use award::*;
 pub use boss_init_set_data::*;
 pub use collision::*;
 pub use common::*;
@@ -1113,6 +1115,13 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         StrengthLevelData,
         OverMysteryBurstData,
         EnemyUniqueOverMysteryData,
+    );
+
+    r!(
+        AwardUserDataParam,
+        AwardUserData,
+        AchievementUserDataParam,
+        AchievementUserData
     );
 
     m.extend(unique_mystery::unique_mystery_type_map());
