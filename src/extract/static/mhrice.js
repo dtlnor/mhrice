@@ -1,5 +1,7 @@
 "use strict";
 
+/* global Masonry */
+
 let g_supported_mh_lang = [];
 let g_language_code = "en";
 
@@ -29,11 +31,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     for (const element of document.getElementsByClassName("mh-color-diagram-img")) {
         imgOnLoad(element, (img) => {
-            const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
-            const context = canvas.getContext('2d');
-            context.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            g_diagram_template.set(img.id, imageData);
+            try {
+                let canvas;
+                try {
+                    canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
+                } catch (e) {
+                    console.warn(e);
+                    console.warn("Falling back to legacy canvas");
+                    canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                }
+                const context = canvas.getContext('2d');
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                g_diagram_template.set(img.id, imageData);
+            } catch (error) {
+                // Catch any potential error and continue other initialization
+                console.error(error);
+            }
         })
     }
 
@@ -196,14 +212,21 @@ function delete_all_cookie() {
 
 
 function adjustVersionMenu() {
+    const reg = /^(\/(version\/[^/]*\/)?)(.*)$/;
+    const current_path = window.location.pathname.match(reg);
+    const current_version = current_path[1];
+    let current_loc = current_path[3];
+    if (current_loc === "/") {
+        current_loc = "/monster.html";
+    }
+
     for (const item of document.getElementsByClassName("mh-version-menu")) {
-        let href = item.getAttribute("href");
-        let hostname = window.location.hostname;
-        let current = `https://${hostname}`;
-        if (href === current) {
+        const href = item.getAttribute("href");
+        const href_version = href.match(reg)[1];
+        if (href_version === current_version) {
             item.classList.add("has-text-weight-bold");
         }
-        item.setAttribute("href", href + window.location.pathname
+        item.setAttribute("href", href_version + current_loc
             + window.location.search
             + window.location.hash);
     }
@@ -481,7 +504,8 @@ function changeFilter(e, category) {
         }
     }
 
-    history.replaceState(null, null, hash);
+    history.replaceState(null, null, location.pathname + hash);
+    adjustVersionMenu();
 
     const filter_button_prefix = `mh-${category}-filter-button-`;
     const prev = document.getElementById(filter_button_prefix + g_filter);
@@ -599,7 +623,7 @@ function search(e) {
 
 function loadTocAndDoSearch() {
     if (g_toc === null) {
-        fetch(`/tocv2/${g_language_code}.json`)
+        fetch(`tocv2/${g_language_code}.json`)
             .then(response => response.json())
             .then(json => {
                 g_toc = json;
@@ -617,7 +641,7 @@ function goSearch(e) {
 
     const text = document.getElementById("nav-search").value.trim();
 
-    window.location.assign(`/index.html?search=${encodeURIComponent(text)}`)
+    window.location.assign(`index.html?search=${encodeURIComponent(text)}`)
 }
 
 

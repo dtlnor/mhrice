@@ -27,10 +27,7 @@ pub fn gen_collab_tag(is_collabo: bool) -> Option<Box<span<String>>> {
 
 pub fn gen_armor_label(piece: Option<&Armor>) -> Box<div<String>> {
     let piece_name = if let Some(piece) = piece {
-        let icon = format!(
-            "/resources/equip/{:03}",
-            piece.data.pl_armor_id.icon_index()
-        );
+        let icon = format!("resources/equip/{:03}", piece.data.pl_armor_id.icon_index());
         html!(<div class="mh-icon-text">
             { gen_rared_icon(piece.data.rare, &icon, [], false) }
             <span>{ gen_multi_lang(piece.name) }</span>
@@ -57,7 +54,7 @@ fn custom_buildup_element(id: u16) -> Option<Box<div<String>>> {
         129..=138 => ("dragon", "Dragon"),
         _ => return None,
     };
-    let url = format!("/resources/{tag}.png");
+    let url = format!("resources/{tag}.png");
     Some(html!(<div>
         <img src={url.as_str()} alt={name} class="mh-small-icon"/>
         {text!("{}", name)}
@@ -73,7 +70,7 @@ pub fn gen_armor_list(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("Armors - MHRice")}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, output) }
                 <style id="mh-armor-list-style">""</style>
             </head>
             <body>
@@ -118,7 +115,7 @@ pub fn gen_armor_list(
                         let series_name = gen_multi_lang(series.name);
                         html!(
                             <li class="mh-armor-filter-item" data-sort=sort_tag data-filter={filter}>
-                            <a href={format!("/armor/{:03}.html", series.series.armor_series.0)}>
+                            <a href={format!("armor/{:03}.html", series.series.armor_series.0)}>
                             <h2>{
                                 series_name
                             }
@@ -155,9 +152,12 @@ fn gen_armor(
     pedia: &Pedia,
     pedia_ex: &PediaEx,
     config: &WebsiteConfig,
-    mut output: impl Write,
-    mut toc_sink: TocSink<'_>,
+    path: &impl Sink,
+    toc: &mut Toc,
 ) -> Result<()> {
+    let (mut output, mut toc_sink) =
+        path.create_html_with_toc(&format!("{:03}.html", series.series.armor_series.0), toc)?;
+
     toc_sink.add(series.name);
 
     for piece in &series.pieces {
@@ -194,11 +194,11 @@ fn gen_armor(
                 <th>"Name"</th>
                 <th>"Buying cost"</th>
                 <th>"Defense"</th>
-                <th><img alt="Fire" src="/resources/fire.png" class="mh-small-icon"/>"Fire"</th>
-                <th><img alt="Water" src="/resources/water.png" class="mh-small-icon"/>"Water"</th>
-                <th><img alt="Ice" src="/resources/ice.png" class="mh-small-icon"/>"Ice"</th>
-                <th><img alt="Thunder" src="/resources/thunder.png" class="mh-small-icon"/>"Thunder"</th>
-                <th><img alt="Dragon" src="/resources/dragon.png" class="mh-small-icon"/>"Dragon"</th>
+                <th><img alt="Fire" src="resources/fire.png" class="mh-small-icon"/>"Fire"</th>
+                <th><img alt="Water" src="resources/water.png" class="mh-small-icon"/>"Water"</th>
+                <th><img alt="Ice" src="resources/ice.png" class="mh-small-icon"/>"Ice"</th>
+                <th><img alt="Thunder" src="resources/thunder.png" class="mh-small-icon"/>"Thunder"</th>
+                <th><img alt="Dragon" src="resources/dragon.png" class="mh-small-icon"/>"Dragon"</th>
                 <th>"Slots"</th>
                 <th>"Skills"</th>
             </tr></thead>
@@ -374,7 +374,7 @@ fn gen_armor(
                                     <td>
                                     { (category_id == 20 && piece.data.cost > 0).then(||{
                                         let class = format!("tag mh-cb-lv{}", piece.data.cost);
-                                        let href = format!("/skill.html#cb{}", piece.data.cost);
+                                        let href = format!("skill.html#cb{}", piece.data.cost);
                                         html!(<a href={href.as_str()}><span class={class.as_str()}>
                                             {text!("Pt{} skill", piece.data.cost)}
                                         </span></a>)}
@@ -498,7 +498,7 @@ fn gen_armor(
             {text!("Type {} counterpart: ", desc)}
             {
                 if let Some(other) = pedia_ex.armors.get(&other) {
-                    html!(<a href={format!("/armor/{:03}.html", other.series.armor_series.0)}>
+                    html!(<a href={format!("armor/{:03}.html", other.series.armor_series.0)}>
                         {gen_multi_lang(other.name)}
                     </a>)
                 } else {
@@ -729,18 +729,18 @@ fn gen_armor(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("Armor {:03}", series.series.armor_series.0)}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, path) }
                 { title_multi_lang(series.name) }
                 { open_graph(Some(series.name), "",
                     None, "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { gen_menu(&sections) }
+                { gen_menu(&sections, toc_sink.path()) }
                 <main>
                 <header class="mh-armor-header">
                     <div class="mh-title-icon"> {
-                        gen_rared_icon(rarity, "/resources/equip/006", [], false)
+                        gen_rared_icon(rarity, "resources/equip/006", [], false)
                     } </div>
                     <h1>
                     { gen_multi_lang(series.name) }
@@ -771,10 +771,14 @@ pub fn gen_armors(
 ) -> Result<()> {
     let armor_path = output.sub_sink("armor")?;
     for series in pedia_ex.armors.values() {
-        let (output, toc_sink) = armor_path
-            .create_html_with_toc(&format!("{:03}.html", series.series.armor_series.0), toc)?;
         gen_armor(
-            hash_store, series, pedia, pedia_ex, config, output, toc_sink,
+            hash_store,
+            series,
+            pedia,
+            pedia_ex,
+            config,
+            &armor_path,
+            toc,
         )?
     }
     Ok(())

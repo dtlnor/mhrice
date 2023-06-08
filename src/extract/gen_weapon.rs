@@ -19,7 +19,7 @@ pub fn gen_weapon_icon(
     element: PlWeaponElementTypes,
     element2: PlWeaponElementTypes,
 ) -> Box<div<String>> {
-    let icon = format!("/resources/equip/{:03}", weapon.id.icon_index());
+    let icon = format!("resources/equip/{:03}", weapon.id.icon_index());
     let rare = if white {
         RareTypes(1)
     } else {
@@ -65,7 +65,7 @@ where
     let icon_element2 = db
         .map(|e| e.sub_element_type)
         .unwrap_or(PlWeaponElementTypes::None);
-    let link = format!("/weapon/{}.html", main.id.to_tag());
+    let link = format!("weapon/{}.html", main.id.to_tag());
     html!(
         <a href={link} class="mh-icon-text">
             {gen_weapon_icon(main, false, icon_element, icon_element2)}
@@ -223,8 +223,8 @@ fn gen_weapon<Param>(
     pedia: &Pedia,
     pedia_ex: &PediaEx,
     config: &WebsiteConfig,
-    mut output: impl Write,
-    mut toc_sink: TocSink<'_>,
+    path: &impl Sink,
+    toc: &mut Toc,
     has_element: fn(&Param) -> Option<&ElementWeaponBaseData>,
     has_second_element: fn(&Param) -> Option<&DualBladesBaseUserDataParam>,
     has_close_range: fn(&Param) -> Option<&CloseRangeWeaponBaseData>,
@@ -239,10 +239,13 @@ where
         + MaybeToBase<ElementWeaponBaseData>
         + MaybeToBase<DualBladesBaseUserDataParam>,
 {
-    toc_sink.add(weapon.name);
-
     let param = weapon.param;
     let main = param.to_base();
+
+    let (mut output, mut toc_sink) =
+        path.create_html_with_toc(&format!("{}.html", main.base.id.to_tag()), toc)?;
+
+    toc_sink.add(weapon.name);
     let first_element = has_element(param);
     let second_element = has_second_element(param);
     let close_range = has_close_range(param);
@@ -401,7 +404,7 @@ where
             PlWeaponElementTypes::Paralyze => ("para", "Paralyze"),
             PlWeaponElementTypes::Bomb => ("blast", "Blast"),
         };
-        let img = format!("/resources/{img}.png");
+        let img = format!("resources/{img}.png");
         html!(<span>
             <img alt={text} src={img.as_str()} class="mh-small-icon"/>
             {text!("{} {}", text, element_val)}
@@ -835,14 +838,14 @@ where
         <html lang="en">
             <head itemscope=true>
                 <title>"Weapon - MHRice"</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, path) }
                 { title_multi_lang(weapon.name) }
                 { open_graph(Some(weapon.name), "",
                     weapon.explain, "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { gen_menu(&sections) }
+                { gen_menu(&sections, toc_sink.path()) }
                 <main>
                 <header>
                     <div class="mh-title-icon">
@@ -957,10 +960,7 @@ where
         + MaybeToBase<DualBladesBaseUserDataParam>,
 {
     let mut list_path = weapon_path.create_html(&format!("{tag}.html"))?;
-    let masonry_js = format!(
-        "/masonry.pkgd.min.js?h={}",
-        hash_store.get(FileTag::Masonry)
-    );
+    let masonry_js = format!("masonry.pkgd.min.js?h={}", hash_store.get(FileTag::Masonry));
 
     let cols = weapon_tree
         .weapons
@@ -976,7 +976,7 @@ where
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("{} - MHRice", name)}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, weapon_path) }
                 <script src={masonry_js}/>
                 <style id="mh-main-list-style">""</style>
             </head>
@@ -985,7 +985,7 @@ where
                 <main>
                 <header><h1> {text!("{}", name)} </h1></header>
                 <div>
-                    <a href="/weapon.html"><span class="icon-text">
+                    <a href="weapon.html"><span class="icon-text">
                     <span class="icon">
                     <i class="fas fa-arrow-right"></i>
                     </span>
@@ -1105,7 +1105,7 @@ pub fn gen_weapons(
             bow:$bow:ident,
             special:$special:expr
         ) => {{
-            let entry_link = format!("/weapon/{}.html", stringify!($label));
+            let entry_link = format!("weapon/{}.html", stringify!($label));
             entry_label.push(html!(<li>
                 <a href={entry_link.as_str()} class="mh-icon-text">
                     {
@@ -1117,9 +1117,7 @@ pub fn gen_weapons(
                 </a>
             </li>));
             gen_tree(pedia, hash_store, &pedia_ex.$label, &path, stringify!($label), $name)?;
-            for (weapon_id, weapon) in &pedia_ex.$label.weapons {
-                let (file_path, toc_sink) =
-                    path.create_html_with_toc(&format!("{}.html", weapon_id.to_tag()), toc)?;
+            for weapon in pedia_ex.$label.weapons.values() {
                 gen_weapon(
                     hash_store,
                     weapon,
@@ -1127,8 +1125,8 @@ pub fn gen_weapons(
                     pedia,
                     pedia_ex,
                     config,
-                    file_path,
-                    toc_sink,
+                    &path,
+                    toc,
                     $element,
                     $second_element,
                     $close_range,
@@ -1315,7 +1313,7 @@ pub fn gen_weapons(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("Weapons - MHRice")}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, output) }
             </head>
             <body>
                 { navbar() }

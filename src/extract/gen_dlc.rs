@@ -14,7 +14,7 @@ use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
 pub fn gen_dlc_label(dlc: &Dlc) -> Box<a<String>> {
-    let link = format!("/dlc/{}.html", dlc.data.dlc_id);
+    let link = format!("dlc/{}.html", dlc.data.dlc_id);
     html!(<a href={link}>
         {if let Some(name) = dlc.name {
             gen_multi_lang(name)
@@ -25,7 +25,7 @@ pub fn gen_dlc_label(dlc: &Dlc) -> Box<a<String>> {
 }
 
 pub fn gen_slc_label(slc: &SaveLinkContents) -> Box<a<String>> {
-    let link = format!("/dlc/slc_{}.html", slc.into_raw());
+    let link = format!("dlc/slc_{}.html", slc.into_raw());
     html!(<a href={link}>
         {text!("{}", slc.display())}
     </a>)
@@ -69,15 +69,17 @@ pub fn gen_dlc_list(hash_store: &HashStore, pedia_ex: &PediaEx, output: &impl Si
         ),
     });
 
+    let file_name = "dlc.html";
+
     let doc: DOMTree<String> = html!(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("DLC - MHRice")}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, output) }
             </head>
             <body>
                 { navbar() }
-                { gen_menu(&sections) }
+                { gen_menu(&sections, &(output.toc_path() + file_name)) }
                 <main>
                 <header><h1>"DLC"</h1></header>
 
@@ -170,7 +172,7 @@ fn gen_add(add: &AddDataInfo, pedia_ex: &PediaEx, sections: &mut Vec<Section>) {
                 {pedia_ex.armors.values().flat_map(|a|&a.pieces).flatten().filter(|p| {
                     add.pl_armor_list.contains(&p.data.pl_armor_id)
                 }).map(|p|html!(<li>
-                    <a class="il" href={format!("/armor/{:03}.html", p.data.series.0)}>
+                    <a class="il" href={format!("armor/{:03}.html", p.data.series.0)}>
                     {gen_armor_label(Some(p))}
                     </a>
                 </li>))}
@@ -182,7 +184,7 @@ fn gen_add(add: &AddDataInfo, pedia_ex: &PediaEx, sections: &mut Vec<Section>) {
                         false
                     }
                 }).map(|p|html!(<li>
-                    <a class="il" href={format!("/armor/{:03}.html", p.data.series.0)}>
+                    <a class="il" href={format!("armor/{:03}.html", p.data.series.0)}>
                     {gen_armor_label(Some(p))}
                     </a>
                     <span class="tag">"Layered"</span>
@@ -195,7 +197,7 @@ fn gen_add(add: &AddDataInfo, pedia_ex: &PediaEx, sections: &mut Vec<Section>) {
                         false
                     }
                 }).map(|p|html!(<li>
-                    <a class="il" href={format!("/otomo/{}.html", p.param.series_id.to_tag())}>
+                    <a class="il" href={format!("otomo/{}.html", p.param.series_id.to_tag())}>
                     {gen_atomo_armor_label(p)}
                     </a>
                     <span class="tag">"Layered"</span>
@@ -242,9 +244,12 @@ fn gen_dlc(
     _pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
     config: &WebsiteConfig,
-    mut output: impl Write,
-    mut toc_sink: TocSink<'_>,
+    path: &impl Sink,
+    toc: &mut Toc,
 ) -> Result<()> {
+    let (mut output, mut toc_sink) =
+        path.create_html_with_toc(&format!("{}.html", dlc.data.dlc_id), toc)?;
+
     if let Some(name) = dlc.name {
         toc_sink.add(name);
     }
@@ -293,14 +298,14 @@ fn gen_dlc(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("{}", plain_title)}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, path) }
                 { dlc.name.map(title_multi_lang).unwrap_or_default()}
                 { open_graph(dlc.name, &plain_title,
                     dlc.explain, "", None, toc_sink.path(), config) }
             </head>
             <body>
                 { navbar() }
-                { gen_menu(&sections) }
+                { gen_menu(&sections, toc_sink.path()) }
                 <main>
                 <header>
                     <h1> { if let Some(name) = dlc.name {
@@ -329,9 +334,12 @@ fn gen_slc(
     slc: &Slc,
     _pedia: &Pedia,
     pedia_ex: &PediaEx<'_>,
-    mut output: impl Write,
-    mut _toc_sink: TocSink<'_>,
+    path: &impl Sink,
+    toc: &mut Toc,
 ) -> Result<()> {
+    let (mut output, toc_sink) =
+        path.create_html_with_toc(&format!("slc_{}.html", slc_id.into_raw()), toc)?;
+
     let mut sections = vec![];
 
     if let Some(add) = slc.add {
@@ -362,11 +370,11 @@ fn gen_slc(
         <html lang="en">
             <head itemscope=true>
                 <title>{text!("{}", plain_title)}</title>
-                { head_common(hash_store) }
+                { head_common(hash_store, path) }
             </head>
             <body>
                 { navbar() }
-                { gen_menu(&sections) }
+                { gen_menu(&sections, toc_sink.path()) }
                 <main>
                 <header>
                     <h1><span>{text!("{}", plain_title)}</span></h1>
@@ -395,15 +403,11 @@ pub fn gen_dlcs(
 ) -> Result<()> {
     let dlc_path = output.sub_sink("dlc")?;
     for dlc in pedia_ex.dlc.values() {
-        let (path, toc_sink) =
-            dlc_path.create_html_with_toc(&format!("{}.html", dlc.data.dlc_id), toc)?;
-        gen_dlc(hash_store, dlc, pedia, pedia_ex, config, path, toc_sink)?;
+        gen_dlc(hash_store, dlc, pedia, pedia_ex, config, &dlc_path, toc)?;
     }
 
     for (&id, slc) in &pedia_ex.slc {
-        let (path, toc_sink) =
-            dlc_path.create_html_with_toc(&format!("slc_{}.html", id.into_raw()), toc)?;
-        gen_slc(hash_store, id, slc, pedia, pedia_ex, path, toc_sink)?;
+        gen_slc(hash_store, id, slc, pedia, pedia_ex, &dlc_path, toc)?;
     }
 
     Ok(())

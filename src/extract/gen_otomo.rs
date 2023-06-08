@@ -12,7 +12,7 @@ use std::io::Write;
 use typed_html::{dom::*, elements::*, html, text};
 
 pub fn gen_atomo_armor_label(piece: &OtArmor) -> Box<div<String>> {
-    let icon = format!("/resources/equip/{:03}", piece.param.id.icon_index());
+    let icon = format!("resources/equip/{:03}", piece.param.id.icon_index());
     html!(<div class="mh-icon-text">
         { gen_rared_icon(piece.param.rare_type, &icon, [], false) }
         <span>{ gen_multi_lang(piece.name) }</span>
@@ -28,7 +28,7 @@ pub fn gen_atomo_weapon_label(piece: &OtWeapon) -> Box<div<String>> {
         (OtWeaponId::None, _) => 9,
     };
 
-    let icon = format!("/resources/equip/{icon_index:03}");
+    let icon = format!("resources/equip/{icon_index:03}");
     html!(<div class="mh-icon-text">
         { gen_rared_icon(piece.param.rare_type, &icon, [], false) }
         <span>{ gen_multi_lang(piece.name) }</span>
@@ -40,9 +40,12 @@ fn gen_otomo_equip(
     series: &OtEquipSeries,
     pedia_ex: &PediaEx,
     config: &WebsiteConfig,
-    mut output: impl Write,
-    mut toc_sink: TocSink<'_>,
+    otomo_path: &impl Sink,
+    toc: &mut Toc,
 ) -> Result<()> {
+    let (mut output, mut toc_sink) =
+        otomo_path.create_html_with_toc(&format!("{}.html", series.series.id.to_tag()), toc)?;
+
     toc_sink.add(series.name);
     let mut rarity = RareTypes(1);
     if let Some(head) = &series.head {
@@ -59,8 +62,8 @@ fn gen_otomo_equip(
     }
 
     let icon = match series.series.id {
-        OtEquipSeriesId::Airou(_) => "/resources/equip/010",
-        OtEquipSeriesId::Dog(_) => "/resources/equip/031",
+        OtEquipSeriesId::Airou(_) => "resources/equip/010",
+        OtEquipSeriesId::Dog(_) => "resources/equip/031",
     };
 
     let gen_armor_stat = |armor: &Option<OtArmor>| -> Option<Box<tr<String>>> {
@@ -71,15 +74,15 @@ fn gen_otomo_equip(
             <td>{text!("Defense: {}", armor.param.def)}</td>
             <td>"Defense"
                 <ul class="mh-buddy-gear-stat">
-                    <li><img alt="Fire" src="/resources/fire.png" class="mh-small-icon"/>
+                    <li><img alt="Fire" src="resources/fire.png" class="mh-small-icon"/>
                         {text!("Fire: {}", armor.param.element_regist_list[0])}</li>
-                    <li><img alt="Water" src="/resources/water.png" class="mh-small-icon"/>
+                    <li><img alt="Water" src="resources/water.png" class="mh-small-icon"/>
                         {text!("Water: {}", armor.param.element_regist_list[1])}</li>
-                    <li><img alt="Thunder" src="/resources/thunder.png" class="mh-small-icon"/>
+                    <li><img alt="Thunder" src="resources/thunder.png" class="mh-small-icon"/>
                         {text!("Thunder: {}", armor.param.element_regist_list[2])}</li>
-                    <li><img alt="Ice" src="/resources/ice.png" class="mh-small-icon"/>
+                    <li><img alt="Ice" src="resources/ice.png" class="mh-small-icon"/>
                         {text!("Ice: {}", armor.param.element_regist_list[3])}</li>
-                    <li><img alt="Dragon" src="/resources/dragon.png" class="mh-small-icon"/>
+                    <li><img alt="Dragon" src="resources/dragon.png" class="mh-small-icon"/>
                         {text!("Dragon: {}", armor.param.element_regist_list[4])}</li>
                 </ul>
             </td>
@@ -169,7 +172,7 @@ fn gen_otomo_equip(
                             ElementType::Paralyze => ("para", "Paralyze"),
                             ElementType::Bomb => ("blast", "Blast"),
                         };
-                        let img = format!("/resources/{img}.png");
+                        let img = format!("resources/{img}.png");
                         html!(<td><div>
                             <img alt={text} src={img.as_str()} class="mh-small-icon"/>
                             {text!("{}", text)}
@@ -387,14 +390,14 @@ fn gen_otomo_equip(
     let doc: DOMTree<String> = html!(<html lang="en">
         <head itemscope=true>
             <title>{text!("Buddy equipment")}</title>
-            { head_common(hash_store) }
+            { head_common(hash_store, otomo_path) }
             { title_multi_lang(series.name) }
             { open_graph(Some(series.name), "",
                 None, "", None, toc_sink.path(), config) }
         </head>
         <body>
             { navbar() }
-            { gen_menu(&sections) }
+            { gen_menu(&sections, toc_sink.path()) }
             <main>
             <header>
                 <div class="mh-title-icon">
@@ -423,10 +426,8 @@ pub fn gen_otomo_equips(
     toc: &mut Toc,
 ) -> Result<()> {
     let otomo_path = output.sub_sink("otomo")?;
-    for (id, series) in &pedia_ex.ot_equip {
-        let (output, toc_sink) =
-            otomo_path.create_html_with_toc(&format!("{}.html", id.to_tag()), toc)?;
-        gen_otomo_equip(hash_store, series, pedia_ex, config, output, toc_sink)?
+    for series in pedia_ex.ot_equip.values() {
+        gen_otomo_equip(hash_store, series, pedia_ex, config, &otomo_path, toc)?
     }
     Ok(())
 }
@@ -449,7 +450,7 @@ pub fn gen_otomo_equip_list(
             <html lang="en">
                 <head itemscope=true>
                     <title>{text!("{} - MHRice", title)}</title>
-                    { head_common(hash_store) }
+                    { head_common(hash_store, output) }
                     <style id="mh-armor-list-style">""</style>
                 </head>
                 <body>
@@ -493,7 +494,7 @@ pub fn gen_otomo_equip_list(
                             let series_name = gen_multi_lang(series.name);
                             html!(
                                 <li class="mh-armor-filter-item" data-sort=sort_tag data-filter={filter}>
-                                <a href={format!("/otomo/{}.html", id.to_tag())}>
+                                <a href={format!("otomo/{}.html", id.to_tag())}>
                                 <h2>{
                                     series_name
                                 }</h2>
@@ -525,7 +526,7 @@ pub fn gen_otomo_equip_list(
     }
 
     let dog_link = html!(<div>
-        <a href="/dog.html"><span class="icon-text">
+        <a href="dog.html"><span class="icon-text">
         <span class="icon">
           <i class="fas fa-arrow-right"></i>
         </span>
@@ -534,7 +535,7 @@ pub fn gen_otomo_equip_list(
     </div>);
 
     let airou_link = html!(<div>
-        <a href="/airou.html"><span class="icon-text">
+        <a href="airou.html"><span class="icon-text">
         <span class="icon">
           <i class="fas fa-arrow-right"></i>
         </span>

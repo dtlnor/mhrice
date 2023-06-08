@@ -184,6 +184,16 @@ pub trait Sink: Sync {
 
     fn finalize(self) -> Result<()>;
     fn toc_path(&self) -> String;
+
+    fn depth(&self) -> usize;
+
+    fn home_path(&self) -> String {
+        let depth = self.depth();
+        if depth == 0 {
+            return "./".to_owned();
+        }
+        (0..depth).map(|_| "../").collect()
+    }
 }
 
 pub struct NullSink;
@@ -209,17 +219,22 @@ impl Sink for NullSink {
     fn toc_path(&self) -> String {
         "".to_string()
     }
+
+    fn depth(&self) -> usize {
+        0
+    }
 }
 
 pub struct DiskSink {
     root: PathBuf,
     toc_path: String,
+    depth: usize,
 }
 
 impl DiskSink {
     pub fn init(root: &Path) -> Result<Self> {
         let root = PathBuf::from(root);
-        let toc_path = "/".to_string();
+        let toc_path = "".to_string();
         if root.exists() {
             eprintln!(
                 "Warning: output folder {} already exists",
@@ -228,7 +243,11 @@ impl DiskSink {
         } else {
             fs::create_dir(&root)?;
         }
-        Ok(DiskSink { root, toc_path })
+        Ok(DiskSink {
+            root,
+            toc_path,
+            depth: 0,
+        })
     }
 }
 
@@ -251,6 +270,7 @@ impl Sink for DiskSink {
         Ok(DiskSink {
             root: path,
             toc_path,
+            depth: self.depth + 1,
         })
     }
 
@@ -261,6 +281,10 @@ impl Sink for DiskSink {
     fn toc_path(&self) -> String {
         self.toc_path.clone()
     }
+
+    fn depth(&self) -> usize {
+        self.depth
+    }
 }
 
 struct S3SinkInner {
@@ -269,7 +293,12 @@ struct S3SinkInner {
 }
 
 impl S3SinkInner {
-    fn init(bucket: String, error: Arc<Mutex<Option<anyhow::Error>>>) -> Result<S3SinkInner> {
+    fn init(
+        bucket: String,
+        prefix: String,
+        error: Arc<Mutex<Option<anyhow::Error>>>,
+    ) -> Result<S3SinkInner> {
+        let carved_prefix = prefix.clone() + "version/";
         let (sender, reciver) = futures::channel::mpsc::channel(10);
         let uploader = Some(spawn(move || {
             use tokio::runtime::Runtime;
@@ -286,17 +315,23 @@ impl S3SinkInner {
                     let result = client
                         .list_objects_v2()
                         .bucket(bucket.clone())
+                        .prefix(prefix.clone())
                         .set_continuation_token(continuation_token.take())
                         .send()
                         .await?;
 
-                    existing_objects.extend(result.contents().into_iter().flatten().flat_map(
-                        |o| {
-                            o.key()
-                                .map(|s| s.to_owned())
-                                .zip(o.e_tag().map(|s| s.to_owned()))
-                        },
-                    ));
+                    existing_objects.extend(
+                        result
+                            .contents()
+                            .into_iter()
+                            .flatten()
+                            .flat_map(|o| {
+                                o.key()
+                                    .map(|s| s.to_owned())
+                                    .zip(o.e_tag().map(|s| s.to_owned()))
+                            })
+                            .filter(|object| !object.0.starts_with(&carved_prefix)),
+                    );
 
                     if result.is_truncated() {
                         continuation_token = result.next_continuation_token;
@@ -314,6 +349,7 @@ impl S3SinkInner {
                         } else {
                             unreachable!()
                         };
+                        let name = prefix.clone() + &name;
 
                         if let Some(etag) = existing_objects.remove(&name) {
                             let md5: [u8; 16] = Md5::digest(&data).try_into().unwrap();
@@ -436,6 +472,7 @@ pub struct S3Sink {
     path: String,
     inner: Arc<S3SinkInner>,
     error: Arc<Mutex<Option<anyhow::Error>>>,
+    depth: usize,
 }
 
 pub struct S3File {
@@ -451,13 +488,14 @@ enum Message {
 }
 
 impl S3Sink {
-    pub fn init(bucket: String) -> Result<S3Sink> {
+    pub fn init(bucket: String, prefix: String) -> Result<S3Sink> {
         let error = Arc::new(Mutex::new(None));
-        let inner = Arc::new(S3SinkInner::init(bucket, error.clone())?);
+        let inner = Arc::new(S3SinkInner::init(bucket, prefix, error.clone())?);
         Ok(S3Sink {
             inner,
             path: String::new(),
             error,
+            depth: 0,
         })
     }
 }
@@ -492,6 +530,7 @@ impl Sink for S3Sink {
             path,
             inner,
             error: self.error.clone(),
+            depth: self.depth + 1,
         })
     }
 
@@ -514,7 +553,11 @@ impl Sink for S3Sink {
     }
 
     fn toc_path(&self) -> String {
-        "/".to_string() + &self.path
+        self.path.clone()
+    }
+
+    fn depth(&self) -> usize {
+        self.depth
     }
 }
 

@@ -6,6 +6,7 @@ use typed_html::{elements::*, html, text};
 
 const WEBSITE_VERSIONS: &[&str] = &[
     "10.0.2", "10.0.3", "11.0.1", "11.0.2", "12.0.0", "12.0.1", "13.0.0", "14.0.0", "15.0.0",
+    "16.0.0",
 ];
 
 pub fn open_graph(
@@ -34,9 +35,9 @@ pub fn open_graph(
     if description.is_empty() {
         description = " ".to_owned(); // avoid empty meta attribute
     }
-    let image = image.unwrap_or("/favicon.png");
-    let image = origin.clone() + image;
-    let url = origin.clone() + path;
+    let image = image.unwrap_or("favicon.png");
+    let image = origin.clone() + "/" + image;
+    let url = origin.clone() + "/" + path;
     vec![
         html!(<meta property="og:type" content="website" />),
         html!(<meta property="og:title" content={title} />),
@@ -53,7 +54,7 @@ pub struct Section {
     pub content: Box<section<String>>,
 }
 
-pub fn gen_menu(sections: &[Section]) -> Box<aside<String>> {
+pub fn gen_menu(sections: &[Section], path: &str) -> Box<aside<String>> {
     html!(<aside id="left-aside">
     <div class="aside-button" id="left-aside-button"/>
     <div class="side-menu">
@@ -62,7 +63,7 @@ pub fn gen_menu(sections: &[Section]) -> Box<aside<String>> {
     </p>
     <ul class="menu-list">
         {sections.iter().map(|s| {
-            let href = format!("#{}", s.content.attrs.id.as_ref().unwrap());
+            let href = format!("{}#{}", path, s.content.attrs.id.as_ref().unwrap());
             html!(<li><a href={href.as_str()} class="left-aside-item">
                 {text!("{}", s.title)}
             </a></li>)
@@ -85,9 +86,9 @@ pub fn right_aside() -> Box<aside<String>> {
         let dot = version.find('.').unwrap();
         let (major, minor) = version.split_at(dot);
         let url = if latest {
-            "".to_owned()
+            "/".to_owned()
         } else {
-            "-".to_owned() + &version.replace('.', "-")
+            format!("/version/{version}/")
         };
         if version_tree.last().map(|v| v.0) == Some(major) {
             version_tree
@@ -126,12 +127,11 @@ pub fn right_aside() -> Box<aside<String>> {
             html!(<li class="mh-version-block">
                 <span class="mh-major">{text!("{}", major)}</span>
                 {minors.into_iter().map(|(minor, url, latest)| {
-                    let href = format!("https://mhrise{url}.mhrice.info");
                     let mut class = "mh-version-menu".to_owned();
                     if latest {
                         class += " mh-version-menu-latest";
                     }
-                    html!(<a class={class.as_str()} href={href.as_str()}>
+                    html!(<a class={class.as_str()} href={url.as_str()}>
                         {text!("{}", minor)}
                     </a>)
                 })}
@@ -144,7 +144,7 @@ pub fn right_aside() -> Box<aside<String>> {
         "Website info"
     </p>
     <ul class="menu-list">
-    <li><a class="navbar-item" href="/about.html">
+    <li><a class="navbar-item" href="about.html">
         "About MHRice"
     </a></li>
     </ul>
@@ -179,9 +179,9 @@ pub fn gen_slot(decorations_num_list: &[u32], is_rampage_slot: bool) -> Box<span
             html!(
                 <span class="mh-slot-outer">
                     <img alt={alt.as_str()}
-                        src={format!("/resources/slot_{s}.png").as_str()} class={class} />
+                        src={format!("resources/slot_{s}.png").as_str()} class={class} />
                     { is_rampage_slot.then(||html!(<img alt="Rampage slot" class="mh-slot-rampage"
-                        src="/resources/slot_rampage.png" />)) }
+                        src="resources/slot_rampage.png" />)) }
                 </span>
             )
         })}
