@@ -221,6 +221,39 @@ fn gen_map(
 
     let ec_name = pedia.ec_name.get_name_map();
     let ec_name_mr = pedia.ec_name_mr.get_name_map();
+    let get_ec_name = |type_: i32| {
+        usize::try_from(type_)
+            .ok()
+            .and_then(|i| EC_ID_MAP.get(i))
+            .and_then(|id| {
+                let tag = format!("EC_NAME_{id}");
+                if let Some(msg) = ec_name.get(&tag) {
+                    return Some(*msg);
+                }
+                let tag_mr = format!("EC_NAME_{id}_MR");
+                if let Some(msg) = ec_name_mr.get(&tag_mr) {
+                    return Some(*msg);
+                }
+                None
+            })
+            .map_or_else(
+                || html!(<span>{text!("Unknown {}", type_)}</span>),
+                gen_multi_lang,
+            )
+    };
+    let get_ec_icon = |type_: i32| {
+        let pattern = get_ec_icon_pattern(type_);
+        if ITEM_ICON_SPECIAL_COLOR.contains(&pattern) {
+            let icon_path = format!("resources/item/{pattern:03}.png");
+            html!(<div class="mh-icon-container">
+                <img alt="map icon" src={icon_path}
+                    class="mh-wire-long-jump-icon undraggable" /*style={rotate}*/ draggable=false/>
+            </div>)
+        } else {
+            let icon_path = format!("resources/item/{pattern:03}");
+            gen_colored_icon_inner(get_ec_icon_color(type_), &icon_path, [], false)
+        }
+    };
 
     let mut map_icons = vec![];
     let mut map_explains = vec![];
@@ -374,43 +407,22 @@ fn gen_map(
                 filter = "camp";
             }
             MapPopKind::Ec { behavior } => {
-                icon_inner = Box::new(|| {
-                    let pattern = get_ec_icon_pattern(behavior.base.type_);
-                    if ITEM_ICON_SPECIAL_COLOR.contains(&pattern) {
-                        let icon_path = format!("resources/item/{pattern:03}.png");
-                        html!(<div class="mh-icon-container">
-                            <img alt="map icon" src={icon_path}
-                                class="mh-wire-long-jump-icon undraggable" /*style={rotate}*/ draggable=false/>
-                        </div>)
-                    } else {
-                        let icon_path = format!("resources/item/{pattern:03}",);
-                        gen_colored_icon_inner(
-                            get_ec_icon_color(behavior.base.type_),
-                            &icon_path,
-                            [],
-                            false,
-                        )
-                    }
-                });
+                icon_inner = Box::new(|| get_ec_icon(behavior.base.type_));
+                let name = get_ec_name(behavior.base.type_);
 
-                let name = usize::try_from(behavior.base.type_)
-                    .ok()
-                    .and_then(|i| EC_ID_MAP.get(i))
-                    .and_then(|id| {
-                        let tag = format!("EC_NAME_{id}");
-                        if let Some(msg) = ec_name.get(&tag) {
-                            return Some(*msg);
-                        }
-                        let tag_mr = format!("EC_NAME_{id}_MR");
-                        if let Some(msg) = ec_name_mr.get(&tag_mr) {
-                            return Some(*msg);
-                        }
-                        None
-                    })
-                    .map_or_else(
-                        || html!(<span>{text!("Unknown {}", behavior.base.type_)}</span>),
-                        gen_multi_lang,
-                    );
+                let extra = match &behavior.extra {
+                    rsz::ec::Extra::Ec055(extra) => vec![
+                        html!(<p class="mh-kv"><span>"Default element lottery ratio"</span>
+                        <span>{match extra.default_element_lottery_ratio {
+                            rsz::Ec055GroupLotteryRatio::High => text!("High"),
+                            rsz::Ec055GroupLotteryRatio::Normal => text!("Normal"),
+                            rsz::Ec055GroupLotteryRatio::Low => text!("Low"),
+                            rsz::Ec055GroupLotteryRatio::Zero => text!("Zero"),
+                        }}</span>
+                        </p>),
+                    ],
+                    _ => vec![],
+                };
 
                 explain_inner = html!(<div>
                     <div class="mh-kvlist">
@@ -420,10 +432,263 @@ fn gen_map(
                     <p class="mh-kv"><span>"Respawn time"</span>
                     <span>{text!("{}", behavior.base.repop_wait_time)}</span>
                     </p>
+                    {extra}
                     </div>
                 </div>);
 
                 filter = "ec";
+            }
+            MapPopKind::Bush { behavior } => {
+                let (icon, color, title, lottery) =
+                    match behavior.env_creature_lottery_data.unwrap() {
+                        rsz::EnvCreatureLotteryData::Anthill(data) => (
+                            35,
+                            13,
+                            "Ant hill",
+                            data.lottery_data_list
+                                .iter()
+                                .map(|d| &d.base)
+                                .collect::<Vec<_>>(),
+                        ),
+                        rsz::EnvCreatureLotteryData::Bush(data) => (
+                            35,
+                            8,
+                            "Bush",
+                            data.lottery_data_list
+                                .iter()
+                                .map(|d| &d.base)
+                                .collect::<Vec<_>>(),
+                        ),
+                    };
+                if lottery.iter().all(|data| data.drop_rate == 0.0) {
+                    continue;
+                }
+
+                explain_inner = html!(<div>
+                    <div class="mh-reward-tables">
+                    <div class="mh-reward-box"><div class="mh-table"><table>
+                        <thead><tr>
+                        <th>{text!("{}", title)}</th>
+                        <th>"Probability"</th></tr></thead>
+                        <tbody> {
+                            lottery.iter().map(|data| {
+                                html!(<tr>
+                                    <td><div class="mh-icon-text">
+                                        {get_ec_icon(data.object_type)}
+                                        {get_ec_name(data.object_type)}
+                                    </div></td>
+                                    <td>{text!("{}%", data.drop_rate)}</td>
+                                </tr>)
+                            })
+                        } </tbody>
+                    </table></div></div>
+                    </div>
+                    </div>);
+
+                icon_inner = Box::new(move || {
+                    let icon_path = format!("resources/item/{:03}", icon);
+                    gen_colored_icon(color, &icon_path, [], false)
+                });
+                filter = "bush";
+            }
+            MapPopKind::Fg { behavior } => 'assign_content: {
+                let icon;
+                let color;
+                match (behavior.base.type_, &behavior.extra) {
+                    (0, _) => {
+                        explain_inner = html!(<div>"Gimmick 0"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 9;
+                    }
+                    (1, rsz::fg::Extra::Fg002(extra)) => {
+                        explain_inner = html!(<div>
+                        <div class="mh-kvlist">
+                        <p class="mh-kv"><span>"Name"</span>
+                        <span>"Lucky life waypoint"</span>
+                        </p>
+                        <p class="mh-kv"><span>"Select probability"</span>
+                        <span>{text!("{}", extra.select_probability)}</span>
+                        </p>
+                        <p class="mh-kv"><span>"Searching distance"</span>
+                        <span>{text!("{}", extra.search_dist)}</span>
+                        </p>
+                        <p class="mh-kv"><span>"Cooldown time"</span>
+                        <span>{text!("{}", extra.cool_time)}</span>
+                        </p>
+                        </div>
+
+                        <div class="mh-reward-tables">
+                        <div class="mh-reward-box"><div class="mh-table"><table>
+                            <thead><tr>
+                            <th>"Lucky life"</th>
+                            <th>"Probability"</th></tr></thead>
+                            <tbody> {
+                                extra.fg002_type_list.iter().zip(&extra.probability_list).map(|(&type_, &prob)| {
+                                    html!(<tr>
+                                        <td><div class="mh-icon-text">
+                                            {get_ec_icon(type_)}
+                                            {get_ec_name(type_)}
+                                        </div></td>
+                                        <td>{text!("{}%", prob)}</td>
+                                    </tr>)
+                                })
+                            } </tbody>
+                        </table></div></div>
+                        </div>
+                        </div>);
+                        filter = "ec";
+                        icon = 35;
+                        color = 10;
+                    }
+                    (2, rsz::fg::Extra::Fg003(extra)) => {
+                        let table = map.ec_data.as_ref().and_then(|ec_data| {
+                            ec_data.fg003_table_data.get(extra.table_id as usize)
+                        });
+
+                        explain_inner = if let Some(table) = table {
+                            html!(<div>
+                            <div class="mh-kvlist">
+                            <p class="mh-kv"><span>"Name"</span>
+                            <span>"Random endemic life"</span>
+                            </p>
+                            <p class="mh-kv"><span>"Min number"</span>
+                            <span>{text!("{}", table.min_num)}</span>
+                            </p>
+                            <p class="mh-kv"><span>"Max number"</span>
+                            <span>{text!("{}", table.max_num)}</span>
+                            </p>
+                            </div>
+
+                            <div class="mh-reward-tables">
+                            <div class="mh-reward-box"><div class="mh-table"><table>
+                                <thead><tr>
+                                <th>"Endemic life"</th>
+                                <th>"Probability"</th></tr></thead>
+                                <tbody> {
+                                    table.ec_data.unwrap().data_list.iter().map(|data| {
+                                        html!(<tr>
+                                            <td><div class="mh-icon-text">
+                                                {get_ec_icon(data.type_)}
+                                                {get_ec_name(data.type_)}
+                                            </div></td>
+                                            <td>{text!("{}%", data.rate)}</td>
+                                        </tr>)
+                                    })
+                                } </tbody>
+                            </table></div></div>
+                            </div>
+                            </div>)
+                        } else {
+                            html!(<div>{text!("Random endemic life with unknown table {}", extra.table_id)}</div>)
+                        };
+                        filter = "ec";
+                        icon = 35;
+                        color = 8;
+                    }
+                    (3, _) => {
+                        explain_inner = html!(
+                            <div class="mh-kvlist">
+                            <p class="mh-kv"><span>"Name"</span>
+                            <span>"Golden/Gilded Spiribug"</span>
+                            </p>
+                            </div>
+                        );
+                        filter = "ec";
+                        icon = 98;
+                        color = 4;
+                    }
+                    (4, rsz::fg::Extra::Fg005(extra)) => {
+                        explain_inner = html!(<div>
+                            "Vent"
+                        </div>);
+                        filter = "fg";
+                        icon_inner = Box::new(move || {
+                            let color = extra.color_standby.to_le_bytes();
+                            gen_colored_icon_inner(
+                                &format!("#{:02X}{:02X}{:02X}", color[0], color[1], color[2]),
+                                "resources/item/112",
+                                [],
+                                false,
+                            )
+                        });
+                        break 'assign_content;
+                    }
+                    (5, _) => {
+                        explain_inner = html!(<div>"Quicksand"</div>);
+                        filter = "fg";
+                        icon = 113;
+                        color = 5;
+                    }
+                    (6, _) => {
+                        explain_inner = html!(<div>"Ring"</div>);
+                        filter = "fg";
+                        icon = 116;
+                        color = 4;
+                    }
+                    (9, _) => {
+                        explain_inner = html!(<div>"Falling Boulder"</div>);
+                        filter = "fg";
+                        icon = 300;
+                        color = 2;
+                    }
+                    (11, _) => {
+                        explain_inner = html!(<div>"Swamp"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 13;
+                    }
+                    (13, _) => {
+                        explain_inner = html!(<div>"Poison Cypress"</div>);
+                        filter = "fg";
+                        icon = 303;
+                        color = 9;
+                    }
+                    (14, _) => {
+                        explain_inner = html!(<div>"Thornytoad biting area"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 7;
+                    }
+                    (15, _) => {
+                        explain_inner = html!(<div>"Bees"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 6;
+                    }
+                    (16, _) => {
+                        explain_inner = html!(<div>"Gimmick 16"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 10;
+                    }
+                    (17, _) => {
+                        explain_inner = html!(<div>"Gimmick 17"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 11;
+                    }
+                    (18, _) => {
+                        explain_inner = html!(<div>"Gimmick 18"</div>);
+                        filter = "fg";
+                        icon = 35;
+                        color = 12;
+                    }
+                    _ => {
+                        explain_inner = html!(<div>
+                            {text!("Field gimmick {}", behavior.base.type_)}
+                        </div>);
+
+                        filter = "fg";
+                        icon = 35;
+                        color = 0;
+                    }
+                }
+
+                icon_inner = Box::new(move || {
+                    let icon_path = format!("resources/item/{:03}", icon);
+                    gen_colored_icon(color, &icon_path, [], false)
+                });
             }
         }
         let map_icon_id = format!("mh-map-icon-{i}");
@@ -463,6 +728,8 @@ fn gen_map(
             <li id="mh-map-filter-button-jump" class="mh-map-filter-button"><a>"Jumping points"</a></li>
             <li id="mh-map-filter-button-fish" class="mh-map-filter-button"><a>"Fishing points"</a></li>
             <li id="mh-map-filter-button-ec" class="mh-map-filter-button"><a>"Endemic life"</a></li>
+            <li id="mh-map-filter-button-bush" class="mh-map-filter-button"><a>"Bush"</a></li>
+            <li id="mh-map-filter-button-fg" class="mh-map-filter-button"><a>"Other"</a></li>
             </ul></div>
 
             <div class="columns">

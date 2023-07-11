@@ -59,6 +59,8 @@ pub struct WeaponList<BaseData> {
 
 #[derive(Debug, Serialize)]
 pub struct Pedia {
+    pub sha: Vec<String>,
+
     pub monsters: Vec<Monster>,
     pub small_monsters: Vec<Monster>,
     pub monster_names: Msg,
@@ -269,6 +271,7 @@ pub struct Pedia {
     pub random_mystery_rank_release: Option<RandomMysteryMonsterRankReleaseData>,
     pub random_mystery_reward_base: Option<RandomMysteryRewardBase>,
     pub random_mystery_reward_subtarget: Option<RandomMysteryRewardSubTarget>,
+    pub random_mystery_research_point: Option<MysteryResearchPointUserData>,
 
     pub progress: ProgressCheckerUserData,
 
@@ -527,6 +530,7 @@ pub struct MonsterEx<'a> {
     pub random_quest: Option<&'a LotEnemyData>,
     pub random_mystery_reward: Vec<&'a RandomMysteryRewardBaseParam>,
     pub random_mystery_subtarget_reward: Option<&'a RandomMysteryRewardSubTargetParam>,
+    pub random_mystery_research_point: Option<&'a MysteryResearchPointUserDataParam>,
     pub discovery: Option<&'a DiscoverEmSetDataParam>,
     pub rank: Option<u8>,
     pub species: Option<&'a EmSpeciesData>,

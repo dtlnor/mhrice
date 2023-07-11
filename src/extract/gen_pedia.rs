@@ -466,7 +466,7 @@ fn get_msg(pak: &mut PakReader<impl Read + Seek>, path: &str) -> Result<Msg> {
     Msg::new(Cursor::new(pak.read_file(index)?))
 }
 
-fn get_user<T: 'static>(
+fn get_user<T: FromUser>(
     pak: &mut PakReader<impl Read + Seek>,
     path: &str,
     version_hint: Option<u32>,
@@ -478,7 +478,7 @@ fn get_user<T: 'static>(
         .with_context(|| path.to_string())
 }
 
-fn get_user_opt<T: 'static>(
+fn get_user_opt<T: FromUser>(
     pak: &mut PakReader<impl Read + Seek>,
     path: &str,
     version_hint: Option<u32>,
@@ -514,7 +514,7 @@ fn get_singleton_opt<T: 'static + SingletonUser>(
     }
 }
 
-fn get_weapon_list<BaseData: 'static>(
+fn get_weapon_list<BaseData: FromUser>(
     pak: &mut PakReader<impl Read + Seek>,
     weapon_class: &str,
     version_hint: Option<u32>,
@@ -595,7 +595,9 @@ fn get_version_hint<T: 'static + SingletonUser, U: FromRsz>(
     bail!("Type not found for version hint")
 }
 
-pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
+pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>, sha: bool) -> Result<Pedia> {
+    let sha = if sha { pak.sha256()? } else { vec![] };
+
     let version_hint = Some(get_version_hint::<MonsterListBossData, BossMonsterData>(
         pak,
     )?);
@@ -979,6 +981,8 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
     let ec_name_mr = get_msg(pak, "Message/HunterNote_MR/EnvironmentCreature_Name_MR.msg")?;
 
     Ok(Pedia {
+        sha,
+
         monsters,
         small_monsters,
         monster_names,
@@ -1177,6 +1181,7 @@ pub fn gen_pedia(pak: &mut PakReader<impl Read + Seek>) -> Result<Pedia> {
         random_mystery_rank_release: get_singleton_opt(pak, version_hint)?,
         random_mystery_reward_base: get_singleton_opt(pak, version_hint)?,
         random_mystery_reward_subtarget: get_singleton_opt(pak, version_hint)?,
+        random_mystery_research_point: get_singleton_opt(pak, version_hint)?,
         progress: get_singleton(pak, version_hint)?,
         enemy_rank: get_singleton(pak, version_hint)?,
         species: get_singleton(pak, version_hint)?,
@@ -2267,9 +2272,11 @@ fn prepare_skills(pedia: &Pedia) -> Result<BTreeMap<PlEquipSkillId, Skill<'_>>> 
         if !deco_dedup.insert(deco.id) {
             bail!("Duplicate deco definition for {:?}", deco.id)
         }
-        let product = deco_products
-            .remove(&deco.id)
-            .with_context(|| format!("No product for deco {:?}", deco.id))?;
+        let Some(product) = deco_products.remove(&deco.id) else {
+            // Crapcom: 16.0.1 dummy deco??
+            eprintln!("No product for deco {:?}", deco.id);
+            continue;
+        };
 
         let name_tag = format!("{}_Name", deco.id.to_msg_tag());
         let name = *deco_name_msg
@@ -3529,6 +3536,15 @@ fn prepare_monsters<'a>(
         false,
     )?;
 
+    let random_mystery_research_point = hash_map_unique(
+        pedia
+            .random_mystery_research_point
+            .iter()
+            .flat_map(|p| &p.param_data),
+        |p| (p.em_type, p),
+        false,
+    )?;
+
     let discoveries: HashMap<EmTypes, &DiscoverEmSetDataParam> = hash_map_unique(
         pedia
             .discover_em_set_data
@@ -3662,6 +3678,8 @@ fn prepare_monsters<'a>(
             .unwrap_or_default();
         let random_mystery_subtarget_reward =
             random_mystery_subtarget.get(&monster.em_type).copied();
+        let random_mystery_research_point =
+            random_mystery_research_point.get(&monster.em_type).copied();
         let discovery = discoveries.get(&monster.em_type).copied();
         let rank = ranks.get(&monster.em_type).copied();
         let species = speciess.get(&monster.em_type).copied();
@@ -3716,6 +3734,7 @@ fn prepare_monsters<'a>(
                 random_quest,
                 random_mystery_reward,
                 random_mystery_subtarget_reward,
+                random_mystery_research_point,
                 discovery,
                 rank,
                 species,
@@ -3732,6 +3751,7 @@ fn prepare_monsters<'a>(
                 random_quest,
                 random_mystery_reward,
                 random_mystery_subtarget_reward,
+                random_mystery_research_point,
                 discovery,
                 rank,
                 species,

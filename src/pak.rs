@@ -8,6 +8,7 @@ use base64::prelude::*;
 use compress::flate;
 use num_bigint::BigUint;
 use once_cell::sync::Lazy;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek, SeekFrom};
@@ -309,6 +310,19 @@ impl<F: Read + Seek> PakReader<F> {
         let mut v: Vec<_> = self.hash_map.values().cloned().collect();
         v.sort();
         v
+    }
+
+    pub fn sha256(&mut self) -> Result<Vec<String>> {
+        self.files
+            .iter_mut()
+            .map(|file| {
+                let mut hasher = Sha256::new();
+                file.file.rewind()?;
+                std::io::copy(&mut file.file, &mut hasher)?;
+                let hash = hasher.finalize();
+                Ok(format!("{hash:x}"))
+            })
+            .collect()
     }
 }
 

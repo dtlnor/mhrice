@@ -3,6 +3,7 @@ use super::*;
 use crate::rsz_enum;
 use crate::rsz_struct;
 use crate::rsz_sumtype;
+use crate::rsz_sumuser;
 use nalgebra_glm::*;
 use serde::*;
 
@@ -831,7 +832,7 @@ rsz_struct! {
     #[rsz("snow.stage.StageObjectControllerBase.KeyHash",
         0xb7d4fea1 = 10_00_02
     )]
-    #[derive(Debug, Serialize)]
+    #[derive(Debug, Serialize, Clone)]
     pub struct KeyHash {
         pub key: String,
         pub hash: u32,
@@ -1842,6 +1843,28 @@ rsz_struct! {
     }
 }
 
+rsz_struct! {
+    #[rsz("snow.stage.FieldGimmickBase")]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct FieldGimmickBase {
+        pub enabled: bool,
+        pub unique_id: u32,
+        pub type_: i32, // snow.stage.FieldGimmickManager.FieldGimmickType
+        pub map_floor_type: i32, // snow.stage.StageDef.MapFloorType
+    }
+}
+
+rsz_enum! {
+    #[rsz(i32)]
+    #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+    pub enum Ec055GroupLotteryRatio {
+        High = 0,
+        Normal = 1,
+        Low = 2,
+        Zero = 3,
+    }
+}
+
 pub mod ec {
     use super::*;
     use anyhow::{Context, Result};
@@ -1957,7 +1980,7 @@ pub mod ec {
         Ec015 [] {}
         Ec017 [] {}
         Ec018 [] {}
-        Ec019 [] {
+        Ec019 [] { // Great Wirebug
             pub wire_long_jump_id: i32, // snow.stage.StageDef.WireLongJumpId
             pub is_relay: bool,
             pub move_interval: f32,
@@ -1980,7 +2003,7 @@ pub mod ec {
             pub move_speed: f32,
             pub random_scale: f32,
         }
-        Ec023 [] {
+        Ec023 [] { // Giganha
             pub gravity: f32,
             pub reach_time: f32,
             pub add_radian_cog: f32,
@@ -2016,7 +2039,7 @@ pub mod ec {
             pub add_speed_rate: f32,
             pub material_data: Ec024MaterialData,
         }
-        Ec025 [] {
+        Ec025 [] { // Pincercrab
             pub active_time: f32,
             pub shot_span_time: f32,
             pub first_shot_span_time: f32,
@@ -2031,7 +2054,7 @@ pub mod ec {
             pub ref_material_curve: Option<EcMaterialCurveController>,
             pub ref_wwise: Option<WwiseEc025>,
         }
-        Ec026 [] {
+        Ec026 [] { // Echobat
             pub adjust_rate: f32,
             pub move_speed: f32,
             pub aim_id: i32,
@@ -2064,7 +2087,7 @@ pub mod ec {
         Ec033 [] {}
         Ec034 [] {}
         Ec035 [] {}
-        Ec036 [] {
+        Ec036 [] { // Tricktoad
             pub active_time: f32,
             pub attract_time: f32,
             pub blink_curve: ExternUser<()>, // snow.envCreature.Ec036BlinkData
@@ -2087,7 +2110,7 @@ pub mod ec {
             pub action_start_distance: f32,
             pub zone_data: ExternUser<()>, // snow.envCreature.Ec051.Ec051ReactionZoneData
         }
-        Ec052 [] {
+        Ec052 [] { // Slicercrab
             pub setting_data: ExternUser<()>, // snow.envCreature.Ec052SettingData
             pub wait_material_set_key: String,
             pub active_material_set_key: String,
@@ -2111,9 +2134,9 @@ pub mod ec {
             pub action_controller: EnvironmentCreatureActionControllerEc054Action,
             pub const_props: Guid,
         }
-        Ec055 [] {
+        Ec055 [] { // Starburst Bug
             pub setting: ExternUser<()>, // snow.envCreature.Ec055Setting,
-            pub default_element_lottery_ratio: i32, // snow.envCreature.Ec055Group.LotteryRatio
+            pub default_element_lottery_ratio: Ec055GroupLotteryRatio,
             pub action_controller: EnvironmentCreatureActionControllerEc055Action,
             pub joint_offsets: Vec<Ec055JointOffset>,
             pub camera_target_object: Guid,
@@ -2131,3 +2154,645 @@ pub mod ec {
 }
 
 pub use ec::{EnvironmentCreatureWrapper, EC_TYPE_MAP};
+
+pub mod fg {
+    use super::*;
+    use anyhow::{Context, Result};
+    macro_rules! def_fg {
+        ($($name:ident [$($vhash:literal=$version:literal),*] {
+            $(
+                $(#[$inner_meta:meta])*
+                $inner_vis:vis $field_name:ident : $field_type:ty
+            ),*$(,)?
+        })*) => {
+            pub mod extra {
+                use super::*;
+                $(rsz_struct! {
+                    #[rsz()]
+                    #[derive(Debug, Serialize, Clone)]
+                    pub struct $name {
+                        $(
+                            $(#[$inner_meta])* #[allow(dead_code)]
+                            $inner_vis $field_name : $field_type,
+                        )*
+                    }
+                })*
+            }
+
+            $(rsz_struct! {
+                #[rsz({concat!("snow.stage.", stringify!($name))}
+                    $(,$vhash = $version)*
+                )]
+                #[derive(Debug, Serialize, Clone)]
+                pub struct $name {
+                    #[serde(flatten)]
+                    pub base: Flatten<FieldGimmickBase>,
+                    #[serde(flatten)]
+                    pub extra: extra::$name
+                }
+            })*
+
+            #[derive(Debug, Serialize)]
+            pub enum Extra {
+                $($name(extra::$name),)*
+            }
+
+            #[derive(Debug, Serialize)]
+            pub struct FieldGimmickWrapper {
+                #[serde(flatten)]
+                pub base: FieldGimmickBase,
+                pub extra: Extra,
+            }
+
+            pub fn fg_type_map() -> HashMap<u32, RszTypeInfo> {
+                let mut m = HashMap::new();
+                $(register::<$name>(&mut m);)*
+                m
+            }
+
+            pub mod loader {
+                use anyhow::{Context, Result};
+                use super::FromRsz;
+                $(
+                    #[allow(non_snake_case)]
+                    pub fn $name(rsz: &super::AnyRsz) -> Result<super::FieldGimmickWrapper> {
+                        let downcasted = rsz.downcast_ref::<super::$name>()
+                            .with_context(||format!("Unexpected type for {}", <super::$name>::SYMBOL))?;
+                        Ok(super::FieldGimmickWrapper {
+                            base: downcasted.base.0.clone(),
+                            extra: super::Extra::$name(downcasted.extra.clone())
+                        })
+                    }
+                )*
+            }
+
+            pub static FG_TYPE_MAP: Lazy<HashMap<&'static str, fn(&AnyRsz) -> Result<FieldGimmickWrapper>>> = Lazy::new(|| {
+                HashMap::from_iter([
+                    $((<$name>::SYMBOL, loader::$name as fn(&AnyRsz) -> Result<FieldGimmickWrapper>),)*
+                ])
+            });
+        };
+    }
+
+    def_fg! {
+        Fg001 [] {
+            pub create_interval_time: f32,
+            pub move_area_size: Vec3,
+            pub move_area_angle: Vec3,
+            pub move_area_offset: Vec3,
+            pub wait_time: f32,
+            pub starting_time: f32,
+            pub life_time: f32,
+            pub waiting_calc_interval_time: f32,
+            pub starting_effect_dist: f32,
+            pub starting_effect_interval_time: f32,
+
+        }
+
+        Fg002 [] {
+            pub select_probability: i32,
+            pub search_dist: f32,
+            pub cool_time: f32,
+            pub fg002_type_list: Vec<i32>, // snow.envCreature.EnvironmentCreatureType
+            pub probability_list: Vec<i32>,
+        }
+
+        Fg003 [] {
+            pub table_id: u32,
+        }
+
+        Fg004 [] {}
+
+        Fg005 [] {
+            pub group_id: i32, // snow.stage.Fg005.GroupId
+            pub fg005_id: i32, // snow.stage.Fg005.Fg005Id
+            pub pre_active_time: f32,
+            pub active_time: f32,
+            pub finish_time: f32,
+            pub enable_color_change: bool,
+            pub color_idle: u32, // via.Color
+            pub color_standby: u32, // via.Color
+            pub color_change_time: f32,
+            pub dither_time: f32,
+            pub ref_object_body: Guid,
+            pub ref_object_idle: Guid,
+            pub ref_object_active: Guid,
+            pub ref_parts_motion: Option<Motion>,
+        }
+
+        Fg006 [] {
+            pub pre_active_time: f32,
+            pub active_time: f32,
+            pub post_process_time: f32,
+            pub ref_interlock_object: Guid,
+        }
+
+        Fg007 [] {
+            pub getted_dist: f32,
+            pub repop_time: f32,
+            pub enable_effect_dist: f32,
+            pub sync_id: i32,
+            pub repop_timer: f32,
+        }
+
+        Fg023 [] {
+            pub is_require_map_icon: bool,
+        }
+
+        Fg025 [] {
+            pub is_require_map_icon: bool,
+        }
+
+        Fg027 [] {
+            pub is_require_map_icon: bool,
+        }
+
+        Fg028 [] {
+            pub is_require_map_icon: bool,
+        }
+
+        Fg029 [] {
+            pub is_require_map_icon: bool,
+        }
+
+        Fg030 [] {
+            pub is_require_map_icon: bool,
+            pub current_state: i32, // snow.stage.Fg030.State
+            pub placement_type: i32,
+            pub effect_parent_object: Guid,
+        }
+
+        Fg031 [] {
+            pub is_require_map_icon: bool,
+            pub effect_keys: Vec<KeyHash>
+        }
+
+        Fg032 [] {
+            pub is_require_map_icon: bool,
+        }
+    }
+}
+
+pub use fg::{FieldGimmickWrapper, FG_TYPE_MAP};
+
+rsz_struct! {
+    #[rsz("snow.stage.BeltScrollController.ScrollSetting")]
+    #[derive(Debug, Serialize)]
+    pub struct ScrollSetting {
+        pub property_name: String,
+        pub scroll_direction: f32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.BeltScrollController")]
+    #[derive(Debug, Serialize)]
+    pub struct BeltScrollController {
+        pub enabled: bool,
+        pub scroll_type: i32, // snow.stage.BeltScrollController.ScrollType
+        pub property_list: Vec<ScrollSetting>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.FieldGimmickDelegate")]
+    #[derive(Debug, Serialize)]
+    pub struct FieldGimmickDelegate {
+        pub enabled: bool,
+        pub type_: i32, // snow.stage.FieldGimmickManager.FieldGimmickType
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseFieldGimmickTrigger.TriggerData")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseFieldGimmickTriggerTriggerData {
+        pub trigger: u32,
+        pub stop_trigger: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseFieldGimmickTrigger")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseFieldGimmickTrigger {
+        pub enabled: bool,
+        pub on_stanby_trigger: Vec<WwiseFieldGimmickTriggerTriggerData>,
+        pub on_active_trigger: Vec<WwiseFieldGimmickTriggerTriggerData>,
+        pub on_finish_trigger: Vec<u32>,
+        pub screen_space: i32, // snow.wwise.WwiseChangeSpaceWatcher.ScreenSpace
+        pub trigger_update_time: f32,
+        pub stop_distance: f32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.Fg023EnemyHitCounter")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg023EnemyHitCounter {
+        pub enabled: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageObjectCollisionController")]
+    #[derive(Debug, Serialize)]
+    pub struct StageObjectCollisionController {
+        pub enabled: bool,
+        pub hit_data_type: i32, // snow.stage.StageObjectCollisionController.HitDataType
+        pub data: ExternUser<()>, // snow.stage.StageObjectCollisionUserData
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.FieldGimmickRemoteSync")]
+    #[derive(Debug, Serialize)]
+    pub struct FieldGimmickRemoteSync {
+        pub enabled: bool,
+        pub own_sync_targets: u32, // snow.stage.StageObjectRemoteSync.OwnSyncTarget
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.Fg023StateMachine")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg023StateMachine {
+        pub enabled: bool,
+        pub remote_sync_object: Guid,
+        pub user_data: ExternUser<()>, // snow.stage.Fg023UserData
+        pub collision_enable_area_no: i32,
+        pub attack_data_key: String,
+        pub type_change_attack_data_key: String,
+        pub break_rock_key: String,
+        pub break_ivy_effect_key: String,
+        pub marker_effect_key: String,
+        pub hammock_object: Guid,
+        pub rock_object: Guid,
+        pub ivy_object: Guid,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseFg023")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseFg023 {
+        pub enabled: bool,
+        pub state: i32, // snow.stage.Fg023State
+        pub fall_trigger: u32,
+        pub rock_break_trigger: u32,
+        pub enemy_hit_trigger: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageObjectDelegate")]
+    #[derive(Debug, Serialize)]
+    pub struct StageObjectDelegate {
+        pub enabled: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseGimmickHitOverWriter")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseGimmickHitOverWriter {
+        pub over_write_hit_trigger_strike: u32,
+        pub over_write_hit_trigger_slash: u32,
+        pub over_write_hit_trigger_shell: u32,
+        pub over_write_hit_trigger_ignore_meat: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StageEffectCullingController")]
+    #[derive(Debug, Serialize)]
+    pub struct StageEffectCullingController {
+        pub enabled: bool,
+        pub condition_data: ExternUser<()>, // snow.stage.StageEffectCullingConditionData
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.StuckFloorZone")]
+    #[derive(Debug, Serialize)]
+    pub struct StuckFloorZone {
+        pub enabled: bool,
+        pub soak_target_max: i32,
+        pub zone_key_hash: KeyHash,
+        pub zone_index: i32,
+        pub soak_collision_attribute_name: String,
+        pub surface_collision_attribute_name: String,
+        pub bottom_collision_attribute_name: String,
+        pub bottom_collision_filter: String,
+        pub player_setting: ExternUser<()>, // snow.stage.PlayerStuckFloorSetting
+        pub enemy_setting: ExternUser<()>, // snow.stage.EnemyStuckFloorSetting
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.Fg028StateMachine")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg028StateMachine {
+        pub enabled: bool,
+        pub remote_sync_object: Guid,
+        pub setting: ExternUser<()>, // snow.stage.Fg028UserData
+        pub zone_controller_object: Guid,
+        pub guide_message_requester_object: Guid,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.envCreature.Ec054BiteArea")]
+    #[derive(Debug, Serialize)]
+    pub struct Ec054BiteArea {
+        pub enabled: bool,
+        pub setting: ExternUser<()>, // snow.envCreature.Ec054BiteAreaSetting
+        pub surface_collision_attribute_name: String
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.DamageStockHolder")]
+    #[derive(Debug, Serialize)]
+    pub struct DamageStockHolder {
+        pub enabled: bool,
+        pub stock_count: i32,
+        pub attack_owners: Vec<i32>, // snow.hit.DamageFlowOwnerType
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.Fg027StateMachine.KeyHash")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg027StateMachineKeyHash {
+        pub key: String,
+        pub hash: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.Fg027StateMachine")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg027StateMachine {
+        pub enabled: bool,
+        pub remote_sync_object: Guid,
+        pub attack_hit_keys: Vec<Fg027StateMachineKeyHash>,
+        pub attack_effect_keys: Vec<Fg027StateMachineKeyHash>,
+        pub damage_motion_keys: Vec<Fg027StateMachineKeyHash>,
+        pub poison_fade_out_material_keys: Vec<Fg027StateMachineKeyHash>,
+        pub poison_disable_state_keys: Vec<Fg027StateMachineKeyHash>,
+        pub setting: ExternUser<()>, // snow.stage.Fg027SettingUserData
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseFieldGimmickStateTrigger.StateTrigger")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseFieldGimmickStateTriggerStateTrigger {
+        pub trigger: u32,
+        pub stop_trigger: u32,
+        pub state_list: Vec<i32>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseFieldGimmickStateTrigger")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseFieldGimmickStateTrigger {
+        pub enabled: bool,
+        pub trigger_update_time: f32,
+        pub stop_distance: f32,
+        pub state_trigger_list: Vec<WwiseFieldGimmickStateTriggerStateTrigger>
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.SnowWwiseGenerator")]
+    #[derive(Debug, Serialize)]
+    pub struct SnowWwiseGenerator {
+        pub enabled: bool,
+        pub start_up: bool,
+        pub closest: bool,
+        pub trigger_id: Vec<u32>,
+        pub stop_triggre_id: u32,
+        pub fade_out_time: f32,
+        pub self_update: bool,
+        pub distance_check: bool,
+        pub auto_stop_distance: f32,
+        pub is_playing: bool,
+        pub target: Zero, // via.GameObject
+        pub mr_phase_state_start: i32, // snow.quest.QuestPhase
+        pub mr_phase_state_last: i32, // snow.quest.QuestPhase
+        pub is_mg032_culling: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseFg007")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseFg007 {
+        pub enabled: bool,
+        pub get_trigger: u32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.envCreature.Fg003ECDataList.Fg003ECData")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg003ECData {
+        pub type_: i32, // snow.envCreature.EnvironmentCreatureType
+        pub rate: i32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.envCreature.Fg003ECDataList")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg003ECDataList {
+        pub data_list: Vec<Fg003ECData>
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.envCreature.EnvironmentCreatureData.Fg003TableData")]
+    #[derive(Debug, Serialize)]
+    pub struct Fg003TableData {
+        pub min_num: u32,
+        pub max_num: u32,
+        pub ec_data: ExternUser<Fg003ECDataList>
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.envCreature.EnvironmentCreatureData")]
+    #[derive(Debug, Serialize)]
+    pub struct EnvironmentCreatureData {
+        pub drop_total_num: u32,
+        pub drop_a_num: u32,
+        pub drop_b_num: u32,
+        pub drop_c_num: u32,
+        pub random_total_num: u32,
+        pub fg003_table_data: Vec<Fg003TableData>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.PropsBase")]
+    #[derive(Debug, Serialize)]
+    pub struct PropsBase {
+        pub enabled: bool,
+        pub props_unique_id: u32,
+        pub block_no: i32,
+        pub separate_block_section: i32, // snow.ZoneDef.BlockSectionAttr
+        pub group_id: i32,
+        pub block_section: i32, // snow.ZoneDef.BlockSectionAttr
+        pub map_floor_type: i32, // snow.stage.StageDef.MapFloorType
+        pub register_map_icon_on_quest_start: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.BreakableStatus")]
+    #[derive(Debug, Serialize)]
+    pub struct BreakableStatus {
+        pub enabled: bool,
+        pub vital: f32,
+        pub reset_vital_rate: f32,
+        pub one_hit_break: bool,
+        pub no_break: bool,
+        pub breakable_deathblow_only: bool,
+        pub force_break_deathblow: bool,
+        pub enable_fake_obj_break_type_ml2deathblow: bool,
+        pub enable_fake_obj_break_type_absolutepower2l: bool,
+        pub force_break_intro_bind_voice: bool,
+        pub guts: bool,
+        pub guts_time: f32,
+        pub interlocked_breakable_obj: Guid,
+        pub sync_break: bool,
+        pub is_hit_final_wave_boss: bool,
+        pub draw_vital: bool,
+        pub vital_draw_offset: Vec3,
+        pub draw_damage_type: i32, // snow.stage.props.BreakableStatus.DamageDrawType
+        pub parts_object_list: Vec<Guid>,
+        pub ignore_hit_owner_type: Vec<i8>, // snow.hit.HitOwnerType
+        pub calc_damage_master_only: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.ObjectStateSettings.ObjectStateInfo")]
+    #[derive(Debug, Serialize)]
+    pub struct ObjectStateInfo {
+        pub target_object: Guid,
+        pub is_update: bool,
+        pub is_draw: bool,
+        pub is_collidable: bool,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.ObjectStateSettings.Param")]
+    #[derive(Debug, Serialize)]
+    pub struct ObjectStateSettingsParam {
+        pub key_name: String,
+        pub enable: bool,
+        pub info_list: Vec<ObjectStateInfo>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.ObjectStateSettings")]
+    #[derive(Debug, Serialize)]
+    pub struct ObjectStateSettings {
+        pub enabled: bool,
+        pub setting_list: Vec<ObjectStateSettingsParam>,
+        pub default_state_param_index: i32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.PropsDelegate")]
+    #[derive(Debug, Serialize)]
+    pub struct PropsDelegate {
+        pub enabled: bool,
+        pub props_type: i32, // snow.stage.StageDef.PropsType
+    }
+}
+
+// not a real type
+rsz_struct! {
+    #[rsz()]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct EnvCreatureLotteryRateInfo {
+        pub object_type: i32, // snow.envCreature.EnvironmentCreatureType
+        pub drop_rate: f32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.EnvCreatureLotteryRateInfo_Anthill")]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct EnvCreatureLotteryRateInfoAnthill {
+        #[serde(flatten)]
+        pub base: EnvCreatureLotteryRateInfo,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.EnvCreatureLotteryData_Anthill")]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct EnvCreatureLotteryDataAnthill {
+        pub lottery_data_list: Vec<EnvCreatureLotteryRateInfoAnthill>,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.EnvCreatureLotteryRateInfo_Bush")]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct EnvCreatureLotteryRateInfoBush {
+        #[serde(flatten)]
+        pub base: EnvCreatureLotteryRateInfo,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.EnvCreatureLotteryData_Bush")]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct EnvCreatureLotteryDataBush {
+        pub lottery_data_list: Vec<EnvCreatureLotteryRateInfoBush>,
+    }
+}
+
+rsz_sumuser! {
+    #[derive(Debug, Serialize, Clone)]
+    pub enum EnvCreatureLotteryData {
+        Anthill(EnvCreatureLotteryDataAnthill),
+        Bush(EnvCreatureLotteryDataBush)
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.stage.props.DropObjectBehavior")]
+    #[derive(Debug, Serialize, Clone)]
+    pub struct DropObjectBehavior {
+        pub enabled: bool,
+        pub env_creature_lottery_data: ExternUser<EnvCreatureLotteryData>, // snow.stage.props.EnvCreatureLotteryData
+        pub drop_offset: Vec3,
+        pub is_need_hunter_note_check: bool,
+        pub hunter_note_unlock_distance: f32,
+    }
+}
+
+rsz_struct! {
+    #[rsz("snow.wwise.WwiseBreakableObj")]
+    #[derive(Debug, Serialize)]
+    pub struct WwiseBreakableObj {
+        pub enabled: bool,
+        pub on_damaged: Vec<u32>,
+        pub on_suicide: Vec<u32>,
+        pub on_break: u32,
+        pub on_break_lost_vital: Vec<u32>,
+        pub screen_space: i32, // snow.wwise.WwiseChangeSpaceWatcher.ScreenSpace
+        pub stop_distance: f32,
+    }
+}

@@ -169,6 +169,9 @@ enum Mhrice {
         /// Path to the PAK file
         #[clap(short, long)]
         pak: Vec<String>,
+        /// Record SHA-256 of the PAK file
+        #[clap(short, long)]
+        sha: bool,
     },
 
     /// Generate the mhrice website the PAK file
@@ -180,9 +183,11 @@ enum Mhrice {
         #[clap(short, long)]
         output: String,
         /// Target website origin. e.g. "https://mhrice.info"
-        /// Output directory
         #[clap(long)]
         origin: Option<String>,
+        /// Record SHA-256 of the PAK file
+        #[clap(short, long)]
+        sha: bool,
     },
 
     /// Find TDB in the given binary and print the converted TDB file
@@ -559,9 +564,9 @@ fn scan_rsz(pak: Vec<String>, print_all: bool) -> Result<()> {
     Ok(())
 }
 
-fn gen_json(pak: Vec<String>) -> Result<()> {
+fn gen_json(pak: Vec<String>, sha: bool) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
-    let pedia = extract::gen_pedia(&mut pak)?;
+    let pedia = extract::gen_pedia(&mut pak, sha)?;
     let json = serde_json::to_string_pretty(&pedia)?;
     println!("{json}");
     Ok(())
@@ -571,9 +576,10 @@ fn gen_website_to_sink(
     pak: Vec<String>,
     sink: impl Sink,
     config: extract::WebsiteConfig,
+    sha: bool,
 ) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
-    let pedia = extract::gen_pedia(&mut pak)?;
+    let pedia = extract::gen_pedia(&mut pak, sha)?;
     let pedia_ex = extract::gen_pedia_ex(&pedia)?;
     sink.create("mhrice.json")?
         .write_all(serde_json::to_string_pretty(&pedia)?.as_bytes())?;
@@ -584,7 +590,7 @@ fn gen_website_to_sink(
     Ok(())
 }
 
-fn gen_website(pak: Vec<String>, output: String, origin: Option<String>) -> Result<()> {
+fn gen_website(pak: Vec<String>, output: String, origin: Option<String>, sha: bool) -> Result<()> {
     let config = extract::WebsiteConfig { origin };
     if let Some(bucket_and_prefix) = output.strip_prefix("S3://") {
         let (bucket, prefix) = if let Some((bucket, prefix)) = bucket_and_prefix.split_once('/') {
@@ -593,13 +599,13 @@ fn gen_website(pak: Vec<String>, output: String, origin: Option<String>) -> Resu
             (bucket_and_prefix, "")
         };
         let sink = S3Sink::init(bucket.to_string(), prefix.to_string())?;
-        gen_website_to_sink(pak, sink, config)?;
+        gen_website_to_sink(pak, sink, config, sha)?;
     } else if output == "null://" {
         let sink = NullSink;
-        gen_website_to_sink(pak, sink, config)?;
+        gen_website_to_sink(pak, sink, config, sha)?;
     } else {
         let sink = DiskSink::init(Path::new(&output))?;
-        gen_website_to_sink(pak, sink, config)?;
+        gen_website_to_sink(pak, sink, config, sha)?;
     }
 
     Ok(())
@@ -1352,9 +1358,9 @@ fn map(pak: Vec<String>, name: String, scale: String, tex: String, output: Strin
     let tex = Tex::new(File::open(tex)?)?;
     let mut rgba = tex.to_rgba(0, 0)?;
 
-    scene.for_each_object(&mut |object: &GameObject| {
+    scene.for_each_object(&mut |object: &GameObject, transforms| {
         if let Ok(_pop) = object.get_component::<rsz::ItemPopBehavior>() {
-            let transform = object.get_component::<rsz::Transform>()?;
+            let transform = transforms.last().context("no transform")?;
             let x = (transform.position.x + scale.map_wide_min_pos) / scale.map_scale;
             let y = (transform.position.z + scale.map_height_min_pos) / scale.map_scale;
             let x = (x * rgba.width() as f32) as i32;
@@ -1388,12 +1394,13 @@ fn main() -> Result<()> {
             output,
         } => dump_index(pak, version, index, output),
         Mhrice::ScanRsz { pak, crc } => scan_rsz(pak, crc),
-        Mhrice::GenJson { pak } => gen_json(pak),
+        Mhrice::GenJson { pak, sha } => gen_json(pak, sha),
         Mhrice::GenWebsite {
             pak,
             output,
             origin,
-        } => gen_website(pak, output, origin),
+            sha,
+        } => gen_website(pak, output, origin, sha),
         Mhrice::ReadTdb { tdb, options } => read_tdb(tdb, options),
         Mhrice::ReadMsg { msg } => read_msg(msg),
         Mhrice::ScanMsg { pak, output } => scan_msg(pak, output),
