@@ -36,6 +36,7 @@ mod user;
 mod uvs;
 
 use extract::hash_store::*;
+use extract::logger::*;
 use extract::sink::*;
 use file_ext::*;
 use gui::*;
@@ -125,7 +126,7 @@ pub struct TdbOptions {
 enum Mhrice {
     /// Dump a sub-file with specific name from the PAK file
     Dump {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Name of the sub-file to dump
@@ -138,7 +139,7 @@ enum Mhrice {
 
     /// Dump a sub-file with specific index from the PAK file
     DumpIndex {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         #[clap(short, long, default_value_t = 0)]
@@ -156,7 +157,7 @@ enum Mhrice {
     /// This will verify the files conform the format,
     /// and list the CRC mismatch among RSZ types found in them.
     ScanRsz {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Print all gathered CRC instead of mismatched ones
@@ -166,7 +167,7 @@ enum Mhrice {
 
     /// Generate JSON file of game information from the PAK file
     GenJson {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Record SHA-256 of the PAK file
@@ -176,7 +177,7 @@ enum Mhrice {
 
     /// Generate the mhrice website the PAK file
     GenWebsite {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Output directory
@@ -209,7 +210,7 @@ enum Mhrice {
 
     /// Scan the PAK file and output messages from all MSG files
     ScanMsg {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Output directory
@@ -219,7 +220,7 @@ enum Mhrice {
 
     /// Scan the PAK file and find a regex pattern in MSG files
     GrepMsg {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// The regex pattern
@@ -228,7 +229,7 @@ enum Mhrice {
 
     /// Scan the PAK file and find a regex pattern in all files
     Grep {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Search for UTF-16 string
@@ -241,7 +242,7 @@ enum Mhrice {
     /// Scan the PAK file as well as optionally full minidump samples
     /// and print all potential sub-file names
     SearchPath {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
 
@@ -252,7 +253,7 @@ enum Mhrice {
 
     /// Dump all sub-files from the PAK file
     DumpTree {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// File name list, can be the output from search-path command
@@ -265,28 +266,28 @@ enum Mhrice {
 
     /// Scan the PAK file and verify the format of all MESH files
     ScanMesh {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
     },
 
     /// Scan the PAK file and verify the format of all TEX files
     ScanTex {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
     },
 
     /// Scan the PAK file and verify the format of all GUI files
     ScanGui {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
     },
 
     /// Scan the PAK file and verify the format of all UVS files
     ScanUvs {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
     },
@@ -349,7 +350,7 @@ enum Mhrice {
 
     /// Generate meat diagram PNG file for a monster
     GenMeat {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Monster EmTypes ID
@@ -362,7 +363,7 @@ enum Mhrice {
 
     /// Generate resource files (images etc.) for the website
     GenResources {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// Output directory
@@ -413,7 +414,7 @@ enum Mhrice {
 
     /// Print information of a SCN tree
     Scene {
-        /// Path to the PAK file
+        /// Paths to the PAK files, folder containing PAK files, or a .txt file listing all PAK files
         #[clap(short, long)]
         pak: Vec<String>,
         /// The name of the root SCN file
@@ -472,6 +473,19 @@ fn open_pak_files(mut pak: Vec<String>) -> Result<Vec<File>> {
         pak.sort();
         for path in &pak {
             eprintln!("Found PAK file: {path}");
+        }
+    } else if pak.len() == 1 && pak[0].to_lowercase().ends_with(".txt") {
+        eprintln!("Listing all PAK files from the txt file...");
+        let mut txt = BufReader::new(File::open(&pak[0])?);
+        pak.clear();
+        loop {
+            let mut line = String::new();
+            if txt.read_line(&mut line)? == 0 {
+                break;
+            }
+            let path = line.trim().to_owned();
+            eprintln!("Found PAK file: {path}");
+            pak.push(path);
         }
     }
 
@@ -566,7 +580,9 @@ fn scan_rsz(pak: Vec<String>, print_all: bool) -> Result<()> {
 
 fn gen_json(pak: Vec<String>, sha: bool) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
-    let pedia = extract::gen_pedia(&mut pak, sha)?;
+    let mut logger_root = LoggerRoot::new();
+    let logger = &mut logger_root.logger();
+    let pedia = extract::gen_pedia(&mut pak, sha, logger)?;
     let json = serde_json::to_string_pretty(&pedia)?;
     println!("{json}");
     Ok(())
@@ -579,13 +595,22 @@ fn gen_website_to_sink(
     sha: bool,
 ) -> Result<()> {
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
-    let pedia = extract::gen_pedia(&mut pak, sha)?;
-    let pedia_ex = extract::gen_pedia_ex(&pedia)?;
-    sink.create("mhrice.json")?
-        .write_all(serde_json::to_string_pretty(&pedia)?.as_bytes())?;
-    let mut hash_store = HashStore::new();
-    extract::gen_website(&mut hash_store, &pedia, &pedia_ex, &config, &sink)?;
-    extract::gen_resources(&mut pak, &sink.sub_sink("resources")?)?;
+    let mut logger_root = LoggerRoot::new();
+    {
+        let logger = &mut logger_root.logger();
+        let pedia = extract::gen_pedia(&mut pak, sha, logger)?;
+        let pedia_ex = extract::gen_pedia_ex(&pedia, logger)?;
+        sink.create("mhrice.json")?
+            .write_all(serde_json::to_string_pretty(&pedia)?.as_bytes())?;
+        let mut hash_store = HashStore::new();
+        extract::gen_website(&mut hash_store, &pedia, &pedia_ex, &config, &sink)?;
+        extract::gen_resources(&mut pak, &sink.sub_sink("resources")?, logger)?;
+    }
+
+    let mut log = sink.create("log.html")?;
+    write!(log, "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>MHRice log</title></head><body><pre>\n{}\n</pre></body></html>", logger_root.finalize())?;
+    drop(log);
+
     sink.finalize()?;
     Ok(())
 }
@@ -1229,10 +1254,12 @@ fn gen_meat(pak: Vec<String>, index: u32, output: impl Write) -> Result<()> {
 }
 
 fn gen_resources(pak: Vec<String>, output: String) -> Result<()> {
+    let mut logger_root = LoggerRoot::new();
+    let logger = &mut logger_root.logger();
     let mut pak = PakReader::new(open_pak_files(pak)?)?;
 
     let sink = DiskSink::init(Path::new(&output))?;
-    extract::gen_resources(&mut pak, &sink)?;
+    extract::gen_resources(&mut pak, &sink, logger)?;
 
     Ok(())
 }

@@ -19,6 +19,7 @@ pub enum FieldValue {
     Bool(bool),
     F64(f64),
     String(String),
+    Size(f32, f32),
     Texture(String),
     Unknown(u32, u64),
 }
@@ -171,6 +172,7 @@ impl Gui {
 
             let old = file.tell()?;
 
+            // via.timeline.PropertyType?
             let value = match value_type {
                 1 => FieldValue::Bool(match value {
                     0 => false,
@@ -181,6 +183,12 @@ impl Gui {
                 13 => {
                     file.seek(SeekFrom::Start(value))?;
                     FieldValue::String(file.read_u16str()?)
+                }
+                31 => {
+                    file.seek(SeekFrom::Start(value))?;
+                    let a = file.read_f32()?;
+                    let b = file.read_f32()?;
+                    FieldValue::Size(a, b)
                 }
                 32 => {
                     file.seek(SeekFrom::Start(value))?;

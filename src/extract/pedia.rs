@@ -40,6 +40,7 @@ pub struct Monster {
     pub pop_parameter: EnemyPopParameterData,
     pub unique_mystery: Option<EnemyUniqueMysteryDataWrapper>,
     pub unique_over_mystery: Option<EnemyUniqueOverMysteryData>,
+    pub block_move: Option<EnemyBlockMoveData>,
 }
 
 #[derive(Debug, Serialize)]
@@ -328,6 +329,8 @@ pub struct Pedia {
 
     pub ec_name: Msg,
     pub ec_name_mr: Msg,
+
+    pub map_icon_list: GuiMapDetailIconListGPopData,
 }
 
 pub struct QuestReward<'a> {
@@ -661,4 +664,5 @@ pub struct PediaEx<'a> {
 
     pub dlc: BTreeMap<i32, Dlc<'a>>,
     pub slc: BTreeMap<SaveLinkContents, Slc<'a>>,
+    // pub map_icon_list: HashMap<i32, &'a MapDetailIconListGPopData>,
 }

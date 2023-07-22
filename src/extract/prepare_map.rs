@@ -74,7 +74,7 @@ static MAP_FILES: [Option<MapFiles>; 16] = [
         // 7
         tex_files: &["gui/80_Texture/map/map_007_IAM.tex"],
         scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_007_sp.user", // special type
-        scene_file: "scene/m01/hyakuryu/m01_hyakuryu_A.scn",
+        scene_file: "scene/m01/hyakuryu/m01_hyakuryu_B.scn",
         ec_file: None,
     }),
     None, // 8
@@ -132,11 +132,10 @@ static MAP_FILES: [Option<MapFiles>; 16] = [
     Some(MapFiles {
         // 15
         tex_files: &[
-            "gui/80_Texture/map/map_042_IAM.tex",
-            "gui/80_Texture/map/map_042_2_IAM.tex",
+            // "gui/80_Texture/map/map_042_IAM.tex",
             "gui/80_Texture/map/map_042_3_IAM.tex",
+            "gui/80_Texture/map/map_042_2_IAM.tex",
         ],
-        // This scale doesn't look right
         scale_file: "gui/01_Common/Map/MapScaleUserdata/GuiMapScaleDefineData_042.user",
         scene_file: "scene/m42/normal/m42_normal.scn",
         ec_file: Some("environmentCreature/UserData/m42_ECData.user"),
@@ -159,9 +158,11 @@ pub enum MapPopKind {
     },
     FishingPoint {
         behavior: rsz::FishingPoint,
+        pop_marker: Option<rsz::StageFacilityPopMarker>,
     },
     Recon {
         behavior: rsz::OtomoReconSpot,
+        pop_marker: Option<rsz::PlayerInfluencePopMarker>,
     },
     Ec {
         behavior: rsz::EnvironmentCreatureWrapper,
@@ -170,7 +171,7 @@ pub enum MapPopKind {
         behavior: rsz::FieldGimmickWrapper,
     },
     Bush {
-        behavior: rsz::DropObjectBehavior,
+        behavior: Vec<rsz::DropObjectBehavior>,
     },
 }
 
@@ -215,6 +216,8 @@ fn get_map<F: Read + Seek>(pak: &mut PakReader<F>, files: &MapFiles) -> Result<O
 
     let mut pops = vec![];
 
+    let mut bush_groups: Vec<Vec<(Vec3, rsz::DropObjectBehavior)>> = vec![];
+
     scene.for_each_object(&mut |object: &GameObject, transforms: &[&rsz::Transform]| {
         // TODO: this isn't an accurate way to get the position, as it doesn't consider rotation and scaling
         let position: Vec3 = transforms.iter().map(|t| t.position.xzy()).sum();
@@ -245,15 +248,27 @@ fn get_map<F: Read + Seek>(pak: &mut PakReader<F>, files: &MapFiles) -> Result<O
         } else if let Ok(behavior) = object.get_component::<rsz::FishingPoint>() {
             let mut behavior = behavior.clone();
             behavior.fish_spawn_data.load(pak, None)?;
+            let pop_marker = object
+                .get_component::<rsz::StageFacilityPopMarker>()
+                .ok()
+                .cloned();
 
-            let kind = MapPopKind::FishingPoint { behavior };
+            let kind = MapPopKind::FishingPoint {
+                behavior,
+                pop_marker,
+            };
 
             pops.push(MapPop { position, kind });
         } else if let Ok(behavior) = object.get_component::<rsz::OtomoReconSpot>() {
+            let pop_marker = object
+                .get_component::<rsz::PlayerInfluencePopMarker>()
+                .ok()
+                .cloned();
             pops.push(MapPop {
                 position,
                 kind: MapPopKind::Recon {
                     behavior: behavior.clone(),
+                    pop_marker,
                 },
             });
         } else if let Ok(behavior) = object
@@ -273,10 +288,21 @@ fn get_map<F: Read + Seek>(pak: &mut PakReader<F>, files: &MapFiles) -> Result<O
         } else if let Ok(behavior) = object.get_component::<rsz::DropObjectBehavior>() {
             let mut behavior = behavior.clone();
             behavior.env_creature_lottery_data.load(pak, None)?;
-            pops.push(MapPop {
-                position,
-                kind: MapPopKind::Bush { behavior },
-            })
+            let mut new_group = vec![];
+            let mut i = 0;
+            let max_dist = 4.0;
+            while i < bush_groups.len() {
+                if bush_groups[i]
+                    .iter()
+                    .any(|(bush_pos, _)| distance2(bush_pos, &position) < max_dist * max_dist)
+                {
+                    new_group.append(&mut bush_groups.remove(i));
+                } else {
+                    i += 1
+                }
+            }
+            new_group.push((position, behavior));
+            bush_groups.push(new_group);
         } else if let Ok(behavior) = object.get_component::<rsz::TentBehavior>() {
             pops.push(MapPop {
                 position,
@@ -288,6 +314,16 @@ fn get_map<F: Read + Seek>(pak: &mut PakReader<F>, files: &MapFiles) -> Result<O
 
         Ok(true)
     })?;
+
+    for group in bush_groups {
+        let pos_sum: Vec3 = group.iter().map(|(p, _)| p).sum();
+        let position = pos_sum / group.len() as f32;
+        let behavior = group.into_iter().map(|(_, b)| b).collect();
+        pops.push(MapPop {
+            position,
+            kind: MapPopKind::Bush { behavior },
+        })
+    }
 
     let ec_data = files
         .ec_file
