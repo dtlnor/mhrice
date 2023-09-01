@@ -12,6 +12,7 @@ mod custom_buildup;
 mod data_base;
 mod data_tune;
 mod dlc;
+mod ecological;
 mod facility;
 mod item;
 mod lot;
@@ -21,6 +22,7 @@ mod monster_list;
 mod mystery;
 mod otomo;
 mod parts_break_data;
+mod pos;
 mod quest_data;
 mod random_quest;
 mod scene;
@@ -41,6 +43,7 @@ pub use custom_buildup::*;
 pub use data_base::*;
 pub use data_tune::*;
 pub use dlc::*;
+pub use ecological::*;
 pub use facility::*;
 pub use item::*;
 pub use lot::*;
@@ -50,6 +53,7 @@ pub use monster_list::*;
 pub use mystery::*;
 pub use otomo::*;
 pub use parts_break_data::*;
+pub use pos::*;
 pub use quest_data::*;
 pub use random_quest::*;
 pub use scene::*;
@@ -130,7 +134,9 @@ impl NodeSlot {
 
     fn take_instance(&mut self) -> Result<AnyRsz> {
         if matches!(self, NodeSlot::Instance(_)) {
-            let NodeSlot::Instance(rsz) = std::mem::replace(self, NodeSlot::None) else {unreachable!()};
+            let NodeSlot::Instance(rsz) = std::mem::replace(self, NodeSlot::None) else {
+                unreachable!()
+            };
             Ok(rsz)
         } else {
             bail!("The node slot doesn't contain instance: {:?}", self)
@@ -1306,6 +1312,17 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         EnemyBlockMoveDataStageInfo,
         EnemyBlockMoveDataCalcRotSpeed,
         EnemyBlockMoveData,
+    );
+
+    r!(EnemyEcologicalDataStageInfo, EnemyEcologicalData,);
+
+    r!(
+        BlockMovePosSetDataMovePosInfo,
+        BlockMovePosSetData,
+        EnemyInsideMoveInfo,
+        InsideMovePosSetData,
+        EnemyBossInitSetInfo,
+        BossInitSetPosSetData,
     );
 
     m.extend(unique_mystery::unique_mystery_type_map());
