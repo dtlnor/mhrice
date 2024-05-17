@@ -234,6 +234,7 @@ fn gen_otomo_equip(
         })
     }
 
+    #[allow(clippy::get_first)]
     let three_item_condition = |ty: EvaluationTypeFor3Argument, item: &[ItemId]| {
         let item0 = item.get(0).filter(|&&i| i != ItemId::None);
         let item1 = item.get(1).filter(|&&i| i != ItemId::None);
@@ -331,8 +332,11 @@ fn gen_otomo_equip(
         )
     });
 
+    #[allow(clippy::question_mark)] // clippy is drunk
     let layered_row = |piece: &Option<OtArmor>| {
-        let Some(piece) = piece else { return None };
+        let Some(piece) = piece else {
+            return None;
+        };
         piece.overwear.map(|overwear| {
             html!(<tr>
                 <td>{gen_atomo_armor_label(piece)}</td>

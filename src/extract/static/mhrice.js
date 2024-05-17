@@ -251,6 +251,7 @@ function onChangeWeaponTree(e) {
     }
     if (select.value === "grid") {
         g_weapon_masonry.destroy();
+        g_weapon_masonry = null;
         root.classList.remove("mh-weapon-tree-list");
         root.classList.add("mh-weapon-tree-grid");
     } else {
@@ -520,6 +521,10 @@ function changeFilter(e, category) {
     const cur = document.getElementById(filter_button_prefix + g_filter);
     if (cur !== null) {
         cur.classList.add("is-active")
+    }
+
+    if (g_weapon_masonry) {
+        g_weapon_masonry.layout();
     }
 }
 

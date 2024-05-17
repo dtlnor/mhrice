@@ -183,7 +183,7 @@ impl Rsz {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        if type_descriptors.get(0) != Some(&TypeDescriptor { hash: 0, crc: 0 }) {
+        if type_descriptors.first() != Some(&TypeDescriptor { hash: 0, crc: 0 }) {
             bail!("The first type descriptor should be 0")
         }
 
@@ -918,6 +918,10 @@ pub static RSZ_TYPE_MAP: Lazy<HashMap<u32, RszTypeInfo>> = Lazy::new(|| {
         OverwearWeaponProductUserData,
         WeaponChaosCriticalUserDataParam,
         WeaponChaosCriticalUserData,
+        InsectBaseUserDataParam,
+        InsectBaseUserData,
+        InsectRateTableUserDataParam,
+        InsectRateTableUserData,
     );
 
     r!(
