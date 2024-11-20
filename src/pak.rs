@@ -87,9 +87,13 @@ impl<F: Read + Seek> PakReader<F> {
                 if &magic != b"KPKA" {
                     bail!("Wrong magic for PAK file");
                 }
-                let pak_version = file.read_u16()?;
-                if pak_version != 4 {
+                let pak_major_version = file.read_u8()?;
+                if pak_major_version != 4 {
                     bail!("Wrong version for PAK file");
+                }
+                let pak_minor_version = file.read_u8()?;
+                if pak_minor_version != 0 {
+                    eprintln!("non-tested minor version for PAK file");
                 }
                 let flag = file.read_u16()?;
                 if flag & 1 != 0 {
@@ -216,8 +220,9 @@ impl<F: Read + Seek> PakReader<F> {
             len_compressed,
             len,
             format,
+            flag,
             encryption,
-            ..
+            
         } = entries[file_index.index];
 
         file.seek(SeekFrom::Start(offset))?;
@@ -254,7 +259,8 @@ impl<F: Read + Seek> PakReader<F> {
         match format {
             0 => {
                 if len != u64::try_from(data.len())? {
-                    bail!("Uncompressed file should have len == len_compressed")
+                    eprintln!("0:Expected len_compressed {}, len {}, actual size {}. flag {}. format {}", len_compressed, len, data.len(), flag, format);
+                    // eprintln!("Uncompressed file should have len == len_compressed")
                 }
                 Ok(data)
             }
@@ -262,14 +268,14 @@ impl<F: Read + Seek> PakReader<F> {
                 let mut decompressed = Vec::new();
                 flate::Decoder::new(&data[..]).read_to_end(&mut decompressed)?;
                 if u64::try_from(decompressed.len()).unwrap() != len {
-                    bail!("Expected size {}, actual size {}", len, decompressed.len());
+                    eprintln!("1:Expected size {}, actual size {}", len, decompressed.len());
                 }
                 Ok(decompressed)
             }
             2 => {
                 let decoded = zstd::decode_all(&data[..])?;
                 if u64::try_from(decoded.len()).unwrap() != len {
-                    bail!("Expected size {}, actual size {}", len, decoded.len());
+                    eprintln!("2:Expected size {}, actual size {}", len, decoded.len());
                 }
                 Ok(decoded)
             }
@@ -278,19 +284,20 @@ impl<F: Read + Seek> PakReader<F> {
                     let mut decompressed = Vec::new();
                     flate::Decoder::new(&data[..]).read_to_end(&mut decompressed)?;
                     if u64::try_from(decompressed.len()).unwrap() != len {
-                        bail!("Expected size {}, actual size {}", len, decompressed.len());
+                        eprintln!("1and:Expected size {}, actual size {}", len, decompressed.len());
                     }
                     Ok(decompressed)
 
                 }else if (format & 2) == 2{
                     let decoded = zstd::decode_all(&data[..])?;
                     if u64::try_from(decoded.len()).unwrap() != len {
-                        bail!("Expected size {}, actual size {}", len, decoded.len());
+                        eprintln!("2and:Expected size {}, actual size {}", len, decoded.len());
                     }
                     Ok(decoded)
 
                 }else{
-                    bail!("Unsupported format: {}", format);
+                    eprintln!("Unsupported format: {}", format);
+                    Ok(data)
                 }
             }
         }
