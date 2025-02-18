@@ -885,15 +885,19 @@ impl Tdb {
             bail!("Wrong magic for TDB file");
         }
 
-        if file.read_u32()? != 0x47 {
+        if file.read_u32()? != 0x4A {
             bail!("Wrong version for TDB file");
         }
 
-        if file.read_u32()? != 0 { //initialized, zero when its not runtime
-            //bail!("Expected 0");
-        }
+        // if file.read_u32()? != 0 { //initialized, zero when it's not runtime, no this thing in tdb 74
+        //     //bail!("Expected 0");
+        // }
 
         let type_instance_count = file.read_u32()?;
+        let _types_start_of_generics_probably = file.read_u32()?;
+
+        let _unkn_tdb74 = file.read_u32()?;
+
         let method_membership_count = file.read_u32()?;
         let field_membership_count = file.read_u32()?;
         let type_count = file.read_u32()?;
@@ -902,11 +906,12 @@ impl Tdb {
         let property_count = file.read_u32()?;
         let property_membership_count = file.read_u32()?;
         let event_count = file.read_u32()?;
+
         let param_count = file.read_u32()?;
         let attribute_count = file.read_u32()?;
-        let constant_count = file.read_u32()?;
+        let constant_count = file.read_u32()?; // num init data
         let (attribute_list_count, data_attribute_list_count) =
-            file.read_u32()?.bit_split((16, 16));
+            file.read_u32()?.bit_split((16, 16)); //unkn & attribute 2 in ref
         let intern_string_count = file.read_u32()?;
         let assembly_count = file.read_u32()?;
         if file.read_u32()? != 0 { //dev_entry
@@ -934,7 +939,6 @@ impl Tdb {
         let string_table_offset = file.read_u64()?;
         let heap_offset = file.read_u64()?;
         let intern_string_offset = file.read_u64()?;
-        let _padding = file.read_u64()?;
 
         // eprintln!("type_instance_count = {}", type_instance_count);
         // eprintln!("method_membership_count = {}", method_membership_count);
@@ -973,6 +977,7 @@ impl Tdb {
         // eprintln!("string_table_offset = {}", string_table_offset);
         // eprintln!("heap_offset = {}", heap_offset);
         // eprintln!("intern_string_offset = {}", intern_string_offset);
+        _ = file.read_u32()?; //padding
         // eprintln!("_padding = {}", _padding);
 
         struct Assembly {
@@ -1043,6 +1048,7 @@ impl Tdb {
 
             runtime_info: u64,
             vtable: u64,
+            unk_new_tdb74: u64,
         }
         file.seek_assert_align_up(type_instance_offset, 16)?;
         let type_instances = (0..type_instance_count)
@@ -1087,6 +1093,8 @@ impl Tdb {
                 let runtime_info = file.read_u64()?;
                 let vtable = file.read_u64()?;
 
+                let unk_new_tdb74 = file.read_u64()?;
+
                 Ok(TypeInstance {
                     index: index,
                     type_def_address,
@@ -1120,6 +1128,7 @@ impl Tdb {
 
                     runtime_info,
                     vtable,
+                    unk_new_tdb74,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
