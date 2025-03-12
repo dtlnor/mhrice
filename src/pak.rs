@@ -96,16 +96,22 @@ impl<F: Read + Seek> PakReader<F> {
                     eprintln!("non-tested minor version for PAK file");
                 }
                 let flag = file.read_u16()?;
-                if flag & 1 != 0 {
-                    bail!("Unimplemented flag 1")
+                if flag & 0b1110_0111 != 0 {
+                    eprintln!("Unexpected flag for PAK file {}", flag);
                 }
                 let count = file.read_u32()?;
                 file.seek(SeekFrom::Current(4))?;
 
-                let mut entries_buffer = vec![0; count as usize * 0x30];
+                let entry_size = 0x30;
+
+                let mut entries_buffer = vec![0; count as usize * entry_size];
                 file.read_exact(&mut entries_buffer)?;
 
-                if flag & 8 != 0 {
+                if flag & 0b0001_0000 != 0 {
+                    let _ = file.read_u32()?; // unknown new data
+                }
+
+                if flag & 0b0000_1000 != 0 {
                     let key = if let Some(m) = &*PAK_MAIN_KEY_MOD {
                         let mut encrypted_key = [0; 128];
                         file.read_exact(&mut encrypted_key)?;
@@ -131,7 +137,7 @@ impl<F: Read + Seek> PakReader<F> {
                 }
 
                 let entries: Vec<PakEntry> = entries_buffer
-                    .chunks(0x30)
+                    .chunks(entry_size)
                     .enumerate()
                     .map(|(index, mut entry)| {
                         let hash = entry.read_u64()?;
